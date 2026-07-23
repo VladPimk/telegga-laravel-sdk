@@ -1,0 +1,33 @@
+{
+    "name": "telegga/laravel-sdk",
+    "description": "Laravel SDK for the Telegga API.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "laravel",
+        "notifications",
+        "telegram",
+        "telegga"
+    ],
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^11.0 || ^12.0 || ^13.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Telegga\\Laravel\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Telegga\\Laravel\\TeleggaServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
