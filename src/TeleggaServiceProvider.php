@@ -41,5 +41,9 @@ final class TeleggaServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../config/telegga.php' => config_path(path: 'telegga.php'),
         ], groups: 'telegga-config');
+
+        $this->publishesMigrations([
+            __DIR__.'/../database/migrations' => database_path(path: 'migrations'),
+        ], groups: 'telegga-migrations');
     }
 }
