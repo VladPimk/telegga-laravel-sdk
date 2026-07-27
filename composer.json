@@ -13,9 +13,19 @@
         "php": "^8.2",
         "illuminate/support": "^11.0 || ^12.0 || ^13.0"
     },
+    "require-dev": {
+        "laravel/pint": "^1.24",
+        "orchestra/testbench": "^9.0 || ^10.0 || ^11.0",
+        "pestphp/pest": "^3.8"
+    },
     "autoload": {
         "psr-4": {
             "Telegga\\Laravel\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Telegga\\Laravel\\Tests\\": "tests/"
         }
     },
     "extra": {
@@ -26,7 +36,17 @@
         }
     },
     "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        },
+        "platform": {
+            "php": "8.2.0"
+        },
         "sort-packages": true
+    },
+    "scripts": {
+        "format": "pint",
+        "test": "pest --compact"
     },
     "minimum-stability": "stable",
     "prefer-stable": true
