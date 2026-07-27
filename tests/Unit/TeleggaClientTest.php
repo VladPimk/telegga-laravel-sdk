@@ -24,7 +24,7 @@ it('подписывает запрос api ключом и возвращает
 
     $response = $client->get(uri: 'bots');
 
-    expect($response['data'][0]['bot_id'])->toBe('bot-1');
+    expect($response->object()->data[0]->bot_id)->toBe('bot-1');
 
     Http::assertSent(fn ($request): bool => $request->hasHeader(
         key: 'Authorization',

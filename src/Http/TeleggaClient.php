@@ -28,11 +28,10 @@ final class TeleggaClient
      * Выполнить GET-запрос.
      *
      * @param  array<string, mixed>  $query
-     * @return array<string, mixed>
      */
-    public function get(string $uri, array $query = []): array
+    public function get(string $uri, array $query = []): Response
     {
-        return $this->resolve(
+        return $this->ensureSuccessful(
             response: $this->execute(
                 request: fn (): Response => $this->request()->get(
                     url: $uri,
@@ -46,11 +45,10 @@ final class TeleggaClient
      * Выполнить POST-запрос.
      *
      * @param  array<string, mixed>  $data
-     * @return array<string, mixed>
      */
-    public function post(string $uri, array $data = []): array
+    public function post(string $uri, array $data = []): Response
     {
-        return $this->resolve(
+        return $this->ensureSuccessful(
             response: $this->execute(
                 request: fn (): Response => $this->request()->post(
                     url: $uri,
@@ -64,11 +62,10 @@ final class TeleggaClient
      * Выполнить PUT-запрос.
      *
      * @param  array<string, mixed>  $data
-     * @return array<string, mixed>
      */
-    public function put(string $uri, array $data = []): array
+    public function put(string $uri, array $data = []): Response
     {
-        return $this->resolve(
+        return $this->ensureSuccessful(
             response: $this->execute(
                 request: fn (): Response => $this->request()->put(
                     url: $uri,
@@ -82,11 +79,10 @@ final class TeleggaClient
      * Выполнить PATCH-запрос.
      *
      * @param  array<string, mixed>  $data
-     * @return array<string, mixed>
      */
-    public function patch(string $uri, array $data = []): array
+    public function patch(string $uri, array $data = []): Response
     {
-        return $this->resolve(
+        return $this->ensureSuccessful(
             response: $this->execute(
                 request: fn (): Response => $this->request()->patch(
                     url: $uri,
@@ -101,9 +97,9 @@ final class TeleggaClient
      *
      * @param  array<string, mixed>  $query
      */
-    public function delete(string $uri, array $query = []): void
+    public function delete(string $uri, array $query = []): Response
     {
-        $this->resolve(
+        return $this->ensureSuccessful(
             response: $this->execute(
                 request: fn (): Response => $this->request()
                     ->withQueryParameters(parameters: $query)
@@ -114,10 +110,8 @@ final class TeleggaClient
 
     /**
      * Загрузить файл.
-     *
-     * @return array<string, mixed>
      */
-    public function upload(string $uri, string $path): array
+    public function upload(string $uri, string $path): Response
     {
         if (! is_file($path) || ! is_readable($path)) {
             throw new InvalidArgumentException(message: 'Media file is not readable.');
@@ -143,7 +137,7 @@ final class TeleggaClient
             fclose(stream: $stream);
         }
 
-        return $this->resolve(response: $response);
+        return $this->ensureSuccessful(response: $response);
     }
 
     /**
@@ -184,22 +178,14 @@ final class TeleggaClient
     }
 
     /**
-     * Проверить и преобразовать HTTP-ответ.
-     *
-     * @return array<string, mixed>
+     * Проверить HTTP-ответ.
      */
-    private function resolve(Response $response): array
+    private function ensureSuccessful(Response $response): Response
     {
         if ($response->failed()) {
             throw TeleggaApiException::fromResponse(response: $response);
         }
 
-        if ($response->noContent()) {
-            return [];
-        }
-
-        $body = $response->json();
-
-        return is_array($body) ? $body : [];
+        return $response;
     }
 }

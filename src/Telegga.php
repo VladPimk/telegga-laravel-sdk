@@ -24,10 +24,8 @@ final class Telegga implements TeleggaInterface
      */
     public function getBots(): Collection
     {
-        $response = $this->client->get(uri: 'bots');
+        $response = $this->client->get(uri: 'bots')->object();
 
-        return collect($response['data'] ?? [])
-            ->values()
-            ->map(static fn (mixed $bot): object => (object) $bot);
+        return collect($response->data ?? [])->values();
     }
 }
