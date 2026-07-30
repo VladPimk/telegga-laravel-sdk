@@ -83,6 +83,34 @@ final class ConnectionContextResolver
     }
 
     /**
+     * Получить локальное подключение, пользователя Telegga и привязку к боту.
+     *
+     * @return object{
+     *     connection: TelegramConnectedUser,
+     *     user: object,
+     *     link: object
+     * }
+     */
+    public function resolveBot(string $uuid): object
+    {
+        $context = $this->resolveUser(uuid: $uuid);
+        $link = $this->findBotLink(user: $context->user);
+
+        if ($link === null) {
+            throw new ConnectionException(
+                message: 'Telegga connection has no bot link.',
+                connectionUuid: $context->connection->uuid,
+            );
+        }
+
+        return (object) [
+            'connection' => $context->connection,
+            'user' => $context->user,
+            'link' => $link,
+        ];
+    }
+
+    /**
      * Найти локальное подключение по UUID.
      */
     private function findConnection(string $uuid): TelegramConnectedUser
@@ -122,6 +150,34 @@ final class ConnectionContextResolver
             if (
                 is_object($link)
                 && ($link->status ?? null) === 'active'
+                && is_string($link->bot_id ?? null)
+                && $link->bot_id !== ''
+            ) {
+                return $link;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Найти доступную привязку пользователя к боту.
+     */
+    private function findBotLink(object $user): ?object
+    {
+        $activeLink = $this->findActiveLink(user: $user);
+
+        if ($activeLink !== null) {
+            return $activeLink;
+        }
+
+        if (! is_array($user->links ?? null)) {
+            return null;
+        }
+
+        foreach ($user->links as $link) {
+            if (
+                is_object($link)
                 && is_string($link->bot_id ?? null)
                 && $link->bot_id !== ''
             ) {

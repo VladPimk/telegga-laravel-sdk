@@ -57,6 +57,67 @@ final class UserService
     }
 
     /**
+     * Получить пользователя Telegga по идентификатору.
+     */
+    public function get(string $userId): object
+    {
+        return $this->ensureObject(
+            response: $this->client->get(
+                uri: 'users/'.rawurlencode($userId),
+            )->object(),
+        );
+    }
+
+    /**
+     * Обновить пользователя Telegga.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function update(string $userId, array $data): object
+    {
+        return $this->ensureObject(
+            response: $this->client->patch(
+                uri: 'users/'.rawurlencode($userId),
+                data: $data,
+            )->object(),
+        );
+    }
+
+    /**
+     * Удалить пользователя Telegga.
+     */
+    public function delete(string $userId): void
+    {
+        $this->client->delete(
+            uri: 'users/'.rawurlencode($userId),
+        );
+    }
+
+    /**
+     * Выпустить новый код подключения пользователя.
+     */
+    public function regenerateCode(string $userId, string $botId): object
+    {
+        return $this->ensureObject(
+            response: $this->client->post(
+                uri: 'users/'.rawurlencode($userId).'/regenerate-code',
+                data: ['bot_id' => $botId],
+            )->object(),
+        );
+    }
+
+    /**
+     * Отвязать пользователя от бота.
+     */
+    public function unlink(string $userId, string $botId): void
+    {
+        $this->client->delete(
+            uri: 'users/'.rawurlencode($userId).'/link',
+            query: ['bot_id' => $botId],
+        );
+    }
+
+    /**
      * Проверить объект ответа пользователя.
      */
     private function ensureObject(mixed $response): object

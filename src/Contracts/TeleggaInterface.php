@@ -24,6 +24,33 @@ interface TeleggaInterface
     public function retryConnection(string $uuid): object;
 
     /**
+     * Получить подключённого пользователя.
+     */
+    public function getConnection(string $uuid): object;
+
+    /**
+     * Обновить подключённого пользователя.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function updateConnection(string $uuid, array $data): object;
+
+    /**
+     * Удалить подключённого пользователя.
+     */
+    public function deleteConnection(string $uuid): void;
+
+    /**
+     * Выпустить новый код подключения.
+     */
+    public function regenerateConnectionCode(string $uuid): object;
+
+    /**
+     * Отвязать подключённого пользователя от бота.
+     */
+    public function unlinkConnection(string $uuid): void;
+
+    /**
      * Отправить сообщение.
      *
      * @param  array<string, mixed>  $data

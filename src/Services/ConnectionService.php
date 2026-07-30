@@ -8,6 +8,7 @@ use Illuminate\Database\QueryException;
 use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Models\TelegramConnectedUser;
+use Telegga\Laravel\Resolvers\ConnectionContextResolver;
 use Throwable;
 
 final class ConnectionService
@@ -18,6 +19,7 @@ final class ConnectionService
     public function __construct(
         private readonly BotService $bots,
         private readonly UserService $users,
+        private readonly ConnectionContextResolver $contexts,
     ) {}
 
     /**
@@ -83,6 +85,163 @@ final class ConnectionService
     }
 
     /**
+     * Получить подключённого пользователя Telegga.
+     */
+    public function get(string $uuid): object
+    {
+        $context = $this->contexts->resolveUser(uuid: $uuid);
+        $userId = $this->getUserId(user: $context->user, uuid: $uuid);
+
+        try {
+            return $this->users->get(userId: $userId);
+        } catch (TeleggaApiException $exception) {
+            throw new ConnectionException(
+                message: $exception->getMessage(),
+                connectionUuid: $uuid,
+                previous: $exception,
+            );
+        }
+    }
+
+    /**
+     * Обновить подключённого пользователя Telegga.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function update(string $uuid, array $data): object
+    {
+        if ($data === []) {
+            throw new ConnectionException(
+                message: 'Connection update data cannot be empty.',
+                connectionUuid: $uuid,
+            );
+        }
+
+        $context = $this->contexts->resolveUser(uuid: $uuid);
+        $userId = $this->getUserId(user: $context->user, uuid: $uuid);
+
+        try {
+            $response = $this->users->update(
+                userId: $userId,
+                data: $data,
+            );
+        } catch (TeleggaApiException $exception) {
+            throw new ConnectionException(
+                message: $exception->getMessage(),
+                connectionUuid: $uuid,
+                previous: $exception,
+            );
+        }
+
+        $this->synchronize(
+            connection: $context->connection,
+            response: $response,
+            data: $data,
+        );
+
+        return $response;
+    }
+
+    /**
+     * Удалить подключённого пользователя Telegga и локальную запись.
+     */
+    public function delete(string $uuid): void
+    {
+        $context = $this->contexts->resolveUser(uuid: $uuid);
+        $userId = $this->getUserId(user: $context->user, uuid: $uuid);
+
+        try {
+            $this->users->delete(userId: $userId);
+        } catch (TeleggaApiException $exception) {
+            throw new ConnectionException(
+                message: $exception->getMessage(),
+                connectionUuid: $uuid,
+                previous: $exception,
+            );
+        }
+
+        try {
+            $deleted = $context->connection->delete();
+        } catch (Throwable $exception) {
+            throw new ConnectionException(
+                message: 'Local Telegga connection could not be deleted.',
+                connectionUuid: $uuid,
+                previous: $exception,
+            );
+        }
+
+        if ($deleted !== true) {
+            throw new ConnectionException(
+                message: 'Local Telegga connection could not be deleted.',
+                connectionUuid: $uuid,
+            );
+        }
+    }
+
+    /**
+     * Выпустить новый код подключения пользователя.
+     */
+    public function regenerateCode(string $uuid): object
+    {
+        $context = $this->contexts->resolveBot(uuid: $uuid);
+        $userId = $this->getUserId(user: $context->user, uuid: $uuid);
+
+        try {
+            return $this->users->regenerateCode(
+                userId: $userId,
+                botId: $context->link->bot_id,
+            );
+        } catch (TeleggaApiException $exception) {
+            throw new ConnectionException(
+                message: $exception->getMessage(),
+                connectionUuid: $uuid,
+                previous: $exception,
+            );
+        }
+    }
+
+    /**
+     * Отвязать подключённого пользователя от бота.
+     */
+    public function unlink(string $uuid): void
+    {
+        $context = $this->contexts->resolveBot(uuid: $uuid);
+        $userId = $this->getUserId(user: $context->user, uuid: $uuid);
+
+        try {
+            $this->users->unlink(
+                userId: $userId,
+                botId: $context->link->bot_id,
+            );
+        } catch (TeleggaApiException $exception) {
+            throw new ConnectionException(
+                message: $exception->getMessage(),
+                connectionUuid: $uuid,
+                previous: $exception,
+            );
+        }
+
+        try {
+            $updated = $context->connection->update([
+                'is_connected' => false,
+            ]);
+        } catch (Throwable $exception) {
+            throw new ConnectionException(
+                message: 'Local Telegga connection state could not be updated.',
+                connectionUuid: $uuid,
+                previous: $exception,
+            );
+        }
+
+        if (! $updated) {
+            throw new ConnectionException(
+                message: 'Local Telegga connection state could not be updated.',
+                connectionUuid: $uuid,
+            );
+        }
+    }
+
+    /**
      * Отправить локальное подключение в Telegga.
      */
     private function send(TelegramConnectedUser $connection): object
@@ -134,5 +293,73 @@ final class ConnectionService
         }
 
         return $response;
+    }
+
+    /**
+     * Получить идентификатор пользователя Telegga.
+     */
+    private function getUserId(object $user, string $uuid): string
+    {
+        $userId = $user->user_id ?? null;
+
+        if (! is_string($userId) || trim($userId) === '') {
+            throw new ConnectionException(
+                message: 'Telegga user response does not contain user_id.',
+                connectionUuid: $uuid,
+            );
+        }
+
+        return $userId;
+    }
+
+    /**
+     * Синхронизировать локальные данные подключения.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function synchronize(
+        TelegramConnectedUser $connection,
+        object $response,
+        array $data,
+    ): void {
+        $attributes = [];
+        $displayName = $response->display_name ?? $data['display_name'] ?? null;
+
+        if (is_string($displayName)) {
+            $attributes['name'] = $displayName;
+        }
+
+        if (property_exists($response, 'email')) {
+            $email = $response->email;
+        } else {
+            $email = $data['email'] ?? null;
+        }
+
+        if ($email === null || is_string($email)) {
+            if (property_exists($response, 'email') || array_key_exists('email', $data)) {
+                $attributes['email'] = $email === '' ? null : $email;
+            }
+        }
+
+        if ($attributes === []) {
+            return;
+        }
+
+        try {
+            $updated = $connection->update(attributes: $attributes);
+        } catch (Throwable $exception) {
+            throw new ConnectionException(
+                message: 'Local Telegga connection data could not be updated.',
+                connectionUuid: $connection->uuid,
+                previous: $exception,
+            );
+        }
+
+        if (! $updated) {
+            throw new ConnectionException(
+                message: 'Local Telegga connection data could not be updated.',
+                connectionUuid: $connection->uuid,
+            );
+        }
     }
 }

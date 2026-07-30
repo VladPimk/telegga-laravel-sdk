@@ -48,6 +48,51 @@ final class Telegga implements TeleggaInterface
     }
 
     /**
+     * Получить подключённого пользователя.
+     */
+    public function getConnection(string $uuid): object
+    {
+        return $this->connections->get(uuid: $uuid);
+    }
+
+    /**
+     * Обновить подключённого пользователя.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function updateConnection(string $uuid, array $data): object
+    {
+        return $this->connections->update(
+            uuid: $uuid,
+            data: $data,
+        );
+    }
+
+    /**
+     * Удалить подключённого пользователя.
+     */
+    public function deleteConnection(string $uuid): void
+    {
+        $this->connections->delete(uuid: $uuid);
+    }
+
+    /**
+     * Выпустить новый код подключения.
+     */
+    public function regenerateConnectionCode(string $uuid): object
+    {
+        return $this->connections->regenerateCode(uuid: $uuid);
+    }
+
+    /**
+     * Отвязать подключённого пользователя от бота.
+     */
+    public function unlinkConnection(string $uuid): void
+    {
+        $this->connections->unlink(uuid: $uuid);
+    }
+
+    /**
      * Отправить сообщение.
      *
      * @param  array<string, mixed>  $data
