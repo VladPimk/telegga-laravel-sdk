@@ -16,6 +16,7 @@ use Telegga\Laravel\Services\GroupService;
 use Telegga\Laravel\Services\MediaService;
 use Telegga\Laravel\Services\MessageService;
 use Telegga\Laravel\Services\UserService;
+use Telegga\Laravel\Services\WebhookService;
 
 final class TeleggaServiceProvider extends ServiceProvider
 {
@@ -45,6 +46,7 @@ final class TeleggaServiceProvider extends ServiceProvider
         $this->app->singleton(MediaService::class);
         $this->app->singleton(GroupService::class);
         $this->app->singleton(BroadcastService::class);
+        $this->app->singleton(WebhookService::class);
         $this->app->singleton(ConnectionContextResolver::class);
         $this->app->singleton(TeleggaInterface::class, Telegga::class);
     }
@@ -54,6 +56,10 @@ final class TeleggaServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->loadRoutesFrom(
+            path: __DIR__.'/../routes/webhooks.php',
+        );
+
         $this->publishes([
             __DIR__.'/../config/telegga.php' => config_path(path: 'telegga.php'),
         ], groups: 'telegga-config');
