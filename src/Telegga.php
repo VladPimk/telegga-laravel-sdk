@@ -9,6 +9,7 @@ use Illuminate\Support\Collection;
 use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Services\BotService;
 use Telegga\Laravel\Services\ConnectionService;
+use Telegga\Laravel\Services\GroupService;
 use Telegga\Laravel\Services\MediaService;
 use Telegga\Laravel\Services\MessageService;
 
@@ -22,6 +23,7 @@ final class Telegga implements TeleggaInterface
         private readonly BotService $bots,
         private readonly MessageService $messages,
         private readonly MediaService $media,
+        private readonly GroupService $groups,
     ) {}
 
     /**
@@ -90,6 +92,106 @@ final class Telegga implements TeleggaInterface
     public function unlinkConnection(string $uuid): void
     {
         $this->connections->unlink(uuid: $uuid);
+    }
+
+    /**
+     * Создать группу для бота подключения.
+     */
+    public function createGroup(
+        string $uuid,
+        string $name,
+        ?string $description = null,
+    ): object {
+        return $this->groups->create(
+            uuid: $uuid,
+            name: $name,
+            description: $description,
+        );
+    }
+
+    /**
+     * Получить группы бота подключения.
+     *
+     * @return Collection<int, object>
+     */
+    public function getGroups(string $uuid): Collection
+    {
+        return $this->groups->getAll(uuid: $uuid);
+    }
+
+    /**
+     * Получить группу.
+     */
+    public function getGroup(string $groupId): object
+    {
+        return $this->groups->get(groupId: $groupId);
+    }
+
+    /**
+     * Обновить группу.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function updateGroup(string $groupId, array $data): object
+    {
+        return $this->groups->update(
+            groupId: $groupId,
+            data: $data,
+        );
+    }
+
+    /**
+     * Удалить группу.
+     */
+    public function deleteGroup(string $groupId): void
+    {
+        $this->groups->delete(groupId: $groupId);
+    }
+
+    /**
+     * Добавить подключение в группу через маршрут пользователя.
+     */
+    public function addConnectionToGroup(string $uuid, string $groupId): object
+    {
+        return $this->groups->addConnection(
+            uuid: $uuid,
+            groupId: $groupId,
+        );
+    }
+
+    /**
+     * Удалить подключение из группы через маршрут пользователя.
+     */
+    public function removeConnectionFromGroup(string $uuid, string $groupId): void
+    {
+        $this->groups->removeConnection(
+            uuid: $uuid,
+            groupId: $groupId,
+        );
+    }
+
+    /**
+     * Добавить подключения в группу через групповой маршрут.
+     *
+     * @param  array<int, string>  $uuids
+     */
+    public function addGroupMembers(string $groupId, array $uuids): object
+    {
+        return $this->groups->addMembers(
+            groupId: $groupId,
+            uuids: $uuids,
+        );
+    }
+
+    /**
+     * Удалить подключение из группы через групповой маршрут.
+     */
+    public function removeGroupMember(string $groupId, string $uuid): void
+    {
+        $this->groups->removeMember(
+            groupId: $groupId,
+            uuid: $uuid,
+        );
     }
 
     /**

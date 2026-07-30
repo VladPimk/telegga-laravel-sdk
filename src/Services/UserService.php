@@ -118,6 +118,29 @@ final class UserService
     }
 
     /**
+     * Добавить пользователя Telegga в группу.
+     */
+    public function addToGroup(string $userId, string $groupId): object
+    {
+        return $this->ensureObject(
+            response: $this->client->post(
+                uri: 'users/'.rawurlencode($userId).'/groups',
+                data: ['group_id' => $groupId],
+            )->object(),
+        );
+    }
+
+    /**
+     * Удалить пользователя Telegga из группы.
+     */
+    public function removeFromGroup(string $userId, string $groupId): void
+    {
+        $this->client->delete(
+            uri: 'users/'.rawurlencode($userId).'/groups/'.rawurlencode($groupId),
+        );
+    }
+
+    /**
      * Проверить объект ответа пользователя.
      */
     private function ensureObject(mixed $response): object

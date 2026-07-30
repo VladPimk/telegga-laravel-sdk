@@ -51,6 +51,61 @@ interface TeleggaInterface
     public function unlinkConnection(string $uuid): void;
 
     /**
+     * Создать группу для бота подключения.
+     */
+    public function createGroup(
+        string $uuid,
+        string $name,
+        ?string $description = null,
+    ): object;
+
+    /**
+     * Получить группы бота подключения.
+     *
+     * @return Collection<int, object>
+     */
+    public function getGroups(string $uuid): Collection;
+
+    /**
+     * Получить группу.
+     */
+    public function getGroup(string $groupId): object;
+
+    /**
+     * Обновить группу.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function updateGroup(string $groupId, array $data): object;
+
+    /**
+     * Удалить группу.
+     */
+    public function deleteGroup(string $groupId): void;
+
+    /**
+     * Добавить подключение в группу через маршрут пользователя.
+     */
+    public function addConnectionToGroup(string $uuid, string $groupId): object;
+
+    /**
+     * Удалить подключение из группы через маршрут пользователя.
+     */
+    public function removeConnectionFromGroup(string $uuid, string $groupId): void;
+
+    /**
+     * Добавить подключения в группу через групповой маршрут.
+     *
+     * @param  array<int, string>  $uuids
+     */
+    public function addGroupMembers(string $groupId, array $uuids): object;
+
+    /**
+     * Удалить подключение из группы через групповой маршрут.
+     */
+    public function removeGroupMember(string $groupId, string $uuid): void;
+
+    /**
      * Отправить сообщение.
      *
      * @param  array<string, mixed>  $data
