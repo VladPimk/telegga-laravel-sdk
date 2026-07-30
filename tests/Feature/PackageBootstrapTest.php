@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use Telegga\Laravel\Contracts\TeleggaInterface;
+use Telegga\Laravel\Resolvers\ConnectionContextResolver;
 use Telegga\Laravel\Services\BotService;
 use Telegga\Laravel\Services\ConnectionService;
+use Telegga\Laravel\Services\UserService;
 use Telegga\Laravel\Telegga;
 use Telegga\Laravel\TeleggaServiceProvider;
 
@@ -24,7 +26,11 @@ it('регистрирует внутренние сервисы как singleto
     expect(app(BotService::class))
         ->toBe(app(BotService::class))
         ->and(app(ConnectionService::class))
-        ->toBe(app(ConnectionService::class));
+        ->toBe(app(ConnectionService::class))
+        ->and(app(UserService::class))
+        ->toBe(app(UserService::class))
+        ->and(app(ConnectionContextResolver::class))
+        ->toBe(app(ConnectionContextResolver::class));
 });
 
 it('публикует миграции пакета', function (): void {
