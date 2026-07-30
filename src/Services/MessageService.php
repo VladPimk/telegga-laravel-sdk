@@ -6,7 +6,6 @@ namespace Telegga\Laravel\Services;
 
 use DateTimeInterface;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 use Telegga\Laravel\Exceptions\MessageException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Http\TeleggaClient;
@@ -23,48 +22,34 @@ final class MessageService
     ) {}
 
     /**
-     * Отправить текстовое сообщение.
+     * Отправить сообщение.
      *
-     * @param  array<int, array<int, array{text: string, url: string}>>  $buttons
+     * @param  array<string, mixed>  $data
      */
-    public function sendText(
+    public function send(
         string $uuid,
-        string $text,
-        ?string $parseMode = null,
-        array $buttons = [],
-        bool $disableWebPagePreview = false,
-        bool $disableNotification = false,
+        string $type,
+        array $data = [],
     ): object {
-        $this->validateTextMessage(
-            uuid: $uuid,
-            text: $text,
-            parseMode: $parseMode,
-            buttons: $buttons,
-        );
+        if (trim($uuid) === '') {
+            throw new MessageException(
+                message: 'Connection UUID cannot be empty.',
+                connectionUuid: $uuid,
+            );
+        }
+
+        if (trim($type) === '') {
+            throw new MessageException(
+                message: 'Message type cannot be empty.',
+                connectionUuid: $uuid,
+            );
+        }
 
         $context = $this->connections->resolve(uuid: $uuid);
-        $data = [
-            'external_id' => $context->connection->uuid,
-            'bot_id' => $context->link->bot_id,
-            'type' => 'text',
-            'text' => $text,
-        ];
-
-        if ($parseMode !== null) {
-            $data['parse_mode'] = $parseMode;
-        }
-
-        if ($buttons !== []) {
-            $data['buttons'] = $buttons;
-        }
-
-        if ($disableWebPagePreview) {
-            $data['disable_web_page_preview'] = true;
-        }
-
-        if ($disableNotification) {
-            $data['disable_notification'] = true;
-        }
+        unset($data['user_id']);
+        $data['external_id'] = $context->connection->uuid;
+        $data['bot_id'] = $context->link->bot_id;
+        $data['type'] = trim($type);
 
         try {
             $response = $this->ensureObject(
@@ -178,70 +163,6 @@ final class MessageService
                 connectionUuid: $uuid,
                 previous: $exception,
             );
-        }
-    }
-
-    /**
-     * Проверить данные текстового сообщения.
-     *
-     * @param  array<int, array<int, array{text: string, url: string}>>  $buttons
-     */
-    private function validateTextMessage(
-        string $uuid,
-        string $text,
-        ?string $parseMode,
-        array $buttons,
-    ): void {
-        if (trim($text) === '') {
-            throw new MessageException(
-                message: 'Message text cannot be empty.',
-                connectionUuid: $uuid,
-            );
-        }
-
-        if (Str::length(value: $text) > 4096) {
-            throw new MessageException(
-                message: 'Message text cannot exceed 4096 characters.',
-                connectionUuid: $uuid,
-            );
-        }
-
-        if ($parseMode !== null && ! in_array($parseMode, ['HTML', 'MarkdownV2'], true)) {
-            throw new MessageException(
-                message: 'Message parse mode is invalid.',
-                connectionUuid: $uuid,
-            );
-        }
-
-        if (count($buttons) > 10) {
-            throw new MessageException(
-                message: 'Message buttons cannot exceed 10 rows.',
-                connectionUuid: $uuid,
-            );
-        }
-
-        foreach ($buttons as $row) {
-            if (! is_array($row) || $row === [] || count($row) > 8) {
-                throw new MessageException(
-                    message: 'Message button row must contain between 1 and 8 buttons.',
-                    connectionUuid: $uuid,
-                );
-            }
-
-            foreach ($row as $button) {
-                if (
-                    ! is_array($button)
-                    || ! is_string($button['text'] ?? null)
-                    || trim($button['text']) === ''
-                    || ! is_string($button['url'] ?? null)
-                    || trim($button['url']) === ''
-                ) {
-                    throw new MessageException(
-                        message: 'Message button must contain non-empty text and url.',
-                        connectionUuid: $uuid,
-                    );
-                }
-            }
         }
     }
 

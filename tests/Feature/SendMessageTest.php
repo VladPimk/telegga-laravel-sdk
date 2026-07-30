@@ -31,7 +31,10 @@ afterEach(function (): void {
     Schema::dropIfExists('users');
 });
 
-it('отправляет текстовое сообщение через активную привязку', function (): void {
+it('передаёт тип и данные сообщения в единый маршрут api', function (
+    string $type,
+    array $data,
+): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -52,25 +55,14 @@ it('отправляет текстовое сообщение через акт
         'api.telegga.net/api/v1/messages' => Http::response([
             'message_id' => 'message-1',
             'status' => 'queued',
-            'created_at' => '2026-07-30T10:00:00Z',
             'new_api_field' => 'new-value',
         ], 202),
     ]);
 
-    $result = app(TeleggaInterface::class)->sendText(
+    $result = app(TeleggaInterface::class)->sendMessage(
         uuid: $connection->uuid,
-        text: 'Заказ <b>#1234</b> отправлен',
-        parseMode: 'HTML',
-        buttons: [
-            [
-                [
-                    'text' => 'Отследить',
-                    'url' => 'https://example.com/track/1234',
-                ],
-            ],
-        ],
-        disableWebPagePreview: true,
-        disableNotification: true,
+        type: $type,
+        data: $data,
     );
 
     expect($result)
@@ -80,36 +72,87 @@ it('отправляет текстовое сообщение через акт
         ->and($result->status)
         ->toBe('queued')
         ->and($result->new_api_field)
-        ->toBe('new-value')
-        ->and(TelegramConnectedUser::query()->count())
-        ->toBe(1);
+        ->toBe('new-value');
 
-    Http::assertSent(function (Request $request) use ($connection): bool {
+    Http::assertSent(function (Request $request) use ($connection, $data, $type): bool {
         return $request->method() === 'POST'
             && $request->url() === 'https://api.telegga.net/api/v1/messages'
             && $request->data() === [
+                ...$data,
                 'external_id' => $connection->uuid,
                 'bot_id' => 'bot-active',
-                'type' => 'text',
-                'text' => 'Заказ <b>#1234</b> отправлен',
-                'parse_mode' => 'HTML',
-                'buttons' => [
-                    [
-                        [
-                            'text' => 'Отследить',
-                            'url' => 'https://example.com/track/1234',
-                        ],
-                    ],
-                ],
-                'disable_web_page_preview' => true,
-                'disable_notification' => true,
+                'type' => $type,
             ];
     });
 
     Http::assertSentCount(2);
-});
+})->with([
+    'text' => [
+        'text',
+        [
+            'text' => 'Заказ <b>#1234</b> отправлен',
+            'parse_mode' => 'HTML',
+            'buttons' => [
+                [
+                    [
+                        'text' => 'Отследить',
+                        'url' => 'https://example.com/track/1234',
+                    ],
+                ],
+            ],
+            'disable_web_page_preview' => true,
+            'disable_notification' => true,
+        ],
+    ],
+    'photo' => [
+        'photo',
+        [
+            'media_id' => 'media-photo',
+            'text' => 'Подпись',
+        ],
+    ],
+    'video' => [
+        'video',
+        ['media_id' => 'media-video'],
+    ],
+    'document' => [
+        'document',
+        ['media_id' => 'media-document'],
+    ],
+    'audio' => [
+        'audio',
+        ['media_id' => 'media-audio'],
+    ],
+    'voice' => [
+        'voice',
+        ['media_id' => 'media-voice'],
+    ],
+    'animation' => [
+        'animation',
+        ['media_id' => 'media-animation'],
+    ],
+    'sticker' => [
+        'sticker',
+        ['media_id' => 'media-sticker'],
+    ],
+    'location' => [
+        'location',
+        [
+            'latitude' => 50.4501,
+            'longitude' => 30.5234,
+        ],
+    ],
+    'contact' => [
+        'contact',
+        [
+            'phone_number' => '+380501234567',
+            'first_name' => 'Иван',
+            'last_name' => 'Петров',
+        ],
+    ],
+]);
 
-it('не отправляет необязательные параметры с начальными значениями', function (): void {
+it('не позволяет переопределить служебные поля сообщения', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -133,9 +176,16 @@ it('не отправляет необязательные параметры с
         ], 202),
     ]);
 
-    app(TeleggaInterface::class)->sendText(
+    app(TeleggaInterface::class)->sendMessage(
         uuid: $connection->uuid,
-        text: 'Сообщение',
+        type: 'photo',
+        data: [
+            'external_id' => 'foreign-external-id',
+            'user_id' => 'foreign-user-id',
+            'bot_id' => 'foreign-bot',
+            'type' => 'contact',
+            'media_id' => 'media-photo',
+        ],
     );
 
     Http::assertSent(function (Request $request) use ($connection): bool {
@@ -144,31 +194,26 @@ it('не отправляет необязательные параметры с
             && $request->data() === [
                 'external_id' => $connection->uuid,
                 'bot_id' => 'bot-active',
-                'type' => 'text',
-                'text' => 'Сообщение',
+                'type' => 'photo',
+                'media_id' => 'media-photo',
             ];
     });
 });
 
-it('отклоняет некорректные параметры текстового сообщения', function (
-    array $arguments,
-    string $message,
-): void {
-    $connection = TelegramConnectedUser::query()->create([
-        'name' => 'Иван',
-        'is_created' => true,
-    ]);
-    $arguments['uuid'] = $connection->uuid;
-
+it('не отправляет сообщение с пустым uuid подключения', function (): void {
     Http::preventStrayRequests();
 
     try {
-        app(TeleggaInterface::class)->sendText(...$arguments);
+        app(TeleggaInterface::class)->sendMessage(
+            uuid: '   ',
+            type: 'text',
+            data: ['text' => 'Сообщение'],
+        );
     } catch (MessageException $exception) {
         expect($exception->getMessage())
-            ->toBe($message)
+            ->toBe('Connection UUID cannot be empty.')
             ->and($exception->connectionUuid)
-            ->toBe($connection->uuid);
+            ->toBe('   ');
 
         Http::assertNothingSent();
 
@@ -176,59 +221,29 @@ it('отклоняет некорректные параметры тексто�
     }
 
     test()->fail('Ожидалось исключение MessageException.');
-})->with([
-    'пустой текст' => [
-        ['text' => '   '],
-        'Message text cannot be empty.',
-    ],
-    'слишком длинный текст' => [
-        ['text' => str_repeat('я', 4097)],
-        'Message text cannot exceed 4096 characters.',
-    ],
-    'неизвестный parse mode' => [
-        ['text' => 'Сообщение', 'parseMode' => 'Markdown'],
-        'Message parse mode is invalid.',
-    ],
-    'слишком много рядов кнопок' => [
-        [
-            'text' => 'Сообщение',
-            'buttons' => array_fill(
-                start_index: 0,
-                count: 11,
-                value: [['text' => 'Кнопка', 'url' => 'https://example.com']],
-            ),
-        ],
-        'Message buttons cannot exceed 10 rows.',
-    ],
-    'пустой ряд кнопок' => [
-        ['text' => 'Сообщение', 'buttons' => [[]]],
-        'Message button row must contain between 1 and 8 buttons.',
-    ],
-    'слишком много кнопок в ряду' => [
-        [
-            'text' => 'Сообщение',
-            'buttons' => [
-                array_fill(
-                    start_index: 0,
-                    count: 9,
-                    value: ['text' => 'Кнопка', 'url' => 'https://example.com'],
-                ),
-            ],
-        ],
-        'Message button row must contain between 1 and 8 buttons.',
-    ],
-    'кнопка без ссылки' => [
-        [
-            'text' => 'Сообщение',
-            'buttons' => [
-                [
-                    ['text' => 'Кнопка'],
-                ],
-            ],
-        ],
-        'Message button must contain non-empty text and url.',
-    ],
-]);
+});
+
+it('не отправляет сообщение с пустым типом', function (): void {
+    Http::preventStrayRequests();
+
+    try {
+        app(TeleggaInterface::class)->sendMessage(
+            uuid: 'connection-uuid',
+            type: '   ',
+        );
+    } catch (MessageException $exception) {
+        expect($exception->getMessage())
+            ->toBe('Message type cannot be empty.')
+            ->and($exception->connectionUuid)
+            ->toBe('connection-uuid');
+
+        Http::assertNothingSent();
+
+        return;
+    }
+
+    test()->fail('Ожидалось исключение MessageException.');
+});
 
 it('не отправляет сообщение без активной привязки', function (): void {
     $connection = TelegramConnectedUser::query()->create([
@@ -251,9 +266,10 @@ it('не отправляет сообщение без активной при�
     ]);
 
     try {
-        app(TeleggaInterface::class)->sendText(
+        app(TeleggaInterface::class)->sendMessage(
             uuid: $connection->uuid,
-            text: 'Сообщение',
+            type: 'text',
+            data: ['text' => 'Сообщение'],
         );
     } catch (ConnectionException $exception) {
         expect($exception->connectionUuid)
@@ -294,9 +310,10 @@ it('скрывает ошибку api при отправке сообщения
     ]);
 
     try {
-        app(TeleggaInterface::class)->sendText(
+        app(TeleggaInterface::class)->sendMessage(
             uuid: $connection->uuid,
-            text: 'Сообщение',
+            type: 'text',
+            data: ['text' => 'Сообщение'],
         );
     } catch (MessageException $exception) {
         expect($exception->connectionUuid)
@@ -339,9 +356,10 @@ it('отклоняет успешный ответ сообщения с нек�
     ]);
 
     try {
-        app(TeleggaInterface::class)->sendText(
+        app(TeleggaInterface::class)->sendMessage(
             uuid: $connection->uuid,
-            text: 'Сообщение',
+            type: 'text',
+            data: ['text' => 'Сообщение'],
         );
     } catch (MessageException $exception) {
         expect($exception->connectionUuid)

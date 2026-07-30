@@ -48,25 +48,19 @@ final class Telegga implements TeleggaInterface
     }
 
     /**
-     * Отправить текстовое сообщение.
+     * Отправить сообщение.
      *
-     * @param  array<int, array<int, array{text: string, url: string}>>  $buttons
+     * @param  array<string, mixed>  $data
      */
-    public function sendText(
+    public function sendMessage(
         string $uuid,
-        string $text,
-        ?string $parseMode = null,
-        array $buttons = [],
-        bool $disableWebPagePreview = false,
-        bool $disableNotification = false,
+        string $type,
+        array $data = [],
     ): object {
-        return $this->messages->sendText(
+        return $this->messages->send(
             uuid: $uuid,
-            text: $text,
-            parseMode: $parseMode,
-            buttons: $buttons,
-            disableWebPagePreview: $disableWebPagePreview,
-            disableNotification: $disableNotification,
+            type: $type,
+            data: $data,
         );
     }
 

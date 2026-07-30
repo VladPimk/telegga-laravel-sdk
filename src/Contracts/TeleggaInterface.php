@@ -24,17 +24,14 @@ interface TeleggaInterface
     public function retryConnection(string $uuid): object;
 
     /**
-     * Отправить текстовое сообщение.
+     * Отправить сообщение.
      *
-     * @param  array<int, array<int, array{text: string, url: string}>>  $buttons
+     * @param  array<string, mixed>  $data
      */
-    public function sendText(
+    public function sendMessage(
         string $uuid,
-        string $text,
-        ?string $parseMode = null,
-        array $buttons = [],
-        bool $disableWebPagePreview = false,
-        bool $disableNotification = false,
+        string $type,
+        array $data = [],
     ): object;
 
     /**
