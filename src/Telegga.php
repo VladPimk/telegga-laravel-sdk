@@ -8,6 +8,7 @@ use DateTimeInterface;
 use Illuminate\Support\Collection;
 use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Services\BotService;
+use Telegga\Laravel\Services\BroadcastService;
 use Telegga\Laravel\Services\ConnectionService;
 use Telegga\Laravel\Services\GroupService;
 use Telegga\Laravel\Services\MediaService;
@@ -24,6 +25,7 @@ final class Telegga implements TeleggaInterface
         private readonly MessageService $messages,
         private readonly MediaService $media,
         private readonly GroupService $groups,
+        private readonly BroadcastService $broadcasts,
     ) {}
 
     /**
@@ -192,6 +194,41 @@ final class Telegga implements TeleggaInterface
             groupId: $groupId,
             uuid: $uuid,
         );
+    }
+
+    /**
+     * Запустить рассылку.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function startBroadcast(
+        string $uuid,
+        string $type,
+        array $data = [],
+        ?string $groupId = null,
+    ): object {
+        return $this->broadcasts->start(
+            uuid: $uuid,
+            type: $type,
+            data: $data,
+            groupId: $groupId,
+        );
+    }
+
+    /**
+     * Получить прогресс рассылки.
+     */
+    public function getBroadcast(string $broadcastId): object
+    {
+        return $this->broadcasts->get(broadcastId: $broadcastId);
+    }
+
+    /**
+     * Отменить рассылку.
+     */
+    public function cancelBroadcast(string $broadcastId): object
+    {
+        return $this->broadcasts->cancel(broadcastId: $broadcastId);
     }
 
     /**

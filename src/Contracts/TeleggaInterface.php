@@ -106,6 +106,28 @@ interface TeleggaInterface
     public function removeGroupMember(string $groupId, string $uuid): void;
 
     /**
+     * Запустить рассылку.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function startBroadcast(
+        string $uuid,
+        string $type,
+        array $data = [],
+        ?string $groupId = null,
+    ): object;
+
+    /**
+     * Получить прогресс рассылки.
+     */
+    public function getBroadcast(string $broadcastId): object;
+
+    /**
+     * Отменить рассылку.
+     */
+    public function cancelBroadcast(string $broadcastId): object;
+
+    /**
      * Отправить сообщение.
      *
      * @param  array<string, mixed>  $data
