@@ -369,6 +369,10 @@ it('отклоняет успешный ответ api с некорректны
 
         expect($exception->connectionUuid)
             ->toBe($connection->uuid)
+            ->and($exception->getPrevious())
+            ->toBeInstanceOf(TeleggaApiException::class)
+            ->and($exception->getPrevious()?->apiCode)
+            ->toBe('invalid_response')
             ->and($connection->is_created)
             ->toBeFalse();
 

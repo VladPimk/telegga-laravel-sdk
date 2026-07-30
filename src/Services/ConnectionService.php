@@ -7,7 +7,6 @@ namespace Telegga\Laravel\Services;
 use Illuminate\Database\QueryException;
 use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
-use Telegga\Laravel\Http\TeleggaClient;
 use Telegga\Laravel\Models\TelegramConnectedUser;
 use Throwable;
 
@@ -17,8 +16,8 @@ final class ConnectionService
      * Создать сервис подключений.
      */
     public function __construct(
-        private readonly TeleggaClient $client,
         private readonly BotService $bots,
+        private readonly UserService $users,
     ) {}
 
     /**
@@ -91,36 +90,28 @@ final class ConnectionService
         try {
             $bot = $this->bots->getAll()->first();
 
-            if (! is_object($bot) || ! isset($bot->bot_id)) {
+            if (
+                ! is_object($bot)
+                || ! is_string($bot->bot_id ?? null)
+                || $bot->bot_id === ''
+            ) {
                 throw new ConnectionException(
                     message: 'No Telegga bots are available.',
                     connectionUuid: $connection->uuid,
                 );
             }
 
-            $data = [
-                'external_id' => $connection->uuid,
-                'bot_id' => $bot->bot_id,
-                'display_name' => $connection->name,
-            ];
-
-            if ($connection->email !== null) {
-                $data['email'] = $connection->email;
-            }
-
-            $response = $this->client->post(uri: 'users', data: $data)->object();
+            $response = $this->users->create(
+                externalId: $connection->uuid,
+                botId: $bot->bot_id,
+                displayName: $connection->name,
+                email: $connection->email,
+            );
         } catch (TeleggaApiException $exception) {
             throw new ConnectionException(
                 message: $exception->getMessage(),
                 connectionUuid: $connection->uuid,
                 previous: $exception,
-            );
-        }
-
-        if (! is_object($response)) {
-            throw new ConnectionException(
-                message: 'Telegga returned an invalid connection response.',
-                connectionUuid: $connection->uuid,
             );
         }
 
