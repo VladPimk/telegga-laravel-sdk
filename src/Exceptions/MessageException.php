@@ -14,6 +14,7 @@ final class MessageException extends TeleggaException
     public function __construct(
         string $message,
         public readonly ?string $connectionUuid = null,
+        public readonly ?string $messageId = null,
         ?Throwable $previous = null,
     ) {
         parent::__construct(message: $message, previous: $previous);

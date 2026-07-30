@@ -68,6 +68,14 @@ final class Telegga implements TeleggaInterface
     }
 
     /**
+     * Получить сообщение по идентификатору.
+     */
+    public function getMessage(string $messageId): object
+    {
+        return $this->messages->get(messageId: $messageId);
+    }
+
+    /**
      * Получить список доступных ботов.
      *
      * @return Collection<int, object>

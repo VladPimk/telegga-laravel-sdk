@@ -65,18 +65,12 @@ final class MessageService
         }
 
         try {
-            $response = $this->client->post(
-                uri: 'messages',
-                data: $data,
-            )->object();
-
-            if (! is_object($response)) {
-                throw new TeleggaApiException(
-                    message: 'Telegga returned an invalid message response.',
-                    status: 0,
-                    apiCode: 'invalid_response',
-                );
-            }
+            $response = $this->ensureObject(
+                response: $this->client->post(
+                    uri: 'messages',
+                    data: $data,
+                )->object(),
+            );
         } catch (TeleggaApiException $exception) {
             throw new MessageException(
                 message: $exception->getMessage(),
@@ -86,6 +80,33 @@ final class MessageService
         }
 
         return $response;
+    }
+
+    /**
+     * Получить сообщение по идентификатору.
+     */
+    public function get(string $messageId): object
+    {
+        if (trim($messageId) === '') {
+            throw new MessageException(
+                message: 'Message identifier cannot be empty.',
+                messageId: $messageId,
+            );
+        }
+
+        try {
+            return $this->ensureObject(
+                response: $this->client->get(
+                    uri: 'messages/'.rawurlencode($messageId),
+                )->object(),
+            );
+        } catch (TeleggaApiException $exception) {
+            throw new MessageException(
+                message: $exception->getMessage(),
+                messageId: $messageId,
+                previous: $exception,
+            );
+        }
     }
 
     /**
@@ -150,5 +171,21 @@ final class MessageService
                 }
             }
         }
+    }
+
+    /**
+     * Проверить объект ответа сообщения.
+     */
+    private function ensureObject(mixed $response): object
+    {
+        if (! is_object($response)) {
+            throw new TeleggaApiException(
+                message: 'Telegga returned an invalid message response.',
+                status: 0,
+                apiCode: 'invalid_response',
+            );
+        }
+
+        return $response;
     }
 }

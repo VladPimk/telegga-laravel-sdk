@@ -37,6 +37,11 @@ interface TeleggaInterface
     ): object;
 
     /**
+     * Получить сообщение по идентификатору.
+     */
+    public function getMessage(string $messageId): object;
+
+    /**
      * Получить список доступных ботов.
      *
      * @return Collection<int, object>
