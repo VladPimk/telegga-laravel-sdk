@@ -9,6 +9,8 @@ use Illuminate\Support\Str;
 use Telegga\Laravel\Models\TelegramConnectedUser;
 
 beforeEach(function (): void {
+    Schema::enableForeignKeyConstraints();
+
     Schema::create('users', function (Blueprint $table): void {
         $table->id();
         $table->string('name');
@@ -40,13 +42,8 @@ it('создаёт таблицу подключений с ожидаемыми
 });
 
 it('генерирует uuid и устанавливает начальные статусы', function (): void {
-    $user = User::query()->create([
-        'name' => 'Иван',
-    ]);
-
     $connection = TelegramConnectedUser::query()->create([
-        'user_id' => $user->getKey(),
-        'name' => $user->name,
+        'name' => 'Иван',
         'email' => 'ivan@example.com',
     ]);
 
@@ -59,7 +56,11 @@ it('генерирует uuid и устанавливает начальные �
         ->and($connection->is_created)
         ->toBeFalse()
         ->and($connection->is_connected)
-        ->toBeFalse();
+        ->toBeFalse()
+        ->and($connection->user_id)
+        ->toBeNull()
+        ->and($connection->user)
+        ->toBeNull();
 });
 
 it('связывает подключение с пользователем проекта', function (): void {
@@ -76,4 +77,22 @@ it('связывает подключение с пользователем пр
         ->toBeInstanceOf(User::class)
         ->and($connection->user->is($user))
         ->toBeTrue();
+});
+
+it('сохраняет подключение после удаления связанного пользователя', function (): void {
+    $user = User::query()->create([
+        'name' => 'Иван',
+    ]);
+    $connection = TelegramConnectedUser::query()->create([
+        'user_id' => $user->getKey(),
+        'name' => $user->name,
+    ]);
+
+    $user->delete();
+    $connection->refresh();
+
+    expect($connection->user_id)
+        ->toBeNull()
+        ->and($connection->user)
+        ->toBeNull();
 });

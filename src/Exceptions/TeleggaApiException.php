@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace Telegga\Laravel\Exceptions;
 
 use Illuminate\Http\Client\Response;
-use RuntimeException;
 use Throwable;
 
-final class TeleggaApiException extends RuntimeException
+final class TeleggaApiException extends TeleggaException
 {
     /**
      * Создать исключение Telegga API.

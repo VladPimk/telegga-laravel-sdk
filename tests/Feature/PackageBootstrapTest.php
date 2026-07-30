@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Telegga\Laravel\Contracts\TeleggaInterface;
+use Telegga\Laravel\Services\BotService;
+use Telegga\Laravel\Services\ConnectionService;
 use Telegga\Laravel\Telegga;
 use Telegga\Laravel\TeleggaServiceProvider;
 
@@ -16,6 +18,13 @@ it('регистрирует публичный контракт и конфиг
         ->toBeInstanceOf(Telegga::class)
         ->and(config('telegga.base_url'))
         ->toBe('https://api.telegga.net/api/v1');
+});
+
+it('регистрирует внутренние сервисы как singleton', function (): void {
+    expect(app(BotService::class))
+        ->toBe(app(BotService::class))
+        ->and(app(ConnectionService::class))
+        ->toBe(app(ConnectionService::class));
 });
 
 it('публикует миграции пакета', function (): void {

@@ -6,7 +6,8 @@ namespace Telegga\Laravel;
 
 use Illuminate\Support\Collection;
 use Telegga\Laravel\Contracts\TeleggaInterface;
-use Telegga\Laravel\Http\TeleggaClient;
+use Telegga\Laravel\Services\BotService;
+use Telegga\Laravel\Services\ConnectionService;
 
 final class Telegga implements TeleggaInterface
 {
@@ -14,8 +15,32 @@ final class Telegga implements TeleggaInterface
      * Создать сервис Telegga.
      */
     public function __construct(
-        private readonly TeleggaClient $client,
+        private readonly ConnectionService $connections,
+        private readonly BotService $bots,
     ) {}
+
+    /**
+     * Создать подключение пользователя.
+     */
+    public function createConnection(
+        string $name,
+        ?string $email = null,
+        ?int $userId = null,
+    ): object {
+        return $this->connections->create(
+            name: $name,
+            email: $email,
+            userId: $userId,
+        );
+    }
+
+    /**
+     * Повторно отправить существующее подключение.
+     */
+    public function retryConnection(string $uuid): object
+    {
+        return $this->connections->retry(uuid: $uuid);
+    }
 
     /**
      * Получить список доступных ботов.
@@ -24,8 +49,6 @@ final class Telegga implements TeleggaInterface
      */
     public function getBots(): Collection
     {
-        $response = $this->client->get(uri: 'bots')->object();
-
-        return collect($response->data ?? [])->values();
+        return $this->bots->getAll();
     }
 }

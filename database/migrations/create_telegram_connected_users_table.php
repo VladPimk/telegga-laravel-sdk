@@ -16,9 +16,9 @@ return new class extends Migration
         Schema::create('telegram_connected_users', function (Blueprint $table): void {
             $table->id();
             $table->uuid('uuid')->unique();
-            $table->string('name')->nullable();
+            $table->string('name');
             $table->string('email')->nullable();
-            $table->foreignId('user_id')->unique()->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')->nullable()->unique()->constrained()->nullOnDelete();
             $table->boolean('is_connected')->default(false);
             $table->boolean('is_created')->default(false);
             $table->timestamps();

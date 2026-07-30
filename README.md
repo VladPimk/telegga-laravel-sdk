@@ -17,9 +17,69 @@ composer require telegga/laravel-sdk
 
 Laravel автоматически зарегистрирует сервис-провайдер пакета.
 
+Опубликуйте конфигурацию и миграцию:
+
+```bash
+php artisan vendor:publish --tag=telegga-config
+php artisan vendor:publish --tag=telegga-migrations
+php artisan migrate
+```
+
+Укажите API-ключ:
+
+```dotenv
+TELEGGA_API_KEY=tg_live_XXXXXXXXXXXXXXXX
+```
+
+## Создание подключения
+
+Подключение может существовать независимо от пользователя проекта:
+
+```php
+$result = $telegga->createConnection(
+    name: 'Иван',
+    email: 'ivan@example.com',
+);
+```
+
+При необходимости передайте идентификатор пользователя проекта:
+
+```php
+$result = $telegga->createConnection(
+    name: 'Иван',
+    email: 'ivan@example.com',
+    userId: 42,
+);
+```
+
+Поля `link_url` и `link_code` доступны в объекте результата.
+
+## Повтор подключения
+
+Повтор выполняется только явным вызовом и использует существующий UUID:
+
+```php
+$result = $telegga->retryConnection(uuid: $uuid);
+```
+
+Автоматические повторы пакет не выполняет.
+
+Если локальная запись успела создаться, её UUID доступен в исключении:
+
+```php
+try {
+    $result = $telegga->createConnection(
+        name: 'Иван',
+        email: 'ivan@example.com',
+    );
+} catch (\Telegga\Laravel\Exceptions\ConnectionException $exception) {
+    $uuid = $exception->connectionUuid;
+}
+```
+
 ## Статус
 
-Создан базовый каркас пакета. API-клиент, конфигурация, миграции и обработка вебхуков будут добавлены следующими этапами.
+Реализованы HTTP-клиент, локальная модель подключения, создание подключения и явный повтор неудачной отправки. Остальные маршруты API и обработка вебхуков добавляются поэтапно.
 
 ## Лицензия
 
