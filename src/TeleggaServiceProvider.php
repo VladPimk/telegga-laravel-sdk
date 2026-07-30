@@ -11,6 +11,7 @@ use Telegga\Laravel\Http\TeleggaClient;
 use Telegga\Laravel\Resolvers\ConnectionContextResolver;
 use Telegga\Laravel\Services\BotService;
 use Telegga\Laravel\Services\ConnectionService;
+use Telegga\Laravel\Services\MediaService;
 use Telegga\Laravel\Services\MessageService;
 use Telegga\Laravel\Services\UserService;
 
@@ -39,6 +40,7 @@ final class TeleggaServiceProvider extends ServiceProvider
         $this->app->singleton(ConnectionService::class);
         $this->app->singleton(UserService::class);
         $this->app->singleton(MessageService::class);
+        $this->app->singleton(MediaService::class);
         $this->app->singleton(ConnectionContextResolver::class);
         $this->app->singleton(TeleggaInterface::class, Telegga::class);
     }

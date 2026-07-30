@@ -54,6 +54,16 @@ interface TeleggaInterface
     ): object;
 
     /**
+     * Загрузить медиафайл.
+     */
+    public function uploadMedia(string $path): object;
+
+    /**
+     * Получить метаданные медиафайла.
+     */
+    public function getMedia(string $mediaId): object;
+
+    /**
      * Получить список доступных ботов.
      *
      * @return Collection<int, object>

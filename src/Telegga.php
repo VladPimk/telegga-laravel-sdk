@@ -9,6 +9,7 @@ use Illuminate\Support\Collection;
 use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Services\BotService;
 use Telegga\Laravel\Services\ConnectionService;
+use Telegga\Laravel\Services\MediaService;
 use Telegga\Laravel\Services\MessageService;
 
 final class Telegga implements TeleggaInterface
@@ -20,6 +21,7 @@ final class Telegga implements TeleggaInterface
         private readonly ConnectionService $connections,
         private readonly BotService $bots,
         private readonly MessageService $messages,
+        private readonly MediaService $media,
     ) {}
 
     /**
@@ -93,6 +95,22 @@ final class Telegga implements TeleggaInterface
             to: $to,
             cursor: $cursor,
         );
+    }
+
+    /**
+     * Загрузить медиафайл.
+     */
+    public function uploadMedia(string $path): object
+    {
+        return $this->media->upload(path: $path);
+    }
+
+    /**
+     * Получить метаданные медиафайла.
+     */
+    public function getMedia(string $mediaId): object
+    {
+        return $this->media->get(mediaId: $mediaId);
     }
 
     /**
