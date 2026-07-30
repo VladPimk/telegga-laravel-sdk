@@ -8,6 +8,7 @@ use Illuminate\Support\Collection;
 use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Services\BotService;
 use Telegga\Laravel\Services\ConnectionService;
+use Telegga\Laravel\Services\MessageService;
 
 final class Telegga implements TeleggaInterface
 {
@@ -17,6 +18,7 @@ final class Telegga implements TeleggaInterface
     public function __construct(
         private readonly ConnectionService $connections,
         private readonly BotService $bots,
+        private readonly MessageService $messages,
     ) {}
 
     /**
@@ -40,6 +42,29 @@ final class Telegga implements TeleggaInterface
     public function retryConnection(string $uuid): object
     {
         return $this->connections->retry(uuid: $uuid);
+    }
+
+    /**
+     * Отправить текстовое сообщение.
+     *
+     * @param  array<int, array<int, array{text: string, url: string}>>  $buttons
+     */
+    public function sendText(
+        string $uuid,
+        string $text,
+        ?string $parseMode = null,
+        array $buttons = [],
+        bool $disableWebPagePreview = false,
+        bool $disableNotification = false,
+    ): object {
+        return $this->messages->sendText(
+            uuid: $uuid,
+            text: $text,
+            parseMode: $parseMode,
+            buttons: $buttons,
+            disableWebPagePreview: $disableWebPagePreview,
+            disableNotification: $disableNotification,
+        );
     }
 
     /**

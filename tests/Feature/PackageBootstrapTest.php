@@ -6,6 +6,7 @@ use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Resolvers\ConnectionContextResolver;
 use Telegga\Laravel\Services\BotService;
 use Telegga\Laravel\Services\ConnectionService;
+use Telegga\Laravel\Services\MessageService;
 use Telegga\Laravel\Services\UserService;
 use Telegga\Laravel\Telegga;
 use Telegga\Laravel\TeleggaServiceProvider;
@@ -29,6 +30,8 @@ it('регистрирует внутренние сервисы как singleto
         ->toBe(app(ConnectionService::class))
         ->and(app(UserService::class))
         ->toBe(app(UserService::class))
+        ->and(app(MessageService::class))
+        ->toBe(app(MessageService::class))
         ->and(app(ConnectionContextResolver::class))
         ->toBe(app(ConnectionContextResolver::class));
 });
