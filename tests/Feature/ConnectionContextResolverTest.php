@@ -91,6 +91,40 @@ it('разрешает контекст подключения через акт
     });
 });
 
+it('разрешает пользователя Telegga без активной привязки к боту', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'is_created' => true,
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/users*' => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+            'links' => [
+                [
+                    'bot_id' => 'bot-revoked',
+                    'status' => 'revoked',
+                ],
+            ],
+        ]),
+    ]);
+
+    $context = app(ConnectionContextResolver::class)->resolveUser(
+        uuid: $connection->uuid,
+    );
+
+    expect($context)
+        ->toBeInstanceOf(stdClass::class)
+        ->and($context->connection->is($connection))
+        ->toBeTrue()
+        ->and($context->user->user_id)
+        ->toBe('telegga-user-1')
+        ->and($context)
+        ->not->toHaveProperty('link');
+});
+
 it('не обращается к api для неизвестного локального подключения', function (): void {
     $uuid = Str::uuid()->toString();
 

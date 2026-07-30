@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Telegga\Laravel;
 
+use DateTimeInterface;
 use Illuminate\Support\Collection;
 use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Services\BotService;
@@ -73,6 +74,25 @@ final class Telegga implements TeleggaInterface
     public function getMessage(string $messageId): object
     {
         return $this->messages->get(messageId: $messageId);
+    }
+
+    /**
+     * Получить историю сообщений пользователя.
+     */
+    public function getMessages(
+        string $uuid,
+        ?string $status = null,
+        ?DateTimeInterface $from = null,
+        ?DateTimeInterface $to = null,
+        ?string $cursor = null,
+    ): object {
+        return $this->messages->getHistory(
+            uuid: $uuid,
+            status: $status,
+            from: $from,
+            to: $to,
+            cursor: $cursor,
+        );
     }
 
     /**

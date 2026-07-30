@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Telegga\Laravel\Contracts;
 
+use DateTimeInterface;
 use Illuminate\Support\Collection;
 
 interface TeleggaInterface
@@ -40,6 +41,17 @@ interface TeleggaInterface
      * Получить сообщение по идентификатору.
      */
     public function getMessage(string $messageId): object;
+
+    /**
+     * Получить историю сообщений пользователя.
+     */
+    public function getMessages(
+        string $uuid,
+        ?string $status = null,
+        ?DateTimeInterface $from = null,
+        ?DateTimeInterface $to = null,
+        ?string $cursor = null,
+    ): object;
 
     /**
      * Получить список доступных ботов.

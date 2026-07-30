@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Telegga\Laravel\Services;
 
+use DateTimeInterface;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Telegga\Laravel\Exceptions\MessageException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
@@ -110,6 +112,76 @@ final class MessageService
     }
 
     /**
+     * Получить историю сообщений пользователя.
+     */
+    public function getHistory(
+        string $uuid,
+        ?string $status = null,
+        ?DateTimeInterface $from = null,
+        ?DateTimeInterface $to = null,
+        ?string $cursor = null,
+    ): object {
+        if (trim($uuid) === '') {
+            throw new MessageException(
+                message: 'Connection UUID cannot be empty.',
+                connectionUuid: $uuid,
+            );
+        }
+
+        if ($from !== null && $to !== null && $from > $to) {
+            throw new MessageException(
+                message: 'Message history date range is invalid.',
+                connectionUuid: $uuid,
+            );
+        }
+
+        $context = $this->connections->resolveUser(uuid: $uuid);
+        $userId = $context->user->user_id ?? null;
+
+        if (! is_string($userId) || trim($userId) === '') {
+            throw new MessageException(
+                message: 'Telegga user response does not contain user_id.',
+                connectionUuid: $uuid,
+            );
+        }
+
+        $query = [
+            'user_id' => $userId,
+        ];
+
+        if ($status !== null && trim($status) !== '') {
+            $query['status'] = trim($status);
+        }
+
+        if ($from !== null) {
+            $query['from'] = $from->format(DATE_RFC3339);
+        }
+
+        if ($to !== null) {
+            $query['to'] = $to->format(DATE_RFC3339);
+        }
+
+        if ($cursor !== null && trim($cursor) !== '') {
+            $query['cursor'] = trim($cursor);
+        }
+
+        try {
+            return $this->ensurePage(
+                response: $this->client->get(
+                    uri: 'messages',
+                    query: $query,
+                )->object(),
+            );
+        } catch (TeleggaApiException $exception) {
+            throw new MessageException(
+                message: $exception->getMessage(),
+                connectionUuid: $uuid,
+                previous: $exception,
+            );
+        }
+    }
+
+    /**
      * Проверить данные текстового сообщения.
      *
      * @param  array<int, array<int, array{text: string, url: string}>>  $buttons
@@ -185,6 +257,53 @@ final class MessageService
                 apiCode: 'invalid_response',
             );
         }
+
+        return $response;
+    }
+
+    /**
+     * Проверить страницу истории сообщений.
+     *
+     * @return object{
+     *     data: Collection<int, object>,
+     *     next_cursor: string|null
+     * }
+     */
+    private function ensurePage(mixed $response): object
+    {
+        $response = $this->ensureObject(response: $response);
+        $data = $response->data ?? null;
+
+        if (! is_array($data)) {
+            throw new TeleggaApiException(
+                message: 'Telegga returned an invalid message history response.',
+                status: 0,
+                apiCode: 'invalid_response',
+            );
+        }
+
+        foreach ($data as $message) {
+            if (! is_object($message)) {
+                throw new TeleggaApiException(
+                    message: 'Telegga returned an invalid message history response.',
+                    status: 0,
+                    apiCode: 'invalid_response',
+                );
+            }
+        }
+
+        $nextCursor = $response->next_cursor ?? null;
+
+        if ($nextCursor !== null && ! is_string($nextCursor)) {
+            throw new TeleggaApiException(
+                message: 'Telegga returned an invalid message history response.',
+                status: 0,
+                apiCode: 'invalid_response',
+            );
+        }
+
+        $response->data = collect($data)->values();
+        $response->next_cursor = $nextCursor;
 
         return $response;
     }

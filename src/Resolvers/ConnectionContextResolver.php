@@ -30,6 +30,33 @@ final class ConnectionContextResolver
      */
     public function resolve(string $uuid): object
     {
+        $context = $this->resolveUser(uuid: $uuid);
+        $link = $this->findActiveLink(user: $context->user);
+
+        if ($link === null) {
+            throw new ConnectionException(
+                message: 'Telegga connection has no active bot link.',
+                connectionUuid: $context->connection->uuid,
+            );
+        }
+
+        return (object) [
+            'connection' => $context->connection,
+            'user' => $context->user,
+            'link' => $link,
+        ];
+    }
+
+    /**
+     * Получить локальное подключение и пользователя Telegga.
+     *
+     * @return object{
+     *     connection: TelegramConnectedUser,
+     *     user: object
+     * }
+     */
+    public function resolveUser(string $uuid): object
+    {
         $connection = $this->findConnection(uuid: $uuid);
 
         if (! $connection->is_created) {
@@ -49,19 +76,9 @@ final class ConnectionContextResolver
             );
         }
 
-        $link = $this->findActiveLink(user: $user);
-
-        if ($link === null) {
-            throw new ConnectionException(
-                message: 'Telegga connection has no active bot link.',
-                connectionUuid: $connection->uuid,
-            );
-        }
-
         return (object) [
             'connection' => $connection,
             'user' => $user,
-            'link' => $link,
         ];
     }
 
