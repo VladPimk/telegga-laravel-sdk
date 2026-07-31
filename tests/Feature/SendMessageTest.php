@@ -22,10 +22,10 @@ beforeEach(function (): void {
         $table->timestamps();
     });
 
-    $botMigration = require __DIR__.'/../../database/migrations/create_available_telegram_bots_table.php';
+    $botMigration = require __DIR__.'/../../database/migrations/2026_07_31_000001_create_available_telegram_bots_table.php';
     $botMigration->up();
 
-    $connectionMigration = require __DIR__.'/../../database/migrations/create_telegram_connected_users_table.php';
+    $connectionMigration = require __DIR__.'/../../database/migrations/2026_07_31_000002_create_telegram_connected_users_table.php';
     $connectionMigration->up();
 
     $this->telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);

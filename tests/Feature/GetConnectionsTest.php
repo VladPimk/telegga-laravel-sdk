@@ -13,7 +13,7 @@ use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Models\AvailableTelegramBot;
 
 beforeEach(function (): void {
-    $migration = require __DIR__.'/../../database/migrations/create_available_telegram_bots_table.php';
+    $migration = require __DIR__.'/../../database/migrations/2026_07_31_000001_create_available_telegram_bots_table.php';
     $migration->up();
 });
 
