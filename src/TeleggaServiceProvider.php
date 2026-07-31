@@ -60,12 +60,12 @@ final class TeleggaServiceProvider extends ServiceProvider
             path: __DIR__.'/../routes/webhooks.php',
         );
 
+        $this->loadMigrationsFrom(
+            paths: __DIR__.'/../database/migrations',
+        );
+
         $this->publishes([
             __DIR__.'/../config/telegga.php' => config_path(path: 'telegga.php'),
         ], groups: 'telegga-config');
-
-        $this->publishesMigrations([
-            __DIR__.'/../database/migrations' => database_path(path: 'migrations'),
-        ], groups: 'telegga-migrations');
     }
 }

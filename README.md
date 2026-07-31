@@ -17,12 +17,16 @@ composer require telegga/laravel-sdk
 
 Laravel автоматически зарегистрирует сервис-провайдер пакета.
 
-Опубликуйте конфигурацию и миграцию:
+Миграции пакета регистрируются автоматически и выполняются вместе с миграциями проекта:
+
+```bash
+php artisan migrate
+```
+
+Конфигурация работает непосредственно из пакета. Если её необходимо изменить в проекте, опубликуйте файл отдельно:
 
 ```bash
 php artisan vendor:publish --tag=telegga-config
-php artisan vendor:publish --tag=telegga-migrations
-php artisan migrate
 ```
 
 Укажите API-ключ и собственный токен для входящих webhook:

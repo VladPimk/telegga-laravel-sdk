@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\Schema;
 use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Resolvers\ConnectionContextResolver;
 use Telegga\Laravel\Services\BotService;
@@ -36,18 +37,12 @@ it('регистрирует внутренние сервисы как singleto
         ->toBe(app(ConnectionContextResolver::class));
 });
 
-it('публикует миграции пакета', function (): void {
-    $paths = TeleggaServiceProvider::pathsToPublish(
-        provider: TeleggaServiceProvider::class,
-        group: 'telegga-migrations',
-    );
-    $source = str_replace('\\', '/', (string) array_key_first($paths));
-    $destination = str_replace('\\', '/', (string) array_values($paths)[0]);
+it('выполняет миграции пакета стандартной командой migrate', function (): void {
+    $this->artisan('migrate', ['--force' => true])
+        ->assertExitCode(0);
 
-    expect($paths)
-        ->toHaveCount(1)
-        ->and($source)
-        ->toEndWith('database/migrations')
-        ->and($destination)
-        ->toEndWith('database/migrations');
+    expect(Schema::hasTable('available_telegram_bots'))
+        ->toBeTrue()
+        ->and(Schema::hasTable('telegram_connected_users'))
+        ->toBeTrue();
 });
