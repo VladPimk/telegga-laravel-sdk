@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Schema;
 use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Exceptions\GroupException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
+use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Models\TelegramConnectedUser;
 
 beforeEach(function (): void {
@@ -21,13 +22,18 @@ beforeEach(function (): void {
         $table->timestamps();
     });
 
-    $migration = require __DIR__.'/../../database/migrations/create_telegram_connected_users_table.php';
+    $botMigration = require __DIR__.'/../../database/migrations/create_available_telegram_bots_table.php';
+    $botMigration->up();
 
-    $migration->up();
+    $connectionMigration = require __DIR__.'/../../database/migrations/create_telegram_connected_users_table.php';
+    $connectionMigration->up();
+
+    $this->telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
 });
 
 afterEach(function (): void {
     Schema::dropIfExists('telegram_connected_users');
+    Schema::dropIfExists('available_telegram_bots');
     Schema::dropIfExists('users');
 });
 
@@ -35,6 +41,7 @@ it('создаёт группу для бота локального подкл�
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
     Http::preventStrayRequests();
@@ -52,6 +59,7 @@ it('создаёт группу для бота локального подкл�
             'links' => [
                 [
                     'bot_id' => 'bot-pending',
+                    'bot_username' => 'mybot',
                     'status' => 'pending',
                 ],
             ],
@@ -86,6 +94,7 @@ it('возвращает коллекцию групп бота локально
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
     Http::preventStrayRequests();
@@ -105,6 +114,7 @@ it('возвращает коллекцию групп бота локально
             'links' => [
                 [
                     'bot_id' => 'bot-active',
+                    'bot_username' => 'mybot',
                     'status' => 'active',
                 ],
             ],
@@ -191,6 +201,7 @@ it('управляет членством через маршруты польз
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
     Http::preventStrayRequests();
@@ -246,10 +257,12 @@ it('преобразует локальные uuid при массовом до�
     $first = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
     $second = TelegramConnectedUser::query()->create([
         'name' => 'Пётр',
         'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
     Http::preventStrayRequests();
@@ -296,6 +309,7 @@ it('удаляет участника через групповой маршру
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
     Http::preventStrayRequests();
@@ -410,6 +424,7 @@ it('отклоняет некорректный ответ списка груп
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
     Http::preventStrayRequests();
@@ -423,6 +438,7 @@ it('отклоняет некорректный ответ списка груп
             'links' => [
                 [
                     'bot_id' => 'bot-active',
+                    'bot_username' => 'mybot',
                     'status' => 'active',
                 ],
             ],

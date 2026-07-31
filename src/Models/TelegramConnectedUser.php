@@ -20,6 +20,7 @@ final class TelegramConnectedUser extends Model
         'name',
         'email',
         'user_id',
+        'available_telegram_bot_id',
         'is_connected',
         'is_created',
     ];
@@ -58,5 +59,18 @@ final class TelegramConnectedUser extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(related: User::class);
+    }
+
+    /**
+     * Получить выбранного Telegram-бота.
+     *
+     * @return BelongsTo<AvailableTelegramBot, $this>
+     */
+    public function telegramBot(): BelongsTo
+    {
+        return $this->belongsTo(
+            related: AvailableTelegramBot::class,
+            foreignKey: 'available_telegram_bot_id',
+        );
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Telegga\Laravel\Services;
 
 use Illuminate\Database\QueryException;
+use Telegga\Laravel\Exceptions\BotException;
 use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Models\TelegramConnectedUser;
@@ -27,6 +28,7 @@ final class ConnectionService
      */
     public function create(
         string $name,
+        string $telegramBotUuid,
         ?string $email = null,
         ?int $userId = null,
     ): object {
@@ -35,10 +37,20 @@ final class ConnectionService
         }
 
         try {
+            $telegramBot = $this->bots->getAvailableByUuid(uuid: $telegramBotUuid);
+        } catch (BotException $exception) {
+            throw new ConnectionException(
+                message: $exception->getMessage(),
+                previous: $exception,
+            );
+        }
+
+        try {
             $connection = TelegramConnectedUser::query()->create([
                 'name' => $name,
                 'email' => $email,
                 'user_id' => $userId,
+                'available_telegram_bot_id' => $telegramBot->getKey(),
             ]);
         } catch (QueryException $exception) {
             throw new ConnectionException(
@@ -247,21 +259,16 @@ final class ConnectionService
     private function send(TelegramConnectedUser $connection): object
     {
         try {
-            $bot = $this->bots->getAll()->first(
-                fn (mixed $bot): bool => is_object($bot)
-                    && ($bot->status ?? null) === 'active',
-            );
+            $telegramBot = $connection->telegramBot;
 
-            if (
-                ! is_object($bot)
-                || ! is_string($bot->bot_id ?? null)
-                || $bot->bot_id === ''
-            ) {
+            if ($telegramBot === null) {
                 throw new ConnectionException(
-                    message: 'No active Telegga bots are available.',
+                    message: 'Telegga connection has no selected Telegram bot.',
                     connectionUuid: $connection->uuid,
                 );
             }
+
+            $bot = $this->bots->findActive(botName: $telegramBot->bot_name);
 
             $response = $this->users->create(
                 externalId: $connection->uuid,
@@ -269,9 +276,15 @@ final class ConnectionService
                 displayName: $connection->name,
                 email: $connection->email,
             );
-        } catch (TeleggaApiException $exception) {
+        } catch (BotException|TeleggaApiException $exception) {
             throw new ConnectionException(
                 message: $exception->getMessage(),
+                connectionUuid: $connection->uuid,
+                previous: $exception,
+            );
+        } catch (QueryException $exception) {
+            throw new ConnectionException(
+                message: 'Selected Telegram bot could not be loaded.',
                 connectionUuid: $connection->uuid,
                 previous: $exception,
             );

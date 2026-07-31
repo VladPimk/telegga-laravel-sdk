@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Models\TelegramConnectedUser;
 
 beforeEach(function (): void {
@@ -17,13 +18,18 @@ beforeEach(function (): void {
         $table->timestamps();
     });
 
-    $migration = require __DIR__.'/../../database/migrations/create_telegram_connected_users_table.php';
+    $botMigration = require __DIR__.'/../../database/migrations/create_available_telegram_bots_table.php';
+    $botMigration->up();
 
-    $migration->up();
+    $connectionMigration = require __DIR__.'/../../database/migrations/create_telegram_connected_users_table.php';
+    $connectionMigration->up();
+
+    $this->telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
 });
 
 afterEach(function (): void {
     Schema::dropIfExists('telegram_connected_users');
+    Schema::dropIfExists('available_telegram_bots');
     Schema::dropIfExists('users');
 });
 
@@ -34,6 +40,7 @@ it('создаёт таблицу подключений с ожидаемыми
         'name',
         'email',
         'user_id',
+        'available_telegram_bot_id',
         'is_connected',
         'is_created',
         'created_at',
@@ -45,6 +52,7 @@ it('генерирует uuid и устанавливает начальные �
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'email' => 'ivan@example.com',
+        'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
     expect($connection->getKey())
@@ -59,6 +67,8 @@ it('генерирует uuid и устанавливает начальные �
         ->toBeFalse()
         ->and($connection->user_id)
         ->toBeNull()
+        ->and($connection->telegramBot->is($this->telegramBot))
+        ->toBeTrue()
         ->and($connection->user)
         ->toBeNull();
 });
@@ -71,6 +81,7 @@ it('связывает подключение с пользователем пр
     $connection = TelegramConnectedUser::query()->create([
         'user_id' => $user->getKey(),
         'name' => $user->name,
+        'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
     expect($connection->user)
@@ -86,6 +97,7 @@ it('сохраняет подключение после удаления свя
     $connection = TelegramConnectedUser::query()->create([
         'user_id' => $user->getKey(),
         'name' => $user->name,
+        'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
     $user->delete();

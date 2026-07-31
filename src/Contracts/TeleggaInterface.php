@@ -6,6 +6,7 @@ namespace Telegga\Laravel\Contracts;
 
 use DateTimeInterface;
 use Illuminate\Support\Collection;
+use Telegga\Laravel\Models\AvailableTelegramBot;
 
 interface TeleggaInterface
 {
@@ -14,6 +15,7 @@ interface TeleggaInterface
      */
     public function createConnection(
         string $name,
+        string $telegramBotUuid,
         ?string $email = null,
         ?int $userId = null,
     ): object;
@@ -170,4 +172,21 @@ interface TeleggaInterface
      * @return Collection<int, object>
      */
     public function getBots(): Collection;
+
+    /**
+     * Добавить доступного Telegram-бота.
+     */
+    public function addTelegramBot(string $botName): AvailableTelegramBot;
+
+    /**
+     * Получить локально доступных Telegram-ботов.
+     *
+     * @return Collection<int, AvailableTelegramBot>
+     */
+    public function getAvailableBots(): Collection;
+
+    /**
+     * Удалить локально доступного Telegram-бота.
+     */
+    public function deleteTelegramBot(string $uuid): void;
 }

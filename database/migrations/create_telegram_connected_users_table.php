@@ -19,6 +19,9 @@ return new class extends Migration
             $table->string('name');
             $table->string('email')->nullable();
             $table->foreignId('user_id')->nullable()->unique()->constrained()->nullOnDelete();
+            $table->foreignId('available_telegram_bot_id')
+                ->constrained('available_telegram_bots')
+                ->restrictOnDelete();
             $table->boolean('is_connected')->default(false);
             $table->boolean('is_created')->default(false);
             $table->timestamps();

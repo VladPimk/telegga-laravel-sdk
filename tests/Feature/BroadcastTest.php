@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Schema;
 use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Exceptions\BroadcastException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
+use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Models\TelegramConnectedUser;
 
 beforeEach(function (): void {
@@ -20,13 +21,18 @@ beforeEach(function (): void {
         $table->timestamps();
     });
 
-    $migration = require __DIR__.'/../../database/migrations/create_telegram_connected_users_table.php';
+    $botMigration = require __DIR__.'/../../database/migrations/create_available_telegram_bots_table.php';
+    $botMigration->up();
 
-    $migration->up();
+    $connectionMigration = require __DIR__.'/../../database/migrations/create_telegram_connected_users_table.php';
+    $connectionMigration->up();
+
+    $this->telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
 });
 
 afterEach(function (): void {
     Schema::dropIfExists('telegram_connected_users');
+    Schema::dropIfExists('available_telegram_bots');
     Schema::dropIfExists('users');
 });
 
@@ -34,6 +40,7 @@ it('запускает рассылку всем пользователям бо
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
     Http::preventStrayRequests();
@@ -49,6 +56,7 @@ it('запускает рассылку всем пользователям бо
             'links' => [
                 [
                     'bot_id' => 'bot-pending',
+                    'bot_username' => 'mybot',
                     'status' => 'pending',
                 ],
             ],
@@ -94,6 +102,7 @@ it('запускает медиа рассылку участникам указ
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
     Http::preventStrayRequests();
@@ -108,6 +117,7 @@ it('запускает медиа рассылку участникам указ
             'links' => [
                 [
                     'bot_id' => 'bot-active',
+                    'bot_username' => 'mybot',
                     'status' => 'active',
                 ],
             ],

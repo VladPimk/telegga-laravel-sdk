@@ -31,7 +31,11 @@ final class ConnectionContextResolver
     public function resolve(string $uuid): object
     {
         $context = $this->resolveUser(uuid: $uuid);
-        $link = $this->findActiveLink(user: $context->user);
+        $botName = $this->getBotName(connection: $context->connection);
+        $link = $this->findActiveLink(
+            user: $context->user,
+            botName: $botName,
+        );
 
         if ($link === null) {
             throw new ConnectionException(
@@ -94,7 +98,11 @@ final class ConnectionContextResolver
     public function resolveBot(string $uuid): object
     {
         $context = $this->resolveUser(uuid: $uuid);
-        $link = $this->findBotLink(user: $context->user);
+        $botName = $this->getBotName(connection: $context->connection);
+        $link = $this->findBotLink(
+            user: $context->user,
+            botName: $botName,
+        );
 
         if ($link === null) {
             throw new ConnectionException(
@@ -117,6 +125,7 @@ final class ConnectionContextResolver
     {
         try {
             $connection = TelegramConnectedUser::query()
+                ->with('telegramBot')
                 ->where('uuid', $uuid)
                 ->first();
         } catch (QueryException $exception) {
@@ -140,7 +149,7 @@ final class ConnectionContextResolver
     /**
      * Найти активную привязку пользователя к боту.
      */
-    private function findActiveLink(object $user): ?object
+    private function findActiveLink(object $user, string $botName): ?object
     {
         if (! is_array($user->links ?? null)) {
             return null;
@@ -150,6 +159,7 @@ final class ConnectionContextResolver
             if (
                 is_object($link)
                 && ($link->status ?? null) === 'active'
+                && $this->linkMatchesBot(link: $link, botName: $botName)
                 && is_string($link->bot_id ?? null)
                 && $link->bot_id !== ''
             ) {
@@ -163,9 +173,12 @@ final class ConnectionContextResolver
     /**
      * Найти доступную привязку пользователя к боту.
      */
-    private function findBotLink(object $user): ?object
+    private function findBotLink(object $user, string $botName): ?object
     {
-        $activeLink = $this->findActiveLink(user: $user);
+        $activeLink = $this->findActiveLink(
+            user: $user,
+            botName: $botName,
+        );
 
         if ($activeLink !== null) {
             return $activeLink;
@@ -178,6 +191,7 @@ final class ConnectionContextResolver
         foreach ($user->links as $link) {
             if (
                 is_object($link)
+                && $this->linkMatchesBot(link: $link, botName: $botName)
                 && is_string($link->bot_id ?? null)
                 && $link->bot_id !== ''
             ) {
@@ -186,5 +200,31 @@ final class ConnectionContextResolver
         }
 
         return null;
+    }
+
+    /**
+     * Получить имя выбранного Telegram-бота.
+     */
+    private function getBotName(TelegramConnectedUser $connection): string
+    {
+        $botName = $connection->telegramBot?->bot_name;
+
+        if (! is_string($botName) || trim($botName) === '') {
+            throw new ConnectionException(
+                message: 'Telegga connection has no selected Telegram bot.',
+                connectionUuid: $connection->uuid,
+            );
+        }
+
+        return $botName;
+    }
+
+    /**
+     * Проверить принадлежность привязки выбранному Telegram-боту.
+     */
+    private function linkMatchesBot(object $link, string $botName): bool
+    {
+        return is_string($link->bot_username ?? null)
+            && $link->bot_username === $botName;
     }
 }

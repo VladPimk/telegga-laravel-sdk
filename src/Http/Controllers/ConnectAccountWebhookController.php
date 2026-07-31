@@ -36,7 +36,16 @@ final class ConnectAccountWebhookController
                 return $this->invalidRequest(message: 'Webhook external_id is required.');
             }
 
-            $this->webhooks->markConnected(externalId: $externalId);
+            $botName = $request->input(key: 'bot_username');
+
+            if (! is_string($botName) || trim($botName) === '') {
+                return $this->invalidRequest(message: 'Webhook bot_username is required.');
+            }
+
+            $this->webhooks->markConnected(
+                externalId: $externalId,
+                botName: $botName,
+            );
         }
 
         return response()->noContent();

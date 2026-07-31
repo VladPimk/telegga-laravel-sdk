@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
+use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Models\TelegramConnectedUser;
 
 beforeEach(function (): void {
@@ -16,13 +17,18 @@ beforeEach(function (): void {
         $table->timestamps();
     });
 
-    $migration = require __DIR__.'/../../database/migrations/create_telegram_connected_users_table.php';
+    $botMigration = require __DIR__.'/../../database/migrations/create_available_telegram_bots_table.php';
+    $botMigration->up();
 
-    $migration->up();
+    $connectionMigration = require __DIR__.'/../../database/migrations/create_telegram_connected_users_table.php';
+    $connectionMigration->up();
+
+    $this->telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
 });
 
 afterEach(function (): void {
     Schema::dropIfExists('telegram_connected_users');
+    Schema::dropIfExists('available_telegram_bots');
     Schema::dropIfExists('users');
 });
 
@@ -41,6 +47,7 @@ it('принимает событие подключения и идемпоте
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
     $payload = [
         'event' => 'user.linked',
@@ -74,6 +81,7 @@ it('принимает тестовое событие без изменения
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
     $this
@@ -95,11 +103,32 @@ it('принимает событие для неизвестного external i
         ->postJson('/webhooks/v1/telegram/connect-account', [
             'event' => 'user.linked',
             'external_id' => 'unknown-external-id',
+            'bot_username' => 'mybot',
         ])
         ->assertNoContent();
 
     expect(TelegramConnectedUser::query()->doesntExist())
         ->toBeTrue();
+});
+
+it('не активирует подключение при неполном совпадении имени бота', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+
+    $this
+        ->withToken('webhook-secret')
+        ->postJson('/webhooks/v1/telegram/connect-account', [
+            'event' => 'user.linked',
+            'external_id' => $connection->uuid,
+            'bot_username' => '@mybot',
+        ])
+        ->assertNoContent();
+
+    expect($connection->refresh()->is_connected)
+        ->toBeFalse();
 });
 
 it('принимает неизвестное событие для совместимости с новыми событиями', function (): void {
@@ -179,6 +208,22 @@ it('отклоняет событие подключения без external id'
         ]);
 });
 
+it('отклоняет событие подключения без имени бота', function (): void {
+    $this
+        ->withToken('webhook-secret')
+        ->postJson('/webhooks/v1/telegram/connect-account', [
+            'event' => 'user.linked',
+            'external_id' => 'connection-uuid',
+        ])
+        ->assertBadRequest()
+        ->assertExactJson([
+            'error' => [
+                'code' => 'invalid_request',
+                'message' => 'Webhook bot_username is required.',
+            ],
+        ]);
+});
+
 it('возвращает серверную ошибку при недоступной локальной таблице', function (): void {
     Schema::drop('telegram_connected_users');
 
@@ -187,6 +232,7 @@ it('возвращает серверную ошибку при недоступ
         ->postJson('/webhooks/v1/telegram/connect-account', [
             'event' => 'user.linked',
             'external_id' => 'unknown-external-id',
+            'bot_username' => 'mybot',
         ])
         ->assertServerError();
 });

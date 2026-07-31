@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
+use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Models\TelegramConnectedUser;
 use Telegga\Laravel\Resolvers\ConnectionContextResolver;
 
@@ -22,13 +23,18 @@ beforeEach(function (): void {
         $table->timestamps();
     });
 
-    $migration = require __DIR__.'/../../database/migrations/create_telegram_connected_users_table.php';
+    $botMigration = require __DIR__.'/../../database/migrations/create_available_telegram_bots_table.php';
+    $botMigration->up();
 
-    $migration->up();
+    $connectionMigration = require __DIR__.'/../../database/migrations/create_telegram_connected_users_table.php';
+    $connectionMigration->up();
+
+    $this->telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
 });
 
 afterEach(function (): void {
     Schema::dropIfExists('telegram_connected_users');
+    Schema::dropIfExists('available_telegram_bots');
     Schema::dropIfExists('users');
 });
 
@@ -36,6 +42,7 @@ it('разрешает контекст подключения через акт
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
     Http::preventStrayRequests();
@@ -46,8 +53,9 @@ it('разрешает контекст подключения через акт
             'status' => 'active',
             'links' => [
                 [
-                    'bot_id' => 'bot-revoked',
-                    'status' => 'revoked',
+                    'bot_id' => 'other-active-bot',
+                    'bot_username' => 'otherbot',
+                    'status' => 'active',
                 ],
                 [
                     'bot_id' => 'bot-active',
@@ -95,6 +103,7 @@ it('разрешает пользователя Telegga без активной 
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
     Http::preventStrayRequests();
@@ -105,6 +114,7 @@ it('разрешает пользователя Telegga без активной 
             'links' => [
                 [
                     'bot_id' => 'bot-revoked',
+                    'bot_username' => 'mybot',
                     'status' => 'revoked',
                 ],
             ],
@@ -149,6 +159,7 @@ it('не обращается к api для неизвестного локал�
 it('не обращается к api для ещё не созданного подключения', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
+        'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
     Http::preventStrayRequests();
@@ -175,6 +186,7 @@ it('скрывает ошибку api при поиске пользовател
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
     Http::preventStrayRequests();
@@ -209,6 +221,7 @@ it('отклоняет пользователя Telegga без активной 
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
     Http::preventStrayRequests();
@@ -219,6 +232,7 @@ it('отклоняет пользователя Telegga без активной 
             'links' => [
                 [
                     'bot_id' => 'bot-revoked',
+                    'bot_username' => 'mybot',
                     'status' => 'revoked',
                 ],
             ],
@@ -234,6 +248,42 @@ it('отклоняет пользователя Telegga без активной 
             ->toBe($connection->uuid)
             ->and($exception->getPrevious())
             ->toBeNull();
+
+        return;
+    }
+
+    test()->fail('Ожидалось исключение ConnectionException.');
+});
+
+it('не принимает привязку при неполном совпадении имени бота', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/users*' => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+            'links' => [
+                [
+                    'bot_id' => 'bot-active',
+                    'bot_username' => '@mybot',
+                    'status' => 'active',
+                ],
+            ],
+        ]),
+    ]);
+
+    try {
+        app(ConnectionContextResolver::class)->resolve(
+            uuid: $connection->uuid,
+        );
+    } catch (ConnectionException $exception) {
+        expect($exception->connectionUuid)
+            ->toBe($connection->uuid);
 
         return;
     }
