@@ -17,6 +17,7 @@ return new class extends Migration
             $table->id();
             $table->uuid('uuid')->unique();
             $table->string('bot_name')->unique();
+            $table->timestamps();
         });
     }
 

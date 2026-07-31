@@ -9,8 +9,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 final class AvailableTelegramBot extends Model
 {
-    public $timestamps = false;
-
     protected $fillable = [
         'uuid',
         'bot_name',

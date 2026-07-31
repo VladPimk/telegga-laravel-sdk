@@ -44,13 +44,19 @@ it('создаёт таблицу доступных ботов и генери�
         'id',
         'uuid',
         'bot_name',
+        'created_at',
+        'updated_at',
     ]))->toBeTrue()
         ->and($bot->getKey())
         ->toBeInt()
         ->and(Str::isUuid($bot->uuid))
         ->toBeTrue()
         ->and($bot->bot_name)
-        ->toBe('mybot');
+        ->toBe('mybot')
+        ->and($bot->created_at)
+        ->not->toBeNull()
+        ->and($bot->updated_at)
+        ->not->toBeNull();
 });
 
 it('добавляет локального бота после проверки списка api', function (): void {
