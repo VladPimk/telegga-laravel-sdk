@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Telegga\Laravel\Services;
 
+use Illuminate\Support\Collection;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Http\TeleggaClient;
 
@@ -18,12 +19,16 @@ final class UserService
 
     /**
      * Создать или обновить пользователя Telegga.
+     *
+     * @param  array<string, mixed>  $meta
      */
     public function create(
         string $externalId,
         string $botId,
         string $displayName,
         ?string $email = null,
+        array $meta = [],
+        ?string $groupId = null,
     ): object {
         $data = [
             'external_id' => $externalId,
@@ -33,6 +38,14 @@ final class UserService
 
         if ($email !== null) {
             $data['email'] = $email;
+        }
+
+        if ($meta !== []) {
+            $data['meta'] = $meta;
+        }
+
+        if ($groupId !== null) {
+            $data['group_id'] = $groupId;
         }
 
         return $this->ensureObject(
@@ -52,6 +65,21 @@ final class UserService
             response: $this->client->get(
                 uri: 'users',
                 query: ['external_id' => $externalId],
+            )->object(),
+        );
+    }
+
+    /**
+     * Получить список пользователей Telegga.
+     *
+     * @param  array<string, string>  $query
+     */
+    public function getAll(array $query = []): object
+    {
+        return $this->ensurePage(
+            response: $this->client->get(
+                uri: 'users',
+                query: $query,
             )->object(),
         );
     }
@@ -152,6 +180,53 @@ final class UserService
                 apiCode: 'invalid_response',
             );
         }
+
+        return $response;
+    }
+
+    /**
+     * Проверить страницу пользователей.
+     *
+     * @return object{
+     *     data: Collection<int, object>,
+     *     next_cursor: string|null
+     * }
+     */
+    private function ensurePage(mixed $response): object
+    {
+        $response = $this->ensureObject(response: $response);
+        $data = $response->data ?? null;
+
+        if (! is_array($data)) {
+            throw new TeleggaApiException(
+                message: 'Telegga returned an invalid user list response.',
+                status: 0,
+                apiCode: 'invalid_response',
+            );
+        }
+
+        foreach ($data as $user) {
+            if (! is_object($user)) {
+                throw new TeleggaApiException(
+                    message: 'Telegga returned an invalid user list response.',
+                    status: 0,
+                    apiCode: 'invalid_response',
+                );
+            }
+        }
+
+        $nextCursor = $response->next_cursor ?? null;
+
+        if ($nextCursor !== null && ! is_string($nextCursor)) {
+            throw new TeleggaApiException(
+                message: 'Telegga returned an invalid user list response.',
+                status: 0,
+                apiCode: 'invalid_response',
+            );
+        }
+
+        $response->data = collect($data)->values();
+        $response->next_cursor = $nextCursor;
 
         return $response;
     }

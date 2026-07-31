@@ -23,6 +23,8 @@ it('создаёт пользователя Telegga без потери новы
         botId: 'bot-1',
         displayName: 'Иван',
         email: 'ivan@example.com',
+        meta: ['locale' => 'ru'],
+        groupId: 'group-1',
     );
 
     expect($user)
@@ -42,6 +44,8 @@ it('создаёт пользователя Telegga без потери новы
                 'bot_id' => 'bot-1',
                 'display_name' => 'Иван',
                 'email' => 'ivan@example.com',
+                'meta' => ['locale' => 'ru'],
+                'group_id' => 'group-1',
             ];
     });
 });

@@ -31,27 +31,42 @@ final class Telegga implements TeleggaInterface
 
     /**
      * Создать подключение пользователя.
+     *
+     * @param  array<string, mixed>  $meta
      */
     public function createConnection(
         string $name,
         string $telegramBotUuid,
         ?string $email = null,
         ?int $userId = null,
+        array $meta = [],
+        ?string $groupId = null,
     ): object {
         return $this->connections->create(
             name: $name,
             telegramBotUuid: $telegramBotUuid,
             email: $email,
             userId: $userId,
+            meta: $meta,
+            groupId: $groupId,
         );
     }
 
     /**
      * Повторно отправить существующее подключение.
+     *
+     * @param  array<string, mixed>  $meta
      */
-    public function retryConnection(string $uuid): object
-    {
-        return $this->connections->retry(uuid: $uuid);
+    public function retryConnection(
+        string $uuid,
+        array $meta = [],
+        ?string $groupId = null,
+    ): object {
+        return $this->connections->retry(
+            uuid: $uuid,
+            meta: $meta,
+            groupId: $groupId,
+        );
     }
 
     /**
@@ -60,6 +75,23 @@ final class Telegga implements TeleggaInterface
     public function getConnection(string $uuid): object
     {
         return $this->connections->get(uuid: $uuid);
+    }
+
+    /**
+     * Получить список подключений Telegga.
+     */
+    public function getConnections(
+        ?string $email = null,
+        ?string $telegramBotUuid = null,
+        ?string $status = null,
+        ?string $cursor = null,
+    ): object {
+        return $this->connections->getAll(
+            email: $email,
+            telegramBotUuid: $telegramBotUuid,
+            status: $status,
+            cursor: $cursor,
+        );
     }
 
     /**

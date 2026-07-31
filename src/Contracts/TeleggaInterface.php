@@ -12,23 +12,43 @@ interface TeleggaInterface
 {
     /**
      * Создать подключение пользователя.
+     *
+     * @param  array<string, mixed>  $meta
      */
     public function createConnection(
         string $name,
         string $telegramBotUuid,
         ?string $email = null,
         ?int $userId = null,
+        array $meta = [],
+        ?string $groupId = null,
     ): object;
 
     /**
      * Повторно отправить существующее подключение.
+     *
+     * @param  array<string, mixed>  $meta
      */
-    public function retryConnection(string $uuid): object;
+    public function retryConnection(
+        string $uuid,
+        array $meta = [],
+        ?string $groupId = null,
+    ): object;
 
     /**
      * Получить подключённого пользователя.
      */
     public function getConnection(string $uuid): object;
+
+    /**
+     * Получить список подключений Telegga.
+     */
+    public function getConnections(
+        ?string $email = null,
+        ?string $telegramBotUuid = null,
+        ?string $status = null,
+        ?string $cursor = null,
+    ): object;
 
     /**
      * Обновить подключённого пользователя.

@@ -81,6 +81,8 @@ it('создаёт независимое подключение через вы
         name: 'Иван',
         telegramBotUuid: $selectedBot->uuid,
         email: 'ivan@example.com',
+        meta: ['locale' => 'ru'],
+        groupId: 'group-1',
     );
     $connection = TelegramConnectedUser::query()->sole();
 
@@ -111,6 +113,8 @@ it('создаёт независимое подключение через вы
                 'bot_id' => 'bot-2',
                 'display_name' => 'Иван',
                 'email' => 'ivan@example.com',
+                'meta' => ['locale' => 'ru'],
+                'group_id' => 'group-1',
             ];
     });
 });
@@ -217,6 +221,8 @@ it('повторно отправляет существующее подклю�
 
     $result = app(TeleggaInterface::class)->retryConnection(
         uuid: $connection->uuid,
+        meta: ['locale' => 'ru'],
+        groupId: 'group-1',
     );
     $connection->refresh();
 
@@ -232,8 +238,33 @@ it('повторно отправляет существующее подклю�
     Http::assertSent(function (Request $request) use ($connection): bool {
         return $request->method() === 'POST'
             && $request->url() === 'https://api.telegga.net/api/v1/users'
-            && $request['external_id'] === $connection->uuid;
+            && $request['external_id'] === $connection->uuid
+            && $request['meta'] === ['locale' => 'ru']
+            && $request['group_id'] === 'group-1';
     });
+});
+
+it('отклоняет пустой идентификатор группы до создания локальной записи', function (): void {
+    Http::preventStrayRequests();
+
+    try {
+        app(TeleggaInterface::class)->createConnection(
+            name: 'Иван',
+            telegramBotUuid: $this->telegramBot->uuid,
+            groupId: '   ',
+        );
+    } catch (ConnectionException $exception) {
+        expect($exception->connectionUuid)
+            ->toBeNull()
+            ->and(TelegramConnectedUser::query()->doesntExist())
+            ->toBeTrue();
+
+        Http::assertNothingSent();
+
+        return;
+    }
+
+    test()->fail('Ожидалось исключение ConnectionException.');
 });
 
 it('не повторяет уже созданное подключение', function (): void {

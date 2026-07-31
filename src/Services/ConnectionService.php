@@ -25,16 +25,22 @@ final class ConnectionService
 
     /**
      * Создать локальное подключение и отправить его в Telegga.
+     *
+     * @param  array<string, mixed>  $meta
      */
     public function create(
         string $name,
         string $telegramBotUuid,
         ?string $email = null,
         ?int $userId = null,
+        array $meta = [],
+        ?string $groupId = null,
     ): object {
         if (trim($name) === '') {
             throw new ConnectionException(message: 'Connection name cannot be empty.');
         }
+
+        $groupId = $this->normalizeGroupId(groupId: $groupId);
 
         try {
             $telegramBot = $this->bots->getAvailableByUuid(uuid: $telegramBotUuid);
@@ -59,14 +65,23 @@ final class ConnectionService
             );
         }
 
-        return $this->send(connection: $connection);
+        return $this->send(
+            connection: $connection,
+            meta: $meta,
+            groupId: $groupId,
+        );
     }
 
     /**
      * Повторно отправить существующее подключение в Telegga.
+     *
+     * @param  array<string, mixed>  $meta
      */
-    public function retry(string $uuid): object
-    {
+    public function retry(
+        string $uuid,
+        array $meta = [],
+        ?string $groupId = null,
+    ): object {
         try {
             $connection = TelegramConnectedUser::query()
                 ->where('uuid', $uuid)
@@ -93,7 +108,16 @@ final class ConnectionService
             );
         }
 
-        return $this->send(connection: $connection);
+        $groupId = $this->normalizeGroupId(
+            groupId: $groupId,
+            connectionUuid: $connection->uuid,
+        );
+
+        return $this->send(
+            connection: $connection,
+            meta: $meta,
+            groupId: $groupId,
+        );
     }
 
     /**
@@ -110,6 +134,59 @@ final class ConnectionService
             throw new ConnectionException(
                 message: $exception->getMessage(),
                 connectionUuid: $uuid,
+                previous: $exception,
+            );
+        }
+    }
+
+    /**
+     * Получить список подключений Telegga.
+     */
+    public function getAll(
+        ?string $email = null,
+        ?string $telegramBotUuid = null,
+        ?string $status = null,
+        ?string $cursor = null,
+    ): object {
+        $query = [];
+
+        if ($email !== null) {
+            $email = trim($email);
+
+            if ($email === '') {
+                throw new ConnectionException(message: 'Connection email cannot be empty.');
+            }
+
+            $query['email'] = $email;
+        }
+
+        if ($telegramBotUuid !== null) {
+            try {
+                $telegramBot = $this->bots->getAvailableByUuid(uuid: $telegramBotUuid);
+                $bot = $this->bots->find(botName: $telegramBot->bot_name);
+            } catch (BotException $exception) {
+                throw new ConnectionException(
+                    message: $exception->getMessage(),
+                    previous: $exception,
+                );
+            }
+
+            $query['bot_id'] = $bot->bot_id;
+        }
+
+        if ($status !== null && trim($status) !== '') {
+            $query['status'] = trim($status);
+        }
+
+        if ($cursor !== null && trim($cursor) !== '') {
+            $query['cursor'] = trim($cursor);
+        }
+
+        try {
+            return $this->users->getAll(query: $query);
+        } catch (TeleggaApiException $exception) {
+            throw new ConnectionException(
+                message: $exception->getMessage(),
                 previous: $exception,
             );
         }
@@ -255,9 +332,14 @@ final class ConnectionService
 
     /**
      * Отправить локальное подключение в Telegga.
+     *
+     * @param  array<string, mixed>  $meta
      */
-    private function send(TelegramConnectedUser $connection): object
-    {
+    private function send(
+        TelegramConnectedUser $connection,
+        array $meta = [],
+        ?string $groupId = null,
+    ): object {
         try {
             $telegramBot = $connection->telegramBot;
 
@@ -275,6 +357,8 @@ final class ConnectionService
                 botId: $bot->bot_id,
                 displayName: $connection->name,
                 email: $connection->email,
+                meta: $meta,
+                groupId: $groupId,
             );
         } catch (BotException|TeleggaApiException $exception) {
             throw new ConnectionException(
@@ -309,6 +393,29 @@ final class ConnectionService
         }
 
         return $response;
+    }
+
+    /**
+     * Нормализовать идентификатор группы.
+     */
+    private function normalizeGroupId(
+        ?string $groupId,
+        ?string $connectionUuid = null,
+    ): ?string {
+        if ($groupId === null) {
+            return null;
+        }
+
+        $groupId = trim($groupId);
+
+        if ($groupId === '') {
+            throw new ConnectionException(
+                message: 'Group identifier cannot be empty.',
+                connectionUuid: $connectionUuid,
+            );
+        }
+
+        return $groupId;
     }
 
     /**

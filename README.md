@@ -69,6 +69,10 @@ $result = $telegga->createConnection(
     name: 'Иван',
     telegramBotUuid: $bot->uuid,
     email: 'ivan@example.com',
+    meta: [
+        'locale' => 'ru',
+    ],
+    groupId: $groupId,
 );
 ```
 
@@ -85,15 +89,23 @@ $result = $telegga->createConnection(
 
 Поля `link_url` и `link_code` доступны в объекте результата.
 
+Параметры `meta` и `groupId` необязательны. `meta` передаётся в поле `meta`, а `groupId` — в `group_id` маршрута `POST /users`. Эти значения локально не сохраняются.
+
 ## Повтор подключения
 
 Повтор выполняется только явным вызовом и использует существующий UUID:
 
 ```php
-$result = $telegga->retryConnection(uuid: $uuid);
+$result = $telegga->retryConnection(
+    uuid: $uuid,
+    meta: [
+        'locale' => 'ru',
+    ],
+    groupId: $groupId,
+);
 ```
 
-Автоматические повторы пакет не выполняет.
+Автоматические повторы пакет не выполняет. Если при первой попытке использовались `meta` или `groupId`, при явном повторе передайте их снова.
 
 Если локальная запись успела создаться, её UUID доступен в исключении:
 
@@ -118,6 +130,25 @@ try {
 ```php
 $connection = $telegga->getConnection(uuid: $uuid);
 ```
+
+Список пользователей Telegga запрашивается с необязательными фильтрами:
+
+```php
+$page = $telegga->getConnections(
+    email: 'ivan@example.com',
+    telegramBotUuid: $bot->uuid,
+    status: 'active',
+    cursor: $cursor,
+);
+
+foreach ($page->data as $connection) {
+    $externalId = $connection->external_id;
+}
+
+$nextCursor = $page->next_cursor;
+```
+
+Пакет преобразует локальный UUID бота во внутренний `bot_id`. Поле `data` возвращается как коллекция исходных объектов API, а отсутствующий `next_cursor` нормализуется в `null`.
 
 Обновление имени, email или статуса:
 
