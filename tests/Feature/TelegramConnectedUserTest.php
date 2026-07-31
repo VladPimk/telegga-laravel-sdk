@@ -48,6 +48,23 @@ it('создаёт таблицу подключений с ожидаемыми
     ]))->toBeTrue();
 });
 
+it('создаёт ожидаемые индексы таблицы подключений', function (): void {
+    $indexes = collect(Schema::getIndexes('telegram_connected_users'));
+
+    expect($indexes->contains(
+        fn (array $index): bool => $index['columns'] === ['uuid']
+            && $index['unique'] === true,
+    ))->toBeTrue()
+        ->and($indexes->contains(
+            fn (array $index): bool => $index['columns'] === ['user_id']
+                && $index['unique'] === false,
+        ))->toBeTrue()
+        ->and($indexes->contains(
+            fn (array $index): bool => $index['columns'] === ['available_telegram_bot_id']
+                && $index['unique'] === false,
+        ))->toBeTrue();
+});
+
 it('генерирует uuid и устанавливает начальные статусы', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
@@ -88,6 +105,28 @@ it('связывает подключение с пользователем пр
         ->toBeInstanceOf(User::class)
         ->and($connection->user->is($user))
         ->toBeTrue();
+});
+
+it('позволяет пользователю проекта иметь несколько подключений', function (): void {
+    $user = User::query()->create([
+        'name' => 'Иван',
+    ]);
+
+    TelegramConnectedUser::query()->create([
+        'user_id' => $user->getKey(),
+        'name' => $user->name,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+    TelegramConnectedUser::query()->create([
+        'user_id' => $user->getKey(),
+        'name' => $user->name,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+
+    expect(TelegramConnectedUser::query()
+        ->where('user_id', $user->getKey())
+        ->count())
+        ->toBe(2);
 });
 
 it('сохраняет подключение после удаления связанного пользователя', function (): void {

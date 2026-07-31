@@ -18,8 +18,9 @@ return new class extends Migration
             $table->uuid('uuid')->unique();
             $table->string('name');
             $table->string('email')->nullable();
-            $table->foreignId('user_id')->nullable()->unique()->constrained()->nullOnDelete();
+            $table->foreignId('user_id')->nullable()->index()->constrained()->nullOnDelete();
             $table->foreignId('available_telegram_bot_id')
+                ->index()
                 ->constrained('available_telegram_bots')
                 ->restrictOnDelete();
             $table->boolean('is_connected')->default(false);
