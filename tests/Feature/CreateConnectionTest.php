@@ -32,7 +32,7 @@ afterEach(function (): void {
     Schema::dropIfExists('users');
 });
 
-it('создаёт независимое подключение через первого доступного бота', function (): void {
+it('создаёт независимое подключение через первого активного бота', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
@@ -40,11 +40,16 @@ it('создаёт независимое подключение через пе
                 [
                     'bot_id' => 'bot-1',
                     'username' => 'mybot',
-                    'status' => 'active',
+                    'status' => 'inactive',
                 ],
                 [
                     'bot_id' => 'bot-2',
                     'username' => 'second_bot',
+                    'status' => 'active',
+                ],
+                [
+                    'bot_id' => 'bot-3',
+                    'username' => 'third_bot',
                     'status' => 'active',
                 ],
             ],
@@ -56,7 +61,7 @@ it('создаёт независимое подключение через пе
                     'external_id' => $request['external_id'],
                     'link_status' => 'pending',
                     'link_code' => '6U828WSH',
-                    'link_url' => 'https://t.me/mybot?start=6U828WSH',
+                    'link_url' => 'https://t.me/second_bot?start=6U828WSH',
                 ],
                 status: 201,
             );
@@ -74,7 +79,7 @@ it('создаёт независимое подключение через пе
         ->and($result->external_id)
         ->toBe($connection->uuid)
         ->and($result->link_url)
-        ->toBe('https://t.me/mybot?start=6U828WSH')
+        ->toBe('https://t.me/second_bot?start=6U828WSH')
         ->and($connection->name)
         ->toBe('Иван')
         ->and($connection->email)
@@ -91,7 +96,7 @@ it('создаёт независимое подключение через пе
             && $request->url() === 'https://api.telegga.net/api/v1/users'
             && $request->data() === [
                 'external_id' => $connection->uuid,
-                'bot_id' => 'bot-1',
+                'bot_id' => 'bot-2',
                 'display_name' => 'Иван',
                 'email' => 'ivan@example.com',
             ];
@@ -110,7 +115,7 @@ it('сохраняет необязательный идентификатор �
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
-            'data' => [['bot_id' => 'bot-1']],
+            'data' => [['bot_id' => 'bot-1', 'status' => 'active']],
         ]),
         'api.telegga.net/api/v1/users' => function (Request $request) {
             return Http::response([
@@ -140,7 +145,7 @@ it('оставляет локальную запись несозданной п
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
-            'data' => [['bot_id' => 'bot-1']],
+            'data' => [['bot_id' => 'bot-1', 'status' => 'active']],
         ]),
         'api.telegga.net/api/v1/users' => Http::response([
             'error' => [
@@ -184,7 +189,7 @@ it('повторно отправляет существующее подклю�
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
-            'data' => [['bot_id' => 'bot-1']],
+            'data' => [['bot_id' => 'bot-1', 'status' => 'active']],
         ]),
         'api.telegga.net/api/v1/users' => function (Request $request) {
             return Http::response([
@@ -242,11 +247,16 @@ it('не повторяет уже созданное подключение', f
     test()->fail('Ожидалось исключение ConnectionException.');
 });
 
-it('сохраняет uuid в исключении при отсутствии доступных ботов', function (): void {
+it('сохраняет uuid в исключении при отсутствии активных ботов', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
-            'data' => [],
+            'data' => [
+                [
+                    'bot_id' => 'bot-1',
+                    'status' => 'inactive',
+                ],
+            ],
         ]),
     ]);
 
@@ -257,6 +267,8 @@ it('сохраняет uuid в исключении при отсутствии 
 
         expect($exception->connectionUuid)
             ->toBe($connection->uuid)
+            ->and($exception->getMessage())
+            ->toBe('No active Telegga bots are available.')
             ->and($connection->is_created)
             ->toBeFalse();
 
@@ -354,7 +366,7 @@ it('отклоняет успешный ответ api с некорректны
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
-            'data' => [['bot_id' => 'bot-1']],
+            'data' => [['bot_id' => 'bot-1', 'status' => 'active']],
         ]),
         'api.telegga.net/api/v1/users' => Http::response(
             body: 'not-json',

@@ -247,7 +247,10 @@ final class ConnectionService
     private function send(TelegramConnectedUser $connection): object
     {
         try {
-            $bot = $this->bots->getAll()->first();
+            $bot = $this->bots->getAll()->first(
+                fn (mixed $bot): bool => is_object($bot)
+                    && ($bot->status ?? null) === 'active',
+            );
 
             if (
                 ! is_object($bot)
@@ -255,7 +258,7 @@ final class ConnectionService
                 || $bot->bot_id === ''
             ) {
                 throw new ConnectionException(
-                    message: 'No Telegga bots are available.',
+                    message: 'No active Telegga bots are available.',
                     connectionUuid: $connection->uuid,
                 );
             }
