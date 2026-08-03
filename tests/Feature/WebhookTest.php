@@ -24,6 +24,7 @@ beforeEach(function (): void {
     $connectionMigration->up();
 
     $this->telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
+    $this->eventId = 'd5b7d0e1-0000-4000-8000-000000000001';
 });
 
 afterEach(function (): void {
@@ -43,7 +44,7 @@ it('регистрирует маршрут webhook по ожидаемому а
         ->toContain('POST');
 });
 
-it('принимает событие подключения и идемпотентно обновляет локальный статус', function (): void {
+it('принимает событие подключения и идемпотентно возвращает результат', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -51,7 +52,7 @@ it('принимает событие подключения и идемпоте
     ]);
     $payload = [
         'event' => 'user.linked',
-        'event_id' => 'd5b7d0e1-0000-4000-8000-000000000001',
+        'event_id' => $this->eventId,
         'service_id' => '0a1f376a-0000-4000-8000-000000000001',
         'user_id' => 'b7c0d091-0000-4000-8000-000000000001',
         'external_id' => $connection->uuid,
@@ -60,16 +61,29 @@ it('принимает событие подключения и идемпоте
         'telegram_user_id' => 6141109792,
         'linked_at' => '2026-07-22T10:15:00Z',
     ];
+    $expectedResponse = [
+        'success' => true,
+        'event' => 'user.linked',
+        'event_id' => $this->eventId,
+        'message' => 'Telegram connection marked as connected.',
+        'data' => [
+            'external_id' => $connection->uuid,
+            'bot_username' => 'mybot',
+            'is_connected' => true,
+        ],
+    ];
 
     $this
         ->withToken('webhook-secret')
         ->postJson('/webhooks/v1/telegram/connect-account', $payload)
-        ->assertNoContent();
+        ->assertOk()
+        ->assertExactJson($expectedResponse);
 
     $this
         ->withToken('webhook-secret')
         ->postJson('/webhooks/v1/telegram/connect-account', $payload)
-        ->assertNoContent();
+        ->assertOk()
+        ->assertExactJson($expectedResponse);
 
     expect($connection->refresh()->is_connected)
         ->toBeTrue()
@@ -77,7 +91,7 @@ it('принимает событие подключения и идемпоте
         ->toBe(1);
 });
 
-it('принимает тестовое событие без изменения подключений', function (): void {
+it('принимает тестовое событие и возвращает результат без изменения подключений', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -91,27 +105,42 @@ it('принимает тестовое событие без изменения
             'service_id' => '0a1f376a-0000-4000-8000-000000000001',
             'sent_at' => '2026-07-22T10:15:00Z',
         ])
-        ->assertNoContent();
+        ->assertOk()
+        ->assertExactJson([
+            'success' => true,
+            'event' => 'test',
+            'message' => 'Webhook accepted.',
+        ]);
 
     expect($connection->refresh()->is_connected)
         ->toBeFalse();
 });
 
-it('принимает событие для неизвестного external id', function (): void {
+it('возвращает ошибку для неизвестного external id', function (): void {
     $this
         ->withToken('webhook-secret')
         ->postJson('/webhooks/v1/telegram/connect-account', [
             'event' => 'user.linked',
+            'event_id' => $this->eventId,
             'external_id' => 'unknown-external-id',
             'bot_username' => 'mybot',
         ])
-        ->assertNoContent();
+        ->assertNotFound()
+        ->assertExactJson([
+            'success' => false,
+            'event' => 'user.linked',
+            'event_id' => $this->eventId,
+            'error' => [
+                'code' => 'connection_not_found',
+                'message' => 'Connection was not found for the provided external_id and bot_username.',
+            ],
+        ]);
 
     expect(TelegramConnectedUser::query()->doesntExist())
         ->toBeTrue();
 });
 
-it('не активирует подключение при неполном совпадении имени бота', function (): void {
+it('возвращает ошибку при несовпадении имени бота', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -122,22 +151,40 @@ it('не активирует подключение при неполном с�
         ->withToken('webhook-secret')
         ->postJson('/webhooks/v1/telegram/connect-account', [
             'event' => 'user.linked',
+            'event_id' => $this->eventId,
             'external_id' => $connection->uuid,
             'bot_username' => '@mybot',
         ])
-        ->assertNoContent();
+        ->assertNotFound()
+        ->assertExactJson([
+            'success' => false,
+            'event' => 'user.linked',
+            'event_id' => $this->eventId,
+            'error' => [
+                'code' => 'connection_not_found',
+                'message' => 'Connection was not found for the provided external_id and bot_username.',
+            ],
+        ]);
 
     expect($connection->refresh()->is_connected)
         ->toBeFalse();
 });
 
-it('принимает неизвестное событие для совместимости с новыми событиями', function (): void {
+it('отклоняет неизвестное событие', function (): void {
     $this
         ->withToken('webhook-secret')
         ->postJson('/webhooks/v1/telegram/connect-account', [
             'event' => 'user.updated',
         ])
-        ->assertNoContent();
+        ->assertBadRequest()
+        ->assertExactJson([
+            'success' => false,
+            'event' => 'user.updated',
+            'error' => [
+                'code' => 'unsupported_event',
+                'message' => 'Webhook event is not supported.',
+            ],
+        ]);
 });
 
 it('отклоняет webhook без bearer токена', function (): void {
@@ -147,6 +194,7 @@ it('отклоняет webhook без bearer токена', function (): void {
         ])
         ->assertUnauthorized()
         ->assertExactJson([
+            'success' => false,
             'error' => [
                 'code' => 'unauthorized',
                 'message' => 'Invalid webhook token.',
@@ -162,6 +210,7 @@ it('отклоняет webhook с неверным bearer токеном', funct
         ])
         ->assertUnauthorized()
         ->assertExactJson([
+            'success' => false,
             'error' => [
                 'code' => 'unauthorized',
                 'message' => 'Invalid webhook token.',
@@ -177,7 +226,14 @@ it('отклоняет webhook при пустом токене в конфиг�
         ->postJson('/webhooks/v1/telegram/connect-account', [
             'event' => 'test',
         ])
-        ->assertUnauthorized();
+        ->assertUnauthorized()
+        ->assertExactJson([
+            'success' => false,
+            'error' => [
+                'code' => 'unauthorized',
+                'message' => 'Invalid webhook token.',
+            ],
+        ]);
 });
 
 it('отклоняет payload без названия события', function (): void {
@@ -186,9 +242,27 @@ it('отклоняет payload без названия события', function
         ->postJson('/webhooks/v1/telegram/connect-account')
         ->assertBadRequest()
         ->assertExactJson([
+            'success' => false,
             'error' => [
                 'code' => 'invalid_request',
                 'message' => 'Webhook event is required.',
+            ],
+        ]);
+});
+
+it('отклоняет событие подключения без event id', function (): void {
+    $this
+        ->withToken('webhook-secret')
+        ->postJson('/webhooks/v1/telegram/connect-account', [
+            'event' => 'user.linked',
+        ])
+        ->assertBadRequest()
+        ->assertExactJson([
+            'success' => false,
+            'event' => 'user.linked',
+            'error' => [
+                'code' => 'invalid_request',
+                'message' => 'Webhook event_id is required.',
             ],
         ]);
 });
@@ -198,9 +272,13 @@ it('отклоняет событие подключения без external id'
         ->withToken('webhook-secret')
         ->postJson('/webhooks/v1/telegram/connect-account', [
             'event' => 'user.linked',
+            'event_id' => $this->eventId,
         ])
         ->assertBadRequest()
         ->assertExactJson([
+            'success' => false,
+            'event' => 'user.linked',
+            'event_id' => $this->eventId,
             'error' => [
                 'code' => 'invalid_request',
                 'message' => 'Webhook external_id is required.',
@@ -213,10 +291,14 @@ it('отклоняет событие подключения без имени �
         ->withToken('webhook-secret')
         ->postJson('/webhooks/v1/telegram/connect-account', [
             'event' => 'user.linked',
+            'event_id' => $this->eventId,
             'external_id' => 'connection-uuid',
         ])
         ->assertBadRequest()
         ->assertExactJson([
+            'success' => false,
+            'event' => 'user.linked',
+            'event_id' => $this->eventId,
             'error' => [
                 'code' => 'invalid_request',
                 'message' => 'Webhook bot_username is required.',
@@ -224,15 +306,25 @@ it('отклоняет событие подключения без имени �
         ]);
 });
 
-it('возвращает серверную ошибку при недоступной локальной таблице', function (): void {
+it('возвращает json с серверной ошибкой при недоступной локальной таблице', function (): void {
     Schema::drop('telegram_connected_users');
 
     $this
         ->withToken('webhook-secret')
         ->postJson('/webhooks/v1/telegram/connect-account', [
             'event' => 'user.linked',
+            'event_id' => $this->eventId,
             'external_id' => 'unknown-external-id',
             'bot_username' => 'mybot',
         ])
-        ->assertServerError();
+        ->assertServerError()
+        ->assertExactJson([
+            'success' => false,
+            'event' => 'user.linked',
+            'event_id' => $this->eventId,
+            'error' => [
+                'code' => 'internal',
+                'message' => 'Webhook could not be processed.',
+            ],
+        ]);
 });

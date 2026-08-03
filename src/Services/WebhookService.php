@@ -14,18 +14,35 @@ final class WebhookService
     /**
      * Отметить локальное подключение активным.
      */
-    public function markConnected(string $externalId, string $botName): void
+    public function markConnected(string $externalId, string $botName): bool
     {
         try {
-            TelegramConnectedUser::query()
+            $connection = TelegramConnectedUser::query()
                 ->where('uuid', $externalId)
                 ->whereHas(
                     relation: 'telegramBot',
                     callback: fn (Builder $query): Builder => $query->where('bot_name', $botName),
                 )
-                ->update([
-                    'is_connected' => true,
-                ]);
+                ->first();
+
+            if ($connection === null) {
+                return false;
+            }
+
+            if ($connection->is_connected) {
+                return true;
+            }
+
+            $updated = $connection->update([
+                'is_connected' => true,
+            ]);
+
+            if (! $updated) {
+                throw new WebhookException(
+                    message: 'Local Telegga connection state could not be updated.',
+                    externalId: $externalId,
+                );
+            }
         } catch (QueryException $exception) {
             throw new WebhookException(
                 message: 'Local Telegga connection state could not be updated.',
@@ -33,5 +50,7 @@ final class WebhookService
                 previous: $exception,
             );
         }
+
+        return true;
     }
 }

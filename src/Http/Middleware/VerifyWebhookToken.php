@@ -25,6 +25,7 @@ final class VerifyWebhookToken
         ) {
             return response()->json(
                 data: [
+                    'success' => false,
                     'error' => [
                         'code' => 'unauthorized',
                         'message' => 'Invalid webhook token.',
