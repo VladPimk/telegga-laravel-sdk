@@ -1,48 +1,48 @@
 # Telegga Laravel SDK
 
-Laravel-пакет для интеграции с API сервиса Telegga.
+Laravel package for integrating applications with the Telegga API.
 
-> Пакет разработан для внутренних проектов Par Soft и опубликован в открытом доступе под лицензией MIT.
+> This package was developed for internal Par Soft projects and is publicly available under the MIT license.
 
-## Требования
+## Requirements
 
-- PHP 8.2 или новее.
-- Laravel 11, 12 или 13.
+- PHP 8.2 or later.
+- Laravel 11, 12, or 13.
 
-## Установка
+## Installation
 
-После публикации стабильной версии пакет будет устанавливаться через Composer:
+Install the package through Composer:
 
 ```bash
 composer require telegga/laravel-sdk
 ```
 
-Laravel автоматически зарегистрирует сервис-провайдер пакета.
+Laravel automatically registers the package service provider.
 
-Миграции пакета регистрируются автоматически и выполняются вместе с миграциями проекта:
+Package migrations are registered automatically and run together with the application migrations:
 
 ```bash
 php artisan migrate
 ```
 
-Конфигурация работает непосредственно из пакета. Если её необходимо изменить в проекте, опубликуйте файл отдельно:
+The package uses its bundled configuration by default. Publish the configuration file only when application-level customization is required:
 
 ```bash
 php artisan vendor:publish --tag=telegga-config
 ```
 
-Укажите API-ключ и собственный токен для входящих webhook:
+Configure the Telegga API key and a project-generated token for incoming webhooks:
 
 ```dotenv
 TELEGGA_API_KEY=tg_live_XXXXXXXXXXXXXXXX
-TELEGGA_WEBHOOK_TOKEN=случайная-секретная-строка
+TELEGGA_WEBHOOK_TOKEN=random-secret-string
 ```
 
-Значение `TELEGGA_WEBHOOK_TOKEN` необходимо указать в админ-панели Telegga как bearer-токен webhook.
+Set the same `TELEGGA_WEBHOOK_TOKEN` value as the webhook bearer token in the Telegga admin panel.
 
-## Доступные Telegram-боты
+## Available Telegram bots
 
-Перед созданием подключений зарегистрируйте локально бота, доступного сервису Telegga:
+Before creating connections, register a bot that is available to the Telegga service:
 
 ```php
 $bot = $telegga->addTelegramBot(
@@ -50,98 +50,98 @@ $bot = $telegga->addTelegramBot(
 );
 ```
 
-Пакет принимает и сохраняет имя без символа `@`, как его возвращает API. При проверке через `GET /bots` полученный `username` строго сравнивается с локальным именем с учётом регистра. Пакет не сохраняет `bot_id` или другие данные API, а поле `uuid` модели генерируется локально.
+The package accepts and stores the username without the `@` prefix, matching the format returned by the API. During validation through `GET /bots`, the returned `username` is compared with the local name using an exact, case-sensitive match. The package does not store `bot_id` or any other bot data returned by the API. The model `uuid` is generated locally.
 
-Получение локально зарегистрированных ботов не выполняет запрос к API:
+Retrieving locally registered bots does not send an API request:
 
 ```php
 $bots = $telegga->getAvailableBots();
 ```
 
-Неиспользуемого бота можно удалить по локальному UUID:
+Delete an unused bot by its local UUID:
 
 ```php
 $telegga->deleteTelegramBot(uuid: $bot->uuid);
 ```
 
-Удаление запрещено, если бот связан хотя бы с одним подключением.
+Deletion is rejected when the bot is associated with at least one connection.
 
-## Создание подключения
+## Creating a connection
 
-Подключение может существовать независимо от пользователя проекта:
+A connection may exist independently of an application user:
 
 ```php
 $result = $telegga->createConnection(
-    name: 'Иван',
+    name: 'John',
     telegramBotUuid: $bot->uuid,
-    email: 'ivan@example.com',
+    email: 'john@example.com',
     meta: [
-        'locale' => 'ru',
+        'locale' => 'en',
     ],
     groupId: $groupId,
 );
 ```
 
-При необходимости передайте идентификатор пользователя проекта:
+Pass the application user ID when the connection should be associated with an existing user:
 
 ```php
 $result = $telegga->createConnection(
-    name: 'Иван',
+    name: 'John',
     telegramBotUuid: $bot->uuid,
-    email: 'ivan@example.com',
+    email: 'john@example.com',
     userId: 42,
 );
 ```
 
-Поля `link_url` и `link_code` доступны в объекте результата.
+The returned object exposes the `link_url` and `link_code` fields.
 
-Параметры `meta` и `groupId` необязательны. `meta` передаётся в поле `meta`, а `groupId` — в `group_id` маршрута `POST /users`. Эти значения локально не сохраняются.
+The `meta` and `groupId` parameters are optional. The package sends them as `meta` and `group_id` in the `POST /users` request. These values are not stored locally.
 
-## Повтор подключения
+## Retrying a connection
 
-Повтор выполняется только явным вызовом и использует существующий UUID:
+A retry is performed only through an explicit call and uses the existing local UUID:
 
 ```php
 $result = $telegga->retryConnection(
     uuid: $uuid,
     meta: [
-        'locale' => 'ru',
+        'locale' => 'en',
     ],
     groupId: $groupId,
 );
 ```
 
-Автоматические повторы пакет не выполняет. Если при первой попытке использовались `meta` или `groupId`, при явном повторе передайте их снова.
+The package does not perform automatic retries. If `meta` or `groupId` were used during the first attempt, pass them again when explicitly retrying the connection.
 
-Если локальная запись успела создаться, её UUID доступен в исключении:
+When a local record was created before the request failed, its UUID is available from the exception:
 
 ```php
 try {
     $result = $telegga->createConnection(
-        name: 'Иван',
+        name: 'John',
         telegramBotUuid: $bot->uuid,
-        email: 'ivan@example.com',
+        email: 'john@example.com',
     );
 } catch (\Telegga\Laravel\Exceptions\ConnectionException $exception) {
     $uuid = $exception->connectionUuid;
 }
 ```
 
-## Управление подключением
+## Managing connections
 
-Все операции принимают UUID локальной записи. Пакет строго сравнивает возвращённый Telegga `bot_username` с локальным `bot_name` с учётом регистра. Оба значения используются без символа `@`. Внутренние идентификаторы пользователя и бота локально не сохраняются.
+All connection operations accept the UUID of the local record. The package compares the `bot_username` returned by Telegga with the local `bot_name` using an exact, case-sensitive match. Both values use the username without the `@` prefix. Internal Telegga user and bot identifiers are not stored locally.
 
-Получение пользователя с привязками и группами:
+Retrieve a user together with links and groups:
 
 ```php
 $connection = $telegga->getConnection(uuid: $uuid);
 ```
 
-Список пользователей Telegga запрашивается с необязательными фильтрами:
+Request a paginated list of Telegga users with optional filters:
 
 ```php
 $page = $telegga->getConnections(
-    email: 'ivan@example.com',
+    email: 'john@example.com',
     telegramBotUuid: $bot->uuid,
     status: 'active',
     cursor: $cursor,
@@ -154,56 +154,56 @@ foreach ($page->data as $connection) {
 $nextCursor = $page->next_cursor;
 ```
 
-Пакет преобразует локальный UUID бота во внутренний `bot_id`. Поле `data` возвращается как коллекция исходных объектов API, а отсутствующий `next_cursor` нормализуется в `null`.
+The package resolves the local bot UUID to the internal `bot_id`. The `data` field is returned as a collection of the original API objects, while a missing `next_cursor` is normalized to `null`.
 
-Обновление имени, email или статуса:
+Update the display name, email, or status:
 
 ```php
 $connection = $telegga->updateConnection(
     uuid: $uuid,
     data: [
-        'display_name' => 'Иван Петров',
+        'display_name' => 'John Smith',
         'email' => 'new@example.com',
         'status' => 'disabled',
     ],
 );
 ```
 
-После успешного ответа API поля `display_name` и `email` синхронизируются с локальными `name` и `email`. Пустая строка в `email` очищает локальное значение. Статус пользователя локально не сохраняется.
+After a successful API response, `display_name` and `email` are synchronized with the local `name` and `email` fields. An empty `email` string clears the local value. The user status is not stored locally.
 
-Новый код для существующей привязки выпускается явно:
+Explicitly generate a new code for an existing link:
 
 ```php
 $result = $telegga->regenerateConnectionCode(uuid: $uuid);
 ```
 
-Отвязка от бота сохраняет локальную запись и устанавливает `is_connected` в `false`:
+Unlinking a user from the bot preserves the local record and sets `is_connected` to `false`:
 
 ```php
 $telegga->unlinkConnection(uuid: $uuid);
 ```
 
-Полное удаление сначала удаляет пользователя в Telegga и только после успешного ответа удаляет локальную запись:
+Full deletion removes the user from Telegga first and deletes the local record only after a successful API response:
 
 ```php
 $telegga->deleteConnection(uuid: $uuid);
 ```
 
-## Отправка сообщений
+## Sending messages
 
-Все типы сообщений отправляются через единый метод. Пакет получает активную привязку выбранного бота и добавляет `external_id`, `bot_id` и `type` в запрос:
+All message types are sent through one method. The package resolves the active link for the selected bot and adds `external_id`, `bot_id`, and `type` to the request:
 
 ```php
 $result = $telegga->sendMessage(
     uuid: $connectionUuid,
     type: 'text',
     data: [
-        'text' => 'Заказ <b>#1234</b> отправлен',
+        'text' => 'Order <b>#1234</b> has been shipped',
         'parse_mode' => 'HTML',
         'buttons' => [
             [
                 [
-                    'text' => 'Отследить',
+                    'text' => 'Track order',
                     'url' => 'https://example.com/track/1234',
                 ],
             ],
@@ -214,7 +214,7 @@ $result = $telegga->sendMessage(
 );
 ```
 
-Медиа отправляется через тот же метод после загрузки файла:
+Send media through the same method after uploading the file:
 
 ```php
 $result = $telegga->sendMessage(
@@ -222,20 +222,20 @@ $result = $telegga->sendMessage(
     type: 'photo',
     data: [
         'media_id' => $mediaId,
-        'text' => 'Подпись к фотографии',
+        'text' => 'Photo caption',
     ],
 );
 ```
 
-Для `location` в `data` передаются `latitude` и `longitude`, а для `contact` — `phone_number`, `first_name` и необязательный `last_name`.
+For `location`, pass `latitude` and `longitude` in `data`. For `contact`, pass `phone_number`, `first_name`, and an optional `last_name`.
 
-Метод поддерживает типы `text`, `photo`, `video`, `document`, `audio`, `voice`, `animation`, `sticker`, `location` и `contact`. Набор `data` передаётся в API без жёсткого DTO, поэтому новые поля и типы можно использовать без обновления пакета. Переданные в `data` значения `external_id`, `bot_id` и `type` всегда заменяются значениями, определёнными пакетом, а `user_id` удаляется. Получателя сообщения определяет только UUID локального подключения.
+The method supports `text`, `photo`, `video`, `document`, `audio`, `voice`, `animation`, `sticker`, `location`, and `contact`. The `data` payload is not restricted by a rigid DTO, so new fields and types can be used without updating the package. Values for `external_id`, `bot_id`, and `type` supplied in `data` are always replaced with values resolved by the package, while `user_id` is removed. The recipient is determined exclusively by the local connection UUID.
 
-Метод возвращает исходный объект ответа API с `message_id`, `status` и `created_at`. Сообщение и его статус локально не сохраняются.
+The method returns the original API response object with `message_id`, `status`, and `created_at`. Messages and their statuses are not stored locally.
 
-## Статус сообщения
+## Message status
 
-Статус доставки запрашивается по `message_id`, полученному при отправке:
+Request the delivery status using the `message_id` returned when the message was queued:
 
 ```php
 $message = $telegga->getMessage(
@@ -243,11 +243,11 @@ $message = $telegga->getMessage(
 );
 ```
 
-Метод возвращает исходный объект ответа API со статусом, количеством попыток, временем доставки и `delivery_attempts`.
+The method returns the original API response object with the status, attempt count, delivery timestamps, and `delivery_attempts`.
 
-## История сообщений пользователя
+## User message history
 
-История всегда запрашивается по UUID локального подключения. Пакет находит пользователя Telegga по локальному `external_id`, получает его внутренний `user_id` и обязательно передаёт этот идентификатор в `GET /messages`:
+Message history is always requested through a local connection UUID. The package finds the Telegga user by the local `external_id`, resolves the internal `user_id`, and always passes that identifier to `GET /messages`:
 
 ```php
 $page = $telegga->getMessages(
@@ -265,13 +265,13 @@ foreach ($page->data as $message) {
 $nextCursor = $page->next_cursor;
 ```
 
-Параметры `status`, `from`, `to` и `cursor` необязательны. Даты передаются в API в формате RFC 3339.
+The `status`, `from`, `to`, and `cursor` parameters are optional. Dates are sent to the API in RFC 3339 format.
 
-Поле `data` возвращается как `Collection` объектов без жёсткого DTO, поэтому новые поля API остаются доступными. `next_cursor` содержит курсор следующей страницы или `null`. Получение полной истории сервиса без указания локального подключения публичным интерфейсом не поддерживается.
+The `data` field is returned as a `Collection` of objects without a rigid DTO, keeping new API fields available to the application. `next_cursor` contains the next page cursor or `null`. The public interface does not support retrieving the full service message history without specifying a local connection.
 
-## Медиафайлы
+## Media files
 
-Файл загружается multipart-запросом из доступного для чтения локального пути:
+Upload a file as multipart data from a readable local path:
 
 ```php
 $media = $telegga->uploadMedia(
@@ -281,7 +281,7 @@ $media = $telegga->uploadMedia(
 $mediaId = $media->media_id;
 ```
 
-Метаданные ранее загруженного файла запрашиваются по `media_id`:
+Request metadata for an uploaded file using its `media_id`:
 
 ```php
 $metadata = $telegga->getMedia(
@@ -289,23 +289,23 @@ $metadata = $telegga->getMedia(
 );
 ```
 
-Оба метода возвращают исходные объекты API без жёсткого DTO. Пакет не определяет MIME-тип и не проверяет ограничения размера самостоятельно: содержимое, допустимый тип и лимиты проверяет Telegga API. Файл и `media_id` локально не сохраняются.
+Both methods return the original API response objects without rigid DTOs. The package does not determine the MIME type or enforce size limits itself. File contents, supported types, and limits are validated by the Telegga API. Neither the file nor its `media_id` is stored locally.
 
-## Группы
+## Groups
 
-Группа создаётся для бота локального подключения. Пакет получает `bot_id` самостоятельно:
+A group is created for the bot associated with a local connection. The package resolves `bot_id` automatically:
 
 ```php
 $group = $telegga->createGroup(
     uuid: $connectionUuid,
     name: 'VIP',
-    description: 'VIP-клиенты',
+    description: 'VIP customers',
 );
 
 $groups = $telegga->getGroups(uuid: $connectionUuid);
 ```
 
-Получение, изменение и удаление используют `group_id`, возвращённый API:
+Retrieving, updating, and deleting a group uses the `group_id` returned by the API:
 
 ```php
 $group = $telegga->getGroup(groupId: $groupId);
@@ -314,14 +314,14 @@ $group = $telegga->updateGroup(
     groupId: $groupId,
     data: [
         'name' => 'Premium',
-        'description' => 'Premium-клиенты',
+        'description' => 'Premium customers',
     ],
 );
 
 $telegga->deleteGroup(groupId: $groupId);
 ```
 
-Управлять членством одного подключения можно через маршруты пользователя:
+Manage membership for one connection through the user routes:
 
 ```php
 $result = $telegga->addConnectionToGroup(
@@ -335,7 +335,7 @@ $telegga->removeConnectionFromGroup(
 );
 ```
 
-Групповые маршруты принимают локальные UUID, которые пакет преобразует во внутренние `user_id` Telegga:
+Group member routes accept local UUIDs, which the package resolves to internal Telegga `user_id` values:
 
 ```php
 $result = $telegga->addGroupMembers(
@@ -349,25 +349,25 @@ $telegga->removeGroupMember(
 );
 ```
 
-Повторяющиеся UUID удаляются перед отправкой. API принимает до 10 000 участников за запрос, но для каждого уникального локального UUID пакет сначала выполняет поиск пользователя Telegga. При больших объёмах передавайте подключения отдельными порциями с учётом лимита API. Автоматические повторы пакет не выполняет.
+Duplicate UUIDs are removed before sending the request. The API accepts up to 10,000 members per request, but the package first performs a Telegga user lookup for every unique local UUID. For large datasets, send connections in separate batches while respecting the API limit. The package does not perform automatic retries.
 
-Группы и членство локально не сохраняются. Объекты и коллекции возвращаются без жёстких DTO.
+Groups and memberships are not stored locally. Objects and collections are returned without rigid DTOs.
 
-## Рассылки
+## Broadcasts
 
-Рассылка всем подключённым пользователям бота запускается по UUID локального подключения:
+Start a broadcast to all connected users of a bot using a local connection UUID:
 
 ```php
 $broadcast = $telegga->startBroadcast(
     uuid: $connectionUuid,
     type: 'text',
     data: [
-        'text' => 'Акция!',
+        'text' => 'Special offer!',
     ],
 );
 ```
 
-Чтобы ограничить получателей участниками группы, передайте `groupId`:
+To limit recipients to group members, pass `groupId`:
 
 ```php
 $broadcast = $telegga->startBroadcast(
@@ -375,15 +375,15 @@ $broadcast = $telegga->startBroadcast(
     type: 'photo',
     data: [
         'media_id' => $mediaId,
-        'text' => 'Новая акция',
+        'text' => 'New special offer',
     ],
     groupId: $groupId,
 );
 ```
 
-Поля сообщения передаются через открытый `data`, как в `sendMessage()`. Значения `external_id`, `user_id`, `bot_id`, `group_id` и `type` из `data` удаляются или заменяются параметрами, которые определил пакет.
+Message fields are passed through the open `data` payload, as in `sendMessage()`. Values for `external_id`, `user_id`, `bot_id`, `group_id`, and `type` supplied in `data` are removed or replaced with parameters resolved by the package.
 
-Прогресс и отмена запрашиваются по `broadcast_id`:
+Request progress or cancel a broadcast using its `broadcast_id`:
 
 ```php
 $broadcast = $telegga->getBroadcast(
@@ -395,36 +395,36 @@ $result = $telegga->cancelBroadcast(
 );
 ```
 
-Рассылки и их прогресс локально не сохраняются. Все методы возвращают исходные объекты API без жёстких DTO.
+Broadcasts and their progress are not stored locally. All methods return the original API response objects without rigid DTOs.
 
-## Входящие webhook
+## Incoming webhooks
 
-Пакет автоматически регистрирует маршрут:
+The package automatically registers this route:
 
 ```text
 POST /webhooks/v1/telegram/connect-account
 ```
 
-В админ-панели Telegga укажите базовый адрес проекта. Telegga самостоятельно добавит к нему путь webhook.
+Set the application base URL in the Telegga admin panel. Telegga appends the webhook path automatically.
 
-Каждый запрос должен содержать токен проекта:
+Every request must contain the project token:
 
 ```http
 Authorization: Bearer <TELEGGA_WEBHOOK_TOKEN>
 ```
 
-Пустой, отсутствующий или неверный токен возвращает `401`. Для сравнения токенов используется безопасное сравнение через `hash_equals`.
+An empty, missing, or invalid token returns `401`. Tokens are compared securely using `hash_equals`.
 
-Событие `user.linked` находит локальную запись по совпадению `external_id` с `telegram_connected_users.uuid`. Полученный `bot_username` также напрямую сопоставляется с именем связанного локального бота. Оба значения используются без символа `@`. После этого пакет устанавливает `is_connected = true`. Повторная доставка события безопасна и возвращает тот же успешный результат.
+The `user.linked` event finds the local record by matching `external_id` with `telegram_connected_users.uuid`. The returned `bot_username` is also matched directly against the associated local bot name. Both values use the username without the `@` prefix. The package then sets `is_connected` to `true`. Repeated event delivery is safe and returns the same successful result.
 
-Успешные события `user.linked` и `test` возвращают `200` с JSON, содержащим `success`, тип события и сообщение о результате. Для `user.linked` ответ также содержит `external_id`, `bot_username` и итоговый статус подключения. Поле `event_id` необязательно и включается в ответ, если оно было передано.
+Successful `user.linked` and `test` events return `200` with JSON containing `success`, the event type, and a result message. A `user.linked` response also contains `external_id`, `bot_username`, and the resulting connection status. The `event_id` field is optional and is included in the response when provided.
 
-Некорректный payload или неизвестный тип события возвращает `400`, неверный токен — `401`, а отсутствующее локальное подключение или несовпадение бота — `404`. Ошибка локальной базы данных преобразуется в JSON-ответ `500`, чтобы Telegga повторила доставку согласно своей политике. Ошибки поиска и обработки записываются в Laravel-лог вместе с `external_id`, `bot_username` и переданным `event_id` без сохранения bearer-токена.
+An invalid payload or unsupported event type returns `400`, an invalid token returns `401`, and a missing local connection or bot mismatch returns `404`. A local database error is converted into a JSON `500` response so Telegga can retry delivery according to its policy. Lookup and processing errors are written to the Laravel log with `external_id`, `bot_username`, and the provided `event_id`, without storing the bearer token.
 
-## Статус
+## Status
 
-Реализованы HTTP-клиент, локальное управление доступными ботами, модель подключения с явно выбранным ботом, создание и управление подключением, явный повтор неудачной отправки, отправка всех типов сообщений, получение статуса сообщения, история сообщений пользователя, загрузка медиафайлов, группы, управление участниками, рассылки и входящие webhook.
+The package provides an HTTP client, local management of available bots, a connection model with an explicitly selected bot, connection creation and management, explicit retry of failed requests, all supported message types, message status lookup, user message history, media uploads, groups, member management, broadcasts, and incoming webhooks.
 
-## Лицензия
+## License
 
-Пакет распространяется по лицензии MIT.
+The package is open-sourced software licensed under the MIT license.
