@@ -49,9 +49,9 @@ final class ConnectAccountWebhookController
 
         $eventId = $request->input(key: 'event_id');
 
-        if (! is_string($eventId) || trim($eventId) === '') {
+        if ($eventId !== null && (! is_string($eventId) || trim($eventId) === '')) {
             return $this->invalidRequest(
-                message: 'Webhook event_id is required.',
+                message: 'Webhook event_id must be a non-empty string.',
                 event: $event,
             );
         }
@@ -114,17 +114,23 @@ final class ConnectAccountWebhookController
             );
         }
 
-        return response()->json(data: [
+        $response = [
             'success' => true,
             'event' => $event,
-            'event_id' => $eventId,
-            'message' => 'Telegram connection marked as connected.',
-            'data' => [
-                'external_id' => $externalId,
-                'bot_username' => $botName,
-                'is_connected' => true,
-            ],
-        ]);
+        ];
+
+        if ($eventId !== null) {
+            $response['event_id'] = $eventId;
+        }
+
+        $response['message'] = 'Telegram connection marked as connected.';
+        $response['data'] = [
+            'external_id' => $externalId,
+            'bot_username' => $botName,
+            'is_connected' => true,
+        ];
+
+        return response()->json(data: $response);
     }
 
     /**

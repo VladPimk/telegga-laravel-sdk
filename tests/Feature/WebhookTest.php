@@ -250,21 +250,34 @@ it('отклоняет payload без названия события', function
         ]);
 });
 
-it('отклоняет событие подключения без event id', function (): void {
+it('принимает событие подключения без event id', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+
     $this
         ->withToken('webhook-secret')
         ->postJson('/webhooks/v1/telegram/connect-account', [
             'event' => 'user.linked',
+            'external_id' => $connection->uuid,
+            'bot_username' => 'mybot',
         ])
-        ->assertBadRequest()
+        ->assertOk()
         ->assertExactJson([
-            'success' => false,
+            'success' => true,
             'event' => 'user.linked',
-            'error' => [
-                'code' => 'invalid_request',
-                'message' => 'Webhook event_id is required.',
+            'message' => 'Telegram connection marked as connected.',
+            'data' => [
+                'external_id' => $connection->uuid,
+                'bot_username' => 'mybot',
+                'is_connected' => true,
             ],
         ]);
+
+    expect($connection->refresh()->is_connected)
+        ->toBeTrue();
 });
 
 it('отклоняет событие подключения без external id', function (): void {
