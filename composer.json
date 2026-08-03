@@ -1,8 +1,13 @@
 {
     "name": "telegga/laravel-sdk",
-    "description": "Laravel SDK for the Telegga API.",
+    "description": "Laravel SDK for the Telegga API, developed for internal projects at Par Soft.",
     "type": "library",
     "license": "MIT",
+    "authors": [
+        {
+            "name": "Vlad Pimkin"
+        }
+    ],
     "keywords": [
         "laravel",
         "notifications",
