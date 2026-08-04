@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Client\Request;
@@ -16,6 +17,7 @@ use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Models\TelegramConnectedUser;
 
 beforeEach(function (): void {
+    Model::preventLazyLoading();
     Schema::enableForeignKeyConstraints();
 
     Schema::create('users', function (Blueprint $table): void {
@@ -34,6 +36,7 @@ beforeEach(function (): void {
 });
 
 afterEach(function (): void {
+    Model::preventLazyLoading(false);
     Schema::dropIfExists('telegram_connected_users');
     Schema::dropIfExists('available_telegram_bots');
     Schema::dropIfExists('users');

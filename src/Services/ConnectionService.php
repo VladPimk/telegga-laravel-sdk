@@ -8,6 +8,7 @@ use Illuminate\Database\QueryException;
 use Telegga\Laravel\Exceptions\BotException;
 use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
+use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Models\TelegramConnectedUser;
 use Telegga\Laravel\Resolvers\ConnectionContextResolver;
 use Throwable;
@@ -67,6 +68,7 @@ final class ConnectionService
 
         return $this->send(
             connection: $connection,
+            telegramBot: $telegramBot,
             meta: $meta,
             groupId: $groupId,
         );
@@ -84,6 +86,7 @@ final class ConnectionService
     ): object {
         try {
             $connection = TelegramConnectedUser::query()
+                ->with('telegramBot')
                 ->where('uuid', $uuid)
                 ->first();
         } catch (QueryException $exception) {
@@ -108,6 +111,15 @@ final class ConnectionService
             );
         }
 
+        $telegramBot = $connection->telegramBot;
+
+        if ($telegramBot === null) {
+            throw new ConnectionException(
+                message: 'Telegga connection has no selected Telegram bot.',
+                connectionUuid: $connection->uuid,
+            );
+        }
+
         $groupId = $this->normalizeGroupId(
             groupId: $groupId,
             connectionUuid: $connection->uuid,
@@ -115,6 +127,7 @@ final class ConnectionService
 
         return $this->send(
             connection: $connection,
+            telegramBot: $telegramBot,
             meta: $meta,
             groupId: $groupId,
         );
@@ -337,19 +350,11 @@ final class ConnectionService
      */
     private function send(
         TelegramConnectedUser $connection,
+        AvailableTelegramBot $telegramBot,
         array $meta = [],
         ?string $groupId = null,
     ): object {
         try {
-            $telegramBot = $connection->telegramBot;
-
-            if ($telegramBot === null) {
-                throw new ConnectionException(
-                    message: 'Telegga connection has no selected Telegram bot.',
-                    connectionUuid: $connection->uuid,
-                );
-            }
-
             $bot = $this->bots->findActive(botName: $telegramBot->bot_name);
 
             $response = $this->users->create(
@@ -363,12 +368,6 @@ final class ConnectionService
         } catch (BotException|TeleggaApiException $exception) {
             throw new ConnectionException(
                 message: $exception->getMessage(),
-                connectionUuid: $connection->uuid,
-                previous: $exception,
-            );
-        } catch (QueryException $exception) {
-            throw new ConnectionException(
-                message: 'Selected Telegram bot could not be loaded.',
                 connectionUuid: $connection->uuid,
                 previous: $exception,
             );
