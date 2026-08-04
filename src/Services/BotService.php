@@ -191,7 +191,7 @@ final class BotService
                 );
             }
 
-            $deleted = $bot->delete();
+            $bot->delete();
         } catch (BotException $exception) {
             throw $exception;
         } catch (Throwable $exception) {
@@ -200,14 +200,6 @@ final class BotService
                 botName: $bot->bot_name,
                 botUuid: $bot->uuid,
                 previous: $exception,
-            );
-        }
-
-        if ($deleted !== true) {
-            throw new BotException(
-                message: 'Available Telegram bot could not be deleted.',
-                botName: $bot->bot_name,
-                botUuid: $bot->uuid,
             );
         }
     }

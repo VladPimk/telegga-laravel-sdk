@@ -493,7 +493,9 @@ it('сбрасывает состояние и пишет критический
     ]);
 
     TelegramConnectedUser::deleting(
-        fn (TelegramConnectedUser $model): bool => false,
+        fn (TelegramConnectedUser $model): never => throw new RuntimeException(
+            message: 'Local connection deletion failed.',
+        ),
     );
     Log::spy();
     Http::preventStrayRequests();

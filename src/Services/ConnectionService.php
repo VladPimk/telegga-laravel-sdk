@@ -6,7 +6,6 @@ namespace Telegga\Laravel\Services;
 
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Log;
-use RuntimeException;
 use Telegga\Laravel\Exceptions\BotException;
 use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
@@ -265,20 +264,11 @@ final class ConnectionService
         }
 
         try {
-            $deleted = $context->connection->delete();
+            $context->connection->delete();
         } catch (Throwable $exception) {
             $this->handleLocalDeletionFailure(
                 connection: $context->connection,
                 deletionException: $exception,
-            );
-        }
-
-        if ($deleted !== true) {
-            $this->handleLocalDeletionFailure(
-                connection: $context->connection,
-                deletionException: new RuntimeException(
-                    message: 'Local Telegga connection deletion was rejected.',
-                ),
             );
         }
     }
@@ -327,7 +317,7 @@ final class ConnectionService
         }
 
         try {
-            $updated = $context->connection->update([
+            $context->connection->update([
                 'is_connected' => false,
             ]);
         } catch (Throwable $exception) {
@@ -335,13 +325,6 @@ final class ConnectionService
                 message: 'Local Telegga connection state could not be updated.',
                 connectionUuid: $uuid,
                 previous: $exception,
-            );
-        }
-
-        if (! $updated) {
-            throw new ConnectionException(
-                message: 'Local Telegga connection state could not be updated.',
-                connectionUuid: $uuid,
             );
         }
     }
@@ -518,19 +501,12 @@ final class ConnectionService
         }
 
         try {
-            $updated = $connection->update(attributes: $attributes);
+            $connection->update(attributes: $attributes);
         } catch (Throwable $exception) {
             throw new ConnectionException(
                 message: 'Local Telegga connection data could not be updated.',
                 connectionUuid: $connection->uuid,
                 previous: $exception,
-            );
-        }
-
-        if (! $updated) {
-            throw new ConnectionException(
-                message: 'Local Telegga connection data could not be updated.',
-                connectionUuid: $connection->uuid,
             );
         }
     }

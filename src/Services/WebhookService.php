@@ -33,16 +33,9 @@ final class WebhookService
                 return true;
             }
 
-            $updated = $connection->update([
+            $connection->update([
                 'is_connected' => true,
             ]);
-
-            if (! $updated) {
-                throw new WebhookException(
-                    message: 'Local Telegga connection state could not be updated.',
-                    externalId: $externalId,
-                );
-            }
         } catch (QueryException $exception) {
             throw new WebhookException(
                 message: 'Local Telegga connection state could not be updated.',
