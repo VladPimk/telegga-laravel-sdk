@@ -432,7 +432,9 @@ it('удаляет локальную запись только после уд�
     expect(TelegramConnectedUser::query()
         ->where('uuid', $connection->uuid)
         ->exists())
-        ->toBeFalse();
+        ->toBeFalse()
+        ->and(TelegramConnectedUser::withTrashed()->find($connection->id)?->trashed())
+        ->toBeTrue();
 
     Http::assertSent(function (Request $request): bool {
         return $request->method() === 'DELETE'

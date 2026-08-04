@@ -15,9 +15,10 @@ return new class extends Migration
     {
         Schema::create('available_telegram_bots', function (Blueprint $table): void {
             $table->id();
-            $table->uuid('uuid')->unique();
-            $table->string('bot_name')->unique();
+            $table->uuid('uuid')->index();
+            $table->string('bot_name')->index();
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

@@ -7,9 +7,12 @@ namespace Telegga\Laravel\Models;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 final class TelegramConnectedUser extends Model
 {
+    use SoftDeletes;
+
     protected $attributes = [
         'is_connected' => false,
         'is_created' => false,

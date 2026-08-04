@@ -15,17 +15,23 @@ return new class extends Migration
     {
         Schema::create('telegram_connected_users', function (Blueprint $table): void {
             $table->id();
-            $table->uuid('uuid')->unique();
+            $table->uuid('uuid')->index();
             $table->string('name');
             $table->string('email')->nullable();
-            $table->foreignId('user_id')->nullable()->index()->constrained()->nullOnDelete();
-            $table->foreignId('available_telegram_bot_id')
-                ->index()
-                ->constrained('available_telegram_bots')
+            $table->unsignedBigInteger('user_id')->nullable()->index();
+            $table->foreign('user_id', 'fk_telegram_connected_users_user_id')
+                ->references('id')
+                ->on('users')
+                ->nullOnDelete();
+            $table->unsignedBigInteger('available_telegram_bot_id')->index();
+            $table->foreign('available_telegram_bot_id', 'fk_telegram_connected_users_available_telegram_bot_id')
+                ->references('id')
+                ->on('available_telegram_bots')
                 ->restrictOnDelete();
             $table->boolean('is_connected')->default(false);
             $table->boolean('is_created')->default(false);
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

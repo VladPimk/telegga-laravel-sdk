@@ -45,6 +45,7 @@ it('создаёт таблицу подключений с ожидаемыми
         'is_created',
         'created_at',
         'updated_at',
+        'deleted_at',
     ]))->toBeTrue();
 });
 
@@ -53,7 +54,7 @@ it('создаёт ожидаемые индексы таблицы подклю
 
     expect($indexes->contains(
         fn (array $index): bool => $index['columns'] === ['uuid']
-            && $index['unique'] === true,
+            && $index['unique'] === false,
     ))->toBeTrue()
         ->and($indexes->contains(
             fn (array $index): bool => $index['columns'] === ['user_id']

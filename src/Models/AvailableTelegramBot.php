@@ -6,9 +6,12 @@ namespace Telegga\Laravel\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 final class AvailableTelegramBot extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'uuid',
         'bot_name',

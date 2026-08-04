@@ -46,6 +46,7 @@ it('создаёт таблицу доступных ботов и генери�
         'bot_name',
         'created_at',
         'updated_at',
+        'deleted_at',
     ]))->toBeTrue()
         ->and($bot->getKey())
         ->toBeInt()
@@ -57,6 +58,13 @@ it('создаёт таблицу доступных ботов и генери�
         ->not->toBeNull()
         ->and($bot->updated_at)
         ->not->toBeNull();
+
+    $indexes = collect(Schema::getIndexes('available_telegram_bots'));
+
+    expect($indexes->contains(
+        fn (array $index): bool => $index['columns'] === ['uuid']
+            && $index['unique'] === false,
+    ))->toBeTrue();
 });
 
 it('добавляет локального бота после проверки списка api', function (): void {
@@ -246,7 +254,40 @@ it('удаляет неиспользуемого локального бота'
     app(TeleggaInterface::class)->deleteTelegramBot(uuid: $bot->uuid);
 
     expect(AvailableTelegramBot::query()->doesntExist())
+        ->toBeTrue()
+        ->and(AvailableTelegramBot::withTrashed()->find($bot->id)?->trashed())
         ->toBeTrue();
+});
+
+it('создаёт нового локального бота после мягкого удаления бота с таким же именем', function (): void {
+    $bot = AvailableTelegramBot::query()->create([
+        'bot_name' => 'mybot',
+    ]);
+    $bot->delete();
+
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/bots' => Http::response([
+            'data' => [
+                [
+                    'bot_id' => 'remote-bot-id',
+                    'username' => 'mybot',
+                    'status' => 'active',
+                ],
+            ],
+        ]),
+    ]);
+
+    $newBot = app(TeleggaInterface::class)->addTelegramBot(botName: 'mybot');
+
+    expect($newBot->is($bot))
+        ->toBeFalse()
+        ->and($newBot->uuid)
+        ->not->toBe($bot->uuid)
+        ->and(AvailableTelegramBot::query()->count())
+        ->toBe(1)
+        ->and(AvailableTelegramBot::withTrashed()->count())
+        ->toBe(2);
 });
 
 it('отклоняет удаление неизвестного локального бота', function (): void {
