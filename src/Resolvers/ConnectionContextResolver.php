@@ -32,9 +32,10 @@ final class ConnectionContextResolver
     {
         $context = $this->resolveUser(uuid: $uuid);
         $botName = $this->getBotName(connection: $context->connection);
-        $link = $this->findActiveLink(
+        $link = $this->findBotLink(
             user: $context->user,
             botName: $botName,
+            activeOnly: true,
         );
 
         if ($link === null) {
@@ -102,6 +103,7 @@ final class ConnectionContextResolver
         $link = $this->findBotLink(
             user: $context->user,
             botName: $botName,
+            activeOnly: false,
         );
 
         if ($link === null) {
@@ -147,46 +149,15 @@ final class ConnectionContextResolver
     }
 
     /**
-     * Найти активную привязку пользователя к боту.
-     */
-    private function findActiveLink(object $user, string $botName): ?object
-    {
-        if (! is_array($user->links ?? null)) {
-            return null;
-        }
-
-        foreach ($user->links as $link) {
-            if (
-                is_object($link)
-                && ($link->status ?? null) === 'active'
-                && $this->linkMatchesBot(link: $link, botName: $botName)
-                && is_string($link->bot_id ?? null)
-                && $link->bot_id !== ''
-            ) {
-                return $link;
-            }
-        }
-
-        return null;
-    }
-
-    /**
      * Найти доступную привязку пользователя к боту.
      */
-    private function findBotLink(object $user, string $botName): ?object
+    private function findBotLink(object $user, string $botName, bool $activeOnly): ?object
     {
-        $activeLink = $this->findActiveLink(
-            user: $user,
-            botName: $botName,
-        );
-
-        if ($activeLink !== null) {
-            return $activeLink;
-        }
-
         if (! is_array($user->links ?? null)) {
             return null;
         }
+
+        $fallback = null;
 
         foreach ($user->links as $link) {
             if (
@@ -195,11 +166,17 @@ final class ConnectionContextResolver
                 && is_string($link->bot_id ?? null)
                 && $link->bot_id !== ''
             ) {
-                return $link;
+                if (($link->status ?? null) === 'active') {
+                    return $link;
+                }
+
+                if (! $activeOnly && $fallback === null) {
+                    $fallback = $link;
+                }
             }
         }
 
-        return null;
+        return $fallback;
     }
 
     /**

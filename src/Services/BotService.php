@@ -145,22 +145,34 @@ final class BotService
     }
 
     /**
-     * Найти Telegram-бота в API по локальному имени.
+     * Найти Telegram-бота в API по имени и статусу.
      */
-    public function find(string $botName): object
+    public function find(string $botName, ?string $status = null): object
     {
-        return $this->findByName(botName: $botName);
-    }
+        try {
+            $bot = $this->getAll()->first(
+                fn (object $bot): bool => is_string($bot->username ?? null)
+                    && $bot->username === $botName
+                    && ($status === null || ($bot->status ?? null) === $status),
+            );
+        } catch (TeleggaApiException $exception) {
+            throw new BotException(
+                message: $exception->getMessage(),
+                botName: $botName,
+                previous: $exception,
+            );
+        }
 
-    /**
-     * Найти активного Telegram-бота в API по локальному имени.
-     */
-    public function findActive(string $botName): object
-    {
-        return $this->findByName(
-            botName: $botName,
-            status: 'active',
-        );
+        if (! is_object($bot) || ! is_string($bot->bot_id ?? null) || trim($bot->bot_id) === '') {
+            throw new BotException(
+                message: $status === 'active'
+                    ? 'Active Telegram bot is not available in Telegga.'
+                    : 'Telegram bot is not available in Telegga.',
+                botName: $botName,
+            );
+        }
+
+        return $bot;
     }
 
     /**
@@ -198,37 +210,6 @@ final class BotService
                 botUuid: $bot->uuid,
             );
         }
-    }
-
-    /**
-     * Найти Telegram-бота в API по имени и статусу.
-     */
-    private function findByName(string $botName, ?string $status = null): object
-    {
-        try {
-            $bot = $this->getAll()->first(
-                fn (object $bot): bool => is_string($bot->username ?? null)
-                    && $bot->username === $botName
-                    && ($status === null || ($bot->status ?? null) === $status),
-            );
-        } catch (TeleggaApiException $exception) {
-            throw new BotException(
-                message: $exception->getMessage(),
-                botName: $botName,
-                previous: $exception,
-            );
-        }
-
-        if (! is_object($bot) || ! is_string($bot->bot_id ?? null) || trim($bot->bot_id) === '') {
-            throw new BotException(
-                message: $status === 'active'
-                    ? 'Active Telegram bot is not available in Telegga.'
-                    : 'Telegram bot is not available in Telegga.',
-                botName: $botName,
-            );
-        }
-
-        return $bot;
     }
 
     /**

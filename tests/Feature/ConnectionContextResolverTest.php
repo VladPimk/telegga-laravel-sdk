@@ -135,6 +135,41 @@ it('разрешает пользователя Telegga без активной 
         ->not->toHaveProperty('link');
 });
 
+it('отдаёт приоритет активной привязке при разрешении любой привязки к боту', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/users*' => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+            'links' => [
+                [
+                    'bot_id' => 'bot-revoked',
+                    'bot_username' => 'mybot',
+                    'status' => 'revoked',
+                ],
+                [
+                    'bot_id' => 'bot-active',
+                    'bot_username' => 'mybot',
+                    'status' => 'active',
+                ],
+            ],
+        ]),
+    ]);
+
+    $context = app(ConnectionContextResolver::class)->resolveBot(
+        uuid: $connection->uuid,
+    );
+
+    expect($context->link->bot_id)
+        ->toBe('bot-active');
+});
+
 it('не обращается к api для неизвестного локального подключения', function (): void {
     $uuid = Str::uuid()->toString();
 

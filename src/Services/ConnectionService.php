@@ -358,7 +358,10 @@ final class ConnectionService
         ?string $groupId = null,
     ): object {
         try {
-            $bot = $this->bots->findActive(botName: $telegramBot->bot_name);
+            $bot = $this->bots->find(
+                botName: $telegramBot->bot_name,
+                status: 'active',
+            );
 
             $response = $this->users->create(
                 externalId: $connection->uuid,
