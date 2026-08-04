@@ -93,7 +93,14 @@ $result = $telegga->createConnection(
 );
 ```
 
-The returned object exposes the `link_url` and `link_code` fields.
+When `link_status` is `pending`, the returned object exposes `link_url`, `link_code`, and `expires_at`. If the user is already connected, Telegga returns `link_status: active` without issuing a new code, so these fields may be absent.
+
+```php
+if (($result->link_status ?? null) === 'pending') {
+    $linkUrl = $result->link_url ?? null;
+    $expiresAt = $result->expires_at ?? null;
+}
+```
 
 The `meta` and `groupId` parameters are optional. The package sends them as `meta` and `group_id` in the `POST /users` request. These values are not stored locally.
 
