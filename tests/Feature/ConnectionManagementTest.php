@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Exceptions\ConnectionException;
@@ -478,6 +479,67 @@ it('сохраняет локальную запись при ошибке уд�
             ->toBeTrue();
 
         return;
+    }
+
+    test()->fail('Ожидалось исключение ConnectionException.');
+});
+
+it('сбрасывает состояние и пишет критический лог при сбое локального удаления', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+        'is_connected' => true,
+    ]);
+
+    TelegramConnectedUser::deleting(
+        fn (TelegramConnectedUser $model): bool => false,
+    );
+    Log::spy();
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/users/telegga-user-1' => Http::response(
+            body: null,
+            status: 204,
+        ),
+        'api.telegga.net/api/v1/users*' => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+        ]),
+    ]);
+
+    try {
+        app(TeleggaInterface::class)->deleteConnection(
+            uuid: $connection->uuid,
+        );
+    } catch (ConnectionException $exception) {
+        $connection->refresh();
+
+        expect($exception->getMessage())
+            ->toBe('Local Telegga connection could not be deleted after remote deletion.')
+            ->and($exception->connectionUuid)
+            ->toBe($connection->uuid)
+            ->and($exception->getPrevious())
+            ->toBeInstanceOf(RuntimeException::class)
+            ->and($connection->is_created)
+            ->toBeFalse()
+            ->and($connection->is_connected)
+            ->toBeFalse();
+
+        Log::shouldHaveReceived('critical')
+            ->once()
+            ->withArgs(function (string $message, array $context) use ($connection): bool {
+                return $message === 'Telegga connection orphaned: remote user deleted, local record kept.'
+                    && $context['connection_uuid'] === $connection->uuid
+                    && $context['state_synchronized'] === true
+                    && $context['deletion_exception'] instanceof RuntimeException
+                    && $context['state_exception'] === null;
+            });
+
+        return;
+    } finally {
+        TelegramConnectedUser::flushEventListeners();
+        TelegramConnectedUser::clearBootedModels();
     }
 
     test()->fail('Ожидалось исключение ConnectionException.');

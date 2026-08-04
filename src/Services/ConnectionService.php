@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Telegga\Laravel\Services;
 
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Log;
+use RuntimeException;
 use Telegga\Laravel\Exceptions\BotException;
 use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
@@ -265,17 +267,18 @@ final class ConnectionService
         try {
             $deleted = $context->connection->delete();
         } catch (Throwable $exception) {
-            throw new ConnectionException(
-                message: 'Local Telegga connection could not be deleted.',
-                connectionUuid: $uuid,
-                previous: $exception,
+            $this->handleLocalDeletionFailure(
+                connection: $context->connection,
+                deletionException: $exception,
             );
         }
 
         if ($deleted !== true) {
-            throw new ConnectionException(
-                message: 'Local Telegga connection could not be deleted.',
-                connectionUuid: $uuid,
+            $this->handleLocalDeletionFailure(
+                connection: $context->connection,
+                deletionException: new RuntimeException(
+                    message: 'Local Telegga connection deletion was rejected.',
+                ),
             );
         }
     }
@@ -432,6 +435,48 @@ final class ConnectionService
         }
 
         return $userId;
+    }
+
+    /**
+     * Обработать сбой локального удаления после удаления пользователя в Telegga.
+     */
+    private function handleLocalDeletionFailure(
+        TelegramConnectedUser $connection,
+        Throwable $deletionException,
+    ): never {
+        $stateException = null;
+        $stateSynchronized = false;
+
+        try {
+            TelegramConnectedUser::query()
+                ->whereKey($connection->getKey())
+                ->update([
+                    'is_created' => false,
+                    'is_connected' => false,
+                ]);
+
+            $storedConnection = TelegramConnectedUser::query()->find($connection->getKey());
+            $stateSynchronized = $storedConnection === null
+                || (! $storedConnection->is_created && ! $storedConnection->is_connected);
+        } catch (Throwable $exception) {
+            $stateException = $exception;
+        }
+
+        Log::critical(
+            message: 'Telegga connection orphaned: remote user deleted, local record kept.',
+            context: [
+                'connection_uuid' => $connection->uuid,
+                'state_synchronized' => $stateSynchronized,
+                'deletion_exception' => $deletionException,
+                'state_exception' => $stateException,
+            ],
+        );
+
+        throw new ConnectionException(
+            message: 'Local Telegga connection could not be deleted after remote deletion.',
+            connectionUuid: $connection->uuid,
+            previous: $deletionException,
+        );
     }
 
     /**
