@@ -280,6 +280,70 @@ it('принимает событие подключения без event id', f
         ->toBeTrue();
 });
 
+it('отклоняет некорректное название события', function (mixed $event): void {
+    $this
+        ->withToken('webhook-secret')
+        ->postJson('/webhooks/v1/telegram/connect-account', [
+            'event' => $event,
+        ])
+        ->assertBadRequest()
+        ->assertExactJson([
+            'success' => false,
+            'error' => [
+                'code' => 'invalid_request',
+                'message' => 'Webhook event is required.',
+            ],
+        ]);
+})->with([
+    'пустая строка' => '',
+    'строка из пробелов' => '   ',
+    'число' => 1,
+    'массив' => [[]],
+]);
+
+it('отклоняет некорректное поле события подключения', function (
+    string $field,
+    mixed $value,
+    string $message,
+): void {
+    $payload = [
+        'event' => 'user.linked',
+        'event_id' => $this->eventId,
+        'external_id' => 'connection-uuid',
+        'bot_username' => 'mybot',
+    ];
+    $payload[$field] = $value;
+
+    $expected = [
+        'success' => false,
+        'event' => 'user.linked',
+    ];
+
+    if ($field !== 'event_id') {
+        $expected['event_id'] = $this->eventId;
+    }
+
+    $expected['error'] = [
+        'code' => 'invalid_request',
+        'message' => $message,
+    ];
+
+    $this
+        ->withToken('webhook-secret')
+        ->postJson('/webhooks/v1/telegram/connect-account', $payload)
+        ->assertBadRequest()
+        ->assertExactJson($expected);
+})->with([
+    'пустой event id' => ['event_id', '', 'Webhook event_id must be a non-empty string.'],
+    'event id из пробелов' => ['event_id', '   ', 'Webhook event_id must be a non-empty string.'],
+    'null вместо event id' => ['event_id', null, 'Webhook event_id must be a non-empty string.'],
+    'числовой event id' => ['event_id', 1, 'Webhook event_id must be a non-empty string.'],
+    'external id из пробелов' => ['external_id', '   ', 'Webhook external_id is required.'],
+    'числовой external id' => ['external_id', 1, 'Webhook external_id is required.'],
+    'имя бота из пробелов' => ['bot_username', '   ', 'Webhook bot_username is required.'],
+    'числовое имя бота' => ['bot_username', 1, 'Webhook bot_username is required.'],
+]);
+
 it('отклоняет событие подключения без external id', function (): void {
     $this
         ->withToken('webhook-secret')

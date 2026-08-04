@@ -7,6 +7,7 @@ namespace Telegga\Laravel\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 use Telegga\Laravel\Exceptions\WebhookException;
 use Telegga\Laravel\Services\WebhookService;
 
@@ -24,11 +25,24 @@ final class ConnectAccountWebhookController
      */
     public function __invoke(Request $request): JsonResponse
     {
-        $event = $request->input(key: 'event');
+        $eventValidation = Validator::make(
+            data: $request->all(),
+            rules: [
+                'event' => ['required', 'string'],
+            ],
+            messages: [
+                'event.required' => 'Webhook event is required.',
+                'event.string' => 'Webhook event is required.',
+            ],
+        );
 
-        if (! is_string($event) || trim($event) === '') {
-            return $this->invalidRequest(message: 'Webhook event is required.');
+        if ($eventValidation->fails()) {
+            return $this->invalidRequest(
+                message: $eventValidation->errors()->first(),
+            );
         }
+
+        $event = (string) $eventValidation->validated()['event'];
 
         if ($event === 'test') {
             return response()->json(data: [
@@ -47,34 +61,37 @@ final class ConnectAccountWebhookController
             );
         }
 
-        $eventId = $request->input(key: 'event_id');
+        $payloadValidation = Validator::make(
+            data: $request->all(),
+            rules: [
+                'event_id' => ['sometimes', 'required', 'string'],
+                'external_id' => ['required', 'string'],
+                'bot_username' => ['required', 'string'],
+            ],
+            messages: [
+                'event_id.required' => 'Webhook event_id must be a non-empty string.',
+                'event_id.string' => 'Webhook event_id must be a non-empty string.',
+                'external_id.required' => 'Webhook external_id is required.',
+                'external_id.string' => 'Webhook external_id is required.',
+                'bot_username.required' => 'Webhook bot_username is required.',
+                'bot_username.string' => 'Webhook bot_username is required.',
+            ],
+        );
 
-        if ($eventId !== null && (! is_string($eventId) || trim($eventId) === '')) {
+        if ($payloadValidation->fails()) {
+            $eventId = $payloadValidation->valid()['event_id'] ?? null;
+
             return $this->invalidRequest(
-                message: 'Webhook event_id must be a non-empty string.',
+                message: $payloadValidation->errors()->first(),
                 event: $event,
+                eventId: is_string($eventId) ? $eventId : null,
             );
         }
 
-        $externalId = $request->input(key: 'external_id');
-
-        if (! is_string($externalId) || trim($externalId) === '') {
-            return $this->invalidRequest(
-                message: 'Webhook external_id is required.',
-                event: $event,
-                eventId: $eventId,
-            );
-        }
-
-        $botName = $request->input(key: 'bot_username');
-
-        if (! is_string($botName) || trim($botName) === '') {
-            return $this->invalidRequest(
-                message: 'Webhook bot_username is required.',
-                event: $event,
-                eventId: $eventId,
-            );
-        }
+        $validated = $payloadValidation->validated();
+        $eventId = isset($validated['event_id']) ? (string) $validated['event_id'] : null;
+        $externalId = (string) $validated['external_id'];
+        $botName = (string) $validated['bot_username'];
 
         try {
             $connected = $this->webhooks->markConnected(

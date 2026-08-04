@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - PHP 8.3 and Laravel 12 are now the minimum supported versions.
 - Message history requests now require an explicit date range.
 - Bot and connection link resolution no longer repeat equivalent searches.
+- Webhook payload validation now uses Laravel validation while preserving the existing response contract.
 
 ### Fixed
 
