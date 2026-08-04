@@ -164,6 +164,71 @@ it('очищает локальный email после успешной очис
         ->toBeNull();
 });
 
+it('сохраняет локальный email при обновлении только имени', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'email' => 'ivan@example.com',
+        'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/users/telegga-user-1' => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+            'display_name' => 'Иван Петров',
+            'email' => null,
+        ]),
+        'api.telegga.net/api/v1/users*' => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+        ]),
+    ]);
+
+    app(TeleggaInterface::class)->updateConnection(
+        uuid: $connection->uuid,
+        data: ['display_name' => 'Иван Петров'],
+    );
+
+    $connection->refresh();
+
+    expect($connection->name)
+        ->toBe('Иван Петров')
+        ->and($connection->email)
+        ->toBe('ivan@example.com');
+});
+
+it('отклоняет невалидный тип email в ответе Telegga', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'email' => 'ivan@example.com',
+        'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/users/telegga-user-1' => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+            'email' => ['invalid'],
+        ]),
+        'api.telegga.net/api/v1/users*' => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+        ]),
+    ]);
+
+    expect(fn (): object => app(TeleggaInterface::class)->updateConnection(
+        uuid: $connection->uuid,
+        data: ['email' => 'new@example.com'],
+    ))->toThrow(
+        TeleggaApiException::class,
+        'Telegga returned an invalid user email.',
+    );
+});
+
 it('не отправляет пустое обновление подключения', function (): void {
     Http::preventStrayRequests();
 

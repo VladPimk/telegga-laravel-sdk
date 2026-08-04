@@ -452,16 +452,18 @@ final class ConnectionService
             $attributes['name'] = $displayName;
         }
 
-        if (property_exists($response, 'email')) {
-            $email = $response->email;
-        } else {
-            $email = $data['email'] ?? null;
-        }
+        if (array_key_exists('email', $data)) {
+            $email = $response->email ?? $data['email'];
 
-        if ($email === null || is_string($email)) {
-            if (property_exists($response, 'email') || array_key_exists('email', $data)) {
-                $attributes['email'] = $email === '' ? null : $email;
+            if ($email !== null && ! is_string($email)) {
+                throw new TeleggaApiException(
+                    message: 'Telegga returned an invalid user email.',
+                    status: 0,
+                    apiCode: 'invalid_response',
+                );
             }
+
+            $attributes['email'] = ($email === null || $email === '') ? null : $email;
         }
 
         if ($attributes === []) {
