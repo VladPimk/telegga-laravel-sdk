@@ -36,7 +36,11 @@ Configure the Telegga API key and a project-generated token for incoming webhook
 ```dotenv
 TELEGGA_API_KEY=tg_live_XXXXXXXXXXXXXXXX
 TELEGGA_WEBHOOK_TOKEN=random-secret-string
+TELEGGA_TIMEOUT=15
+TELEGGA_CONNECT_TIMEOUT=5
 ```
+
+The API base URL defaults to `https://api.telegga.net/api/v1` and must use HTTPS. `TELEGGA_TIMEOUT` limits the total request time, while `TELEGGA_CONNECT_TIMEOUT` limits the time spent establishing a connection.
 
 Set the same `TELEGGA_WEBHOOK_TOKEN` value as the webhook bearer token in the Telegga admin panel.
 

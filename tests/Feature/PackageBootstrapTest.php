@@ -21,7 +21,11 @@ it('регистрирует публичный контракт и конфиг
     expect(app(TeleggaInterface::class))
         ->toBeInstanceOf(Telegga::class)
         ->and(config('telegga.base_url'))
-        ->toBe('https://api.telegga.net/api/v1');
+        ->toBe('https://api.telegga.net/api/v1')
+        ->and(config('telegga.timeout'))
+        ->toBe(15)
+        ->and(config('telegga.connect_timeout'))
+        ->toBe(5);
 });
 
 it('регистрирует внутренние сервисы как singleton', function (): void {

@@ -36,6 +36,7 @@ final class TeleggaServiceProvider extends ServiceProvider
                 baseUrl: (string) config(key: 'telegga.base_url'),
                 apiKey: (string) config(key: 'telegga.api_key'),
                 timeout: (int) config(key: 'telegga.timeout'),
+                connectTimeout: (int) config(key: 'telegga.connect_timeout'),
             );
         });
 

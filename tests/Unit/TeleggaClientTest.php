@@ -20,6 +20,7 @@ it('подписывает запрос api ключом и возвращает
         baseUrl: 'https://api.telegga.net/api/v1',
         apiKey: 'tg_live_test',
         timeout: 15,
+        connectTimeout: 5,
     );
 
     $response = $client->get(uri: 'bots');
@@ -52,6 +53,7 @@ it('преобразует ошибку api и сохраняет retry after', 
         baseUrl: 'https://api.telegga.net/api/v1',
         apiKey: 'tg_live_test',
         timeout: 15,
+        connectTimeout: 5,
     );
 
     try {
@@ -79,6 +81,7 @@ it('скрывает ошибку транспорта', function () {
         baseUrl: 'https://api.telegga.net/api/v1',
         apiKey: 'tg_live_test',
         timeout: 15,
+        connectTimeout: 5,
     );
 
     try {
@@ -99,7 +102,34 @@ it('отклоняет запрос без api ключа', function () {
         baseUrl: 'https://api.telegga.net/api/v1',
         apiKey: '',
         timeout: 15,
+        connectTimeout: 5,
     );
 
     $client->get(uri: 'bots');
 })->throws(TeleggaApiException::class, 'Telegga API key is not configured.');
+
+it('отклоняет незащищённый базовый адрес api', function (): void {
+    Http::preventStrayRequests();
+
+    $client = new TeleggaClient(
+        http: app(Factory::class),
+        baseUrl: 'http://api.telegga.net/api/v1',
+        apiKey: 'tg_live_test',
+        timeout: 15,
+        connectTimeout: 5,
+    );
+
+    try {
+        $client->get(uri: 'bots');
+    } catch (TeleggaApiException $exception) {
+        expect($exception->status)->toBe(0)
+            ->and($exception->apiCode)->toBe('invalid_base_url')
+            ->and($exception->getMessage())->toBe('Telegga API base URL must use HTTPS.');
+
+        Http::assertNothingSent();
+
+        return;
+    }
+
+    test()->fail('Ожидалось исключение TeleggaApiException.');
+});

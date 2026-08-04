@@ -22,6 +22,7 @@ final class TeleggaClient
         private readonly string $baseUrl,
         private readonly string $apiKey,
         private readonly int $timeout,
+        private readonly int $connectTimeout,
     ) {}
 
     /**
@@ -145,6 +146,14 @@ final class TeleggaClient
      */
     private function request(): PendingRequest
     {
+        if (strcasecmp((string) parse_url($this->baseUrl, PHP_URL_SCHEME), 'https') !== 0) {
+            throw new TeleggaApiException(
+                message: 'Telegga API base URL must use HTTPS.',
+                status: 0,
+                apiCode: 'invalid_base_url',
+            );
+        }
+
         if ($this->apiKey === '') {
             throw new TeleggaApiException(
                 message: 'Telegga API key is not configured.',
@@ -157,7 +166,8 @@ final class TeleggaClient
             ->baseUrl(url: rtrim($this->baseUrl, '/'))
             ->acceptJson()
             ->withToken(token: $this->apiKey)
-            ->timeout(seconds: $this->timeout);
+            ->timeout(seconds: $this->timeout)
+            ->connectTimeout(seconds: $this->connectTimeout);
     }
 
     /**
