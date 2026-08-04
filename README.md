@@ -6,8 +6,8 @@ Laravel package for integrating applications with the Telegga API.
 
 ## Requirements
 
-- PHP 8.2 or later.
-- Laravel 11, 12, or 13.
+- PHP 8.3 or later.
+- Laravel 12 or 13.
 
 ## Installation
 
