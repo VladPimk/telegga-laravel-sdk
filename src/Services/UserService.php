@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Telegga\Laravel\Services;
 
 use Illuminate\Support\Collection;
+use InvalidArgumentException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Http\TeleggaClient;
 
@@ -72,10 +73,18 @@ final class UserService
     /**
      * Получить список пользователей Telegga.
      *
+     * Поиск по external_id возвращает одиночный объект и выполняется через findByExternalId().
+     *
      * @param  array<string, string>  $query
      */
     public function getAll(array $query = []): object
     {
+        if (array_key_exists(key: 'external_id', array: $query)) {
+            throw new InvalidArgumentException(
+                message: 'Use findByExternalId() for exact external_id lookup: the API returns a single object.',
+            );
+        }
+
         return $this->ensurePage(
             response: $this->client->get(
                 uri: 'users',

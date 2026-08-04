@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Services\UserService;
@@ -53,7 +54,7 @@ it('создаёт пользователя Telegga без потери новы
 it('получает пользователя Telegga по external_id без потери новых полей', function (): void {
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users*' => Http::response([
+        'api.telegga.net/api/v1/users?external_id=connection-uuid' => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => 'connection-uuid',
             'status' => 'active',
@@ -79,6 +80,53 @@ it('получает пользователя Telegga по external_id без п
         return $request->method() === 'GET'
             && $request->url() === 'https://api.telegga.net/api/v1/users?external_id=connection-uuid';
     });
+});
+
+it('получает страницу пользователей Telegga по email', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/users?email=ivan%40example.com' => Http::response([
+            'data' => [
+                [
+                    'user_id' => 'telegga-user-1',
+                    'external_id' => 'connection-uuid',
+                    'email' => 'ivan@example.com',
+                ],
+            ],
+            'next_cursor' => 'next-cursor',
+        ]),
+    ]);
+
+    $page = app(UserService::class)->getAll(
+        query: ['email' => 'ivan@example.com'],
+    );
+
+    expect($page->data)
+        ->toBeInstanceOf(Collection::class)
+        ->and($page->data)
+        ->toHaveCount(1)
+        ->and($page->data->first()->external_id)
+        ->toBe('connection-uuid')
+        ->and($page->next_cursor)
+        ->toBe('next-cursor');
+
+    Http::assertSent(function (Request $request): bool {
+        return $request->method() === 'GET'
+            && $request->url() === 'https://api.telegga.net/api/v1/users?email=ivan%40example.com';
+    });
+});
+
+it('не допускает поиск по external_id через списочный метод', function (): void {
+    Http::preventStrayRequests();
+
+    expect(fn (): object => app(UserService::class)->getAll(
+        query: ['external_id' => 'connection-uuid'],
+    ))->toThrow(
+        InvalidArgumentException::class,
+        'Use findByExternalId() for exact external_id lookup: the API returns a single object.',
+    );
+
+    Http::assertNothingSent();
 });
 
 it('отклоняет успешный ответ пользователя с некорректным json', function (): void {
