@@ -46,7 +46,13 @@ final class MessageService
         }
 
         $context = $this->connections->resolve(uuid: $uuid);
-        unset($data['user_id']);
+        unset(
+            $data['external_id'],
+            $data['user_id'],
+            $data['bot_id'],
+            $data['group_id'],
+            $data['type'],
+        );
         $data['external_id'] = $context->connection->uuid;
         $data['bot_id'] = $context->link->bot_id;
         $data['type'] = trim($type);

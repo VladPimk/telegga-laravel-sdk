@@ -193,6 +193,7 @@ it('не позволяет переопределить служебные по
             'external_id' => 'foreign-external-id',
             'user_id' => 'foreign-user-id',
             'bot_id' => 'foreign-bot',
+            'group_id' => 'foreign-group',
             'type' => 'contact',
             'media_id' => 'media-photo',
         ],
@@ -201,7 +202,7 @@ it('не позволяет переопределить служебные по
     Http::assertSent(function (Request $request) use ($connection): bool {
         return $request->method() === 'POST'
             && $request->url() === 'https://api.telegga.net/api/v1/messages'
-            && $request->data() === [
+            && $request->data() == [
                 'external_id' => $connection->uuid,
                 'bot_id' => 'bot-active',
                 'type' => 'photo',
