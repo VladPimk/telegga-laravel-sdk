@@ -3,6 +3,11 @@
     "description": "Laravel SDK for the Telegga API, developed for internal projects at Par Soft.",
     "type": "library",
     "license": "MIT",
+    "homepage": "https://github.com/VladPimk/telegga-laravel-sdk",
+    "support": {
+        "issues": "https://github.com/VladPimk/telegga-laravel-sdk/issues",
+        "source": "https://github.com/VladPimk/telegga-laravel-sdk"
+    },
     "authors": [
         {
             "name": "Vlad Pimkin"
@@ -19,7 +24,8 @@
         "illuminate/database": "^12.0 || ^13.0",
         "illuminate/http": "^12.0 || ^13.0",
         "illuminate/routing": "^12.0 || ^13.0",
-        "illuminate/support": "^12.0 || ^13.0"
+        "illuminate/support": "^12.0 || ^13.0",
+        "symfony/http-foundation": "^7.2 || ^8.0"
     },
     "require-dev": {
         "laravel/pint": "^1.24",
