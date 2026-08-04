@@ -272,7 +272,7 @@ foreach ($page->data as $message) {
 $nextCursor = $page->next_cursor;
 ```
 
-The `status`, `from`, `to`, and `cursor` parameters are optional. Dates are sent to the API in RFC 3339 format.
+The `from` and `to` parameters are required, ensuring that every history request has an explicit date range. The `status` and `cursor` parameters are optional. Dates are sent to the API in RFC 3339 format.
 
 The `data` field is returned as a `Collection` of objects without a rigid DTO, keeping new API fields available to the application. `next_cursor` contains the next page cursor or `null`. The public interface does not support retrieving the full service message history without specifying a local connection.
 

@@ -296,9 +296,9 @@ final class Telegga implements TeleggaInterface
      */
     public function getMessages(
         string $uuid,
+        DateTimeInterface $from,
+        DateTimeInterface $to,
         ?string $status = null,
-        ?DateTimeInterface $from = null,
-        ?DateTimeInterface $to = null,
         ?string $cursor = null,
     ): object {
         return $this->messages->getHistory(

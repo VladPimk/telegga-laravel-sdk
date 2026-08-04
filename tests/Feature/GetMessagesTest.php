@@ -110,9 +110,9 @@ it('получает историю сообщений только для ук�
 
         return $query === [
             'user_id' => 'telegga-user-1',
-            'status' => 'sent',
             'from' => '2026-07-01T10:00:00+03:00',
             'to' => '2026-07-30T18:30:00+03:00',
+            'status' => 'sent',
             'cursor' => 'current-page',
         ];
     });
@@ -140,6 +140,8 @@ it('возвращает null вместо отсутствующего курс
 
     $page = app(TeleggaInterface::class)->getMessages(
         uuid: $connection->uuid,
+        from: new DateTimeImmutable('2026-07-01T00:00:00Z'),
+        to: new DateTimeImmutable('2026-07-30T23:59:59Z'),
     );
 
     expect($page->data)
@@ -150,8 +152,24 @@ it('возвращает null вместо отсутствующего курс
         ->toBeNull();
 
     Http::assertSent(function (Request $request): bool {
-        return $request->method() === 'GET'
-            && $request->url() === 'https://api.telegga.net/api/v1/messages?user_id=telegga-user-1';
+        if (
+            $request->method() !== 'GET'
+            || ! str_starts_with($request->url(), 'https://api.telegga.net/api/v1/messages?')
+        ) {
+            return false;
+        }
+
+        $query = [];
+        parse_str(
+            string: parse_url(url: $request->url(), component: PHP_URL_QUERY) ?: '',
+            result: $query,
+        );
+
+        return $query === [
+            'user_id' => 'telegga-user-1',
+            'from' => '2026-07-01T00:00:00+00:00',
+            'to' => '2026-07-30T23:59:59+00:00',
+        ];
     });
 });
 
@@ -159,7 +177,11 @@ it('не запрашивает историю с пустым uuid подклю
     Http::preventStrayRequests();
 
     try {
-        app(TeleggaInterface::class)->getMessages(uuid: '   ');
+        app(TeleggaInterface::class)->getMessages(
+            uuid: '   ',
+            from: new DateTimeImmutable('2026-07-01T00:00:00Z'),
+            to: new DateTimeImmutable('2026-07-30T23:59:59Z'),
+        );
     } catch (MessageException $exception) {
         expect($exception->getMessage())
             ->toBe('Connection UUID cannot be empty.')
@@ -218,6 +240,8 @@ it('отклоняет пользователя Telegga без user_id', functio
     try {
         app(TeleggaInterface::class)->getMessages(
             uuid: $connection->uuid,
+            from: new DateTimeImmutable('2026-07-01T00:00:00Z'),
+            to: new DateTimeImmutable('2026-07-30T23:59:59Z'),
         );
     } catch (MessageException $exception) {
         expect($exception->getMessage())
@@ -259,6 +283,8 @@ it('скрывает ошибку api при получении истории �
     try {
         app(TeleggaInterface::class)->getMessages(
             uuid: $connection->uuid,
+            from: new DateTimeImmutable('2026-07-01T00:00:00Z'),
+            to: new DateTimeImmutable('2026-07-30T23:59:59Z'),
         );
     } catch (MessageException $exception) {
         expect($exception->connectionUuid)
@@ -297,6 +323,8 @@ it('отклоняет некорректную страницу истории 
     try {
         app(TeleggaInterface::class)->getMessages(
             uuid: $connection->uuid,
+            from: new DateTimeImmutable('2026-07-01T00:00:00Z'),
+            to: new DateTimeImmutable('2026-07-30T23:59:59Z'),
         );
     } catch (MessageException $exception) {
         expect($exception->connectionUuid)

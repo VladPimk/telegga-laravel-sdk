@@ -107,9 +107,9 @@ final class MessageService
      */
     public function getHistory(
         string $uuid,
+        DateTimeInterface $from,
+        DateTimeInterface $to,
         ?string $status = null,
-        ?DateTimeInterface $from = null,
-        ?DateTimeInterface $to = null,
         ?string $cursor = null,
     ): object {
         if (trim($uuid) === '') {
@@ -119,7 +119,7 @@ final class MessageService
             );
         }
 
-        if ($from !== null && $to !== null && $from > $to) {
+        if ($from > $to) {
             throw new MessageException(
                 message: 'Message history date range is invalid.',
                 connectionUuid: $uuid,
@@ -138,18 +138,12 @@ final class MessageService
 
         $query = [
             'user_id' => $userId,
+            'from' => $from->format(DATE_RFC3339),
+            'to' => $to->format(DATE_RFC3339),
         ];
 
         if ($status !== null && trim($status) !== '') {
             $query['status'] = trim($status);
-        }
-
-        if ($from !== null) {
-            $query['from'] = $from->format(DATE_RFC3339);
-        }
-
-        if ($to !== null) {
-            $query['to'] = $to->format(DATE_RFC3339);
         }
 
         if ($cursor !== null && trim($cursor) !== '') {
