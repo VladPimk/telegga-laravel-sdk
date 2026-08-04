@@ -117,7 +117,7 @@ final class TeleggaClient
             throw new InvalidArgumentException(message: 'Media file is not readable.');
         }
 
-        $stream = fopen(filename: $path, mode: 'rb');
+        $stream = fopen($path, 'rb');
 
         if ($stream === false) {
             throw new InvalidArgumentException(message: 'Media file cannot be opened.');
@@ -129,12 +129,12 @@ final class TeleggaClient
                     ->attach(
                         name: 'file',
                         contents: $stream,
-                        filename: basename(path: $path),
+                        filename: basename($path),
                     )
                     ->post(url: $uri),
             );
         } finally {
-            fclose(stream: $stream);
+            fclose($stream);
         }
 
         return $this->ensureSuccessful(response: $response);
@@ -154,7 +154,7 @@ final class TeleggaClient
         }
 
         return $this->http
-            ->baseUrl(url: rtrim(string: $this->baseUrl, characters: '/'))
+            ->baseUrl(url: rtrim($this->baseUrl, '/'))
             ->acceptJson()
             ->withToken(token: $this->apiKey)
             ->timeout(seconds: $this->timeout);
