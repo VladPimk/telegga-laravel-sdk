@@ -6,6 +6,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Telegga\Laravel\Contracts\TeleggaInterface;
+use Telegga\Laravel\Exceptions\TeleggaApiException;
 
 it('получает доступных ботов через публичный интерфейс', function () {
     Http::preventStrayRequests();
@@ -39,4 +40,116 @@ it('получает доступных ботов через публичный
         return $request->method() === 'GET'
             && $request->url() === 'https://api.telegga.net/api/v1/bots';
     });
+});
+
+it('кеширует список доступных ботов на десять минут', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/bots' => Http::sequence()
+            ->push([
+                'data' => [
+                    [
+                        'bot_id' => 'bot-1',
+                        'username' => 'first_bot',
+                        'status' => 'active',
+                    ],
+                ],
+            ])
+            ->push([
+                'data' => [
+                    [
+                        'bot_id' => 'bot-2',
+                        'username' => 'second_bot',
+                        'status' => 'active',
+                    ],
+                ],
+            ]),
+    ]);
+
+    $first = app(TeleggaInterface::class)->getBots();
+
+    $this->travel(9)->minutes();
+
+    $cached = app(TeleggaInterface::class)->getBots();
+
+    expect($first->first()->bot_id)
+        ->toBe('bot-1')
+        ->and($cached->first()->bot_id)
+        ->toBe('bot-1');
+
+    Http::assertSentCount(1);
+
+    $this->travel(2)->minutes();
+
+    $refreshed = app(TeleggaInterface::class)->getBots();
+
+    expect($refreshed->first()->bot_id)
+        ->toBe('bot-2');
+
+    Http::assertSentCount(2);
+});
+
+it('не кеширует некорректный ответ списка ботов', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/bots' => Http::sequence()
+            ->push('not-json')
+            ->push([
+                'data' => [
+                    [
+                        'bot_id' => 'bot-1',
+                        'username' => 'mybot',
+                        'status' => 'active',
+                    ],
+                ],
+            ]),
+    ]);
+
+    try {
+        app(TeleggaInterface::class)->getBots();
+
+        test()->fail('Ожидалось исключение TeleggaApiException.');
+    } catch (TeleggaApiException $exception) {
+        expect($exception->apiCode)
+            ->toBe('invalid_response');
+    }
+
+    $bots = app(TeleggaInterface::class)->getBots();
+
+    expect($bots->first()->bot_id)
+        ->toBe('bot-1');
+
+    Http::assertSentCount(2);
+});
+
+it('разделяет кеш списков ботов для разных api ключей', function (): void {
+    Http::preventStrayRequests();
+    Http::fake(function (Request $request) {
+        $botId = $request->hasHeader('Authorization', 'Bearer tg_live_first')
+            ? 'first-service-bot'
+            : 'second-service-bot';
+
+        return Http::response([
+            'data' => [
+                [
+                    'bot_id' => $botId,
+                    'username' => 'mybot',
+                    'status' => 'active',
+                ],
+            ],
+        ]);
+    });
+
+    config()->set('telegga.api_key', 'tg_live_first');
+    $first = app(TeleggaInterface::class)->getBots();
+
+    config()->set('telegga.api_key', 'tg_live_second');
+    $second = app(TeleggaInterface::class)->getBots();
+
+    expect($first->first()->bot_id)
+        ->toBe('first-service-bot')
+        ->and($second->first()->bot_id)
+        ->toBe('second-service-bot');
+
+    Http::assertSentCount(2);
 });

@@ -60,6 +60,8 @@ $bot = $telegga->addTelegramBot(
 
 The package accepts and stores the username without the `@` prefix, matching the format returned by the API. Local and API usernames are converted to lowercase before comparison, and the local value is stored in lowercase. The package does not store `bot_id` or any other bot data returned by the API. The model `uuid` is generated locally.
 
+The remote `GET /bots` response is cached through the application's Laravel cache store for 10 minutes. The cache is scoped by a SHA-256 hash of the API base URL and API key, so bot lists from different Telegga services are not mixed and the API key is not exposed in the cache key. API errors and invalid responses are not cached. Changes to bot access or status can therefore take up to 10 minutes to become visible to the package.
+
 Retrieving locally registered bots does not send an API request:
 
 ```php

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Telegga\Laravel\Services;
 
+use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Telegga\Laravel\Exceptions\BotException;
@@ -14,12 +15,24 @@ use Throwable;
 
 final class BotService
 {
+    private const int CACHE_TTL_SECONDS = 600;
+
+    private readonly string $cacheKey;
+
     /**
      * Создать сервис ботов.
      */
     public function __construct(
         private readonly TeleggaClient $client,
-    ) {}
+        private readonly Repository $cache,
+    ) {
+        $scope = implode('|', [
+            (string) config(key: 'telegga.base_url'),
+            (string) config(key: 'telegga.api_key'),
+        ]);
+
+        $this->cacheKey = 'telegga:bots:'.hash('sha256', $scope);
+    }
 
     /**
      * Получить список доступных ботов.
@@ -27,6 +40,20 @@ final class BotService
      * @return Collection<int, object>
      */
     public function getAll(): Collection
+    {
+        return $this->cache->remember(
+            $this->cacheKey,
+            self::CACHE_TTL_SECONDS,
+            fn (): Collection => $this->fetchAll(),
+        );
+    }
+
+    /**
+     * Получить актуальный список доступных ботов из API.
+     *
+     * @return Collection<int, object>
+     */
+    private function fetchAll(): Collection
     {
         $response = $this->client->get(uri: 'bots')->object();
 
