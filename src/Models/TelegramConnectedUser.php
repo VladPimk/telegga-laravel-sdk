@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Telegga\Laravel\Models;
 
 use App\Models\User;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 final class TelegramConnectedUser extends Model
 {
+    use HasUuids;
     use SoftDeletes;
 
     protected $attributes = [
@@ -19,7 +21,6 @@ final class TelegramConnectedUser extends Model
     ];
 
     protected $fillable = [
-        'uuid',
         'name',
         'email',
         'user_id',
@@ -29,15 +30,13 @@ final class TelegramConnectedUser extends Model
     ];
 
     /**
-     * Загрузить модель.
+     * Получить поля с автоматически генерируемыми UUID.
+     *
+     * @return array<int, string>
      */
-    protected static function boot(): void
+    public function uniqueIds(): array
     {
-        parent::boot();
-
-        self::creating(function (TelegramConnectedUser $model): void {
-            $model->uuid = str()->uuid();
-        });
+        return ['uuid'];
     }
 
     /**
@@ -48,7 +47,6 @@ final class TelegramConnectedUser extends Model
     protected function casts(): array
     {
         return [
-            'uuid' => 'string',
             'is_connected' => 'boolean',
             'is_created' => 'boolean',
         ];

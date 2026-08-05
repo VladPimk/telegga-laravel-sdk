@@ -4,41 +4,28 @@ declare(strict_types=1);
 
 namespace Telegga\Laravel\Models;
 
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 final class AvailableTelegramBot extends Model
 {
+    use HasUuids;
     use SoftDeletes;
 
     protected $fillable = [
-        'uuid',
         'bot_name',
     ];
 
     /**
-     * Загрузить модель.
-     */
-    protected static function boot(): void
-    {
-        parent::boot();
-
-        self::creating(function (AvailableTelegramBot $model): void {
-            $model->uuid = str()->uuid();
-        });
-    }
-
-    /**
-     * Получить преобразования атрибутов модели.
+     * Получить поля с автоматически генерируемыми UUID.
      *
-     * @return array<string, string>
+     * @return array<int, string>
      */
-    protected function casts(): array
+    public function uniqueIds(): array
     {
-        return [
-            'uuid' => 'string',
-        ];
+        return ['uuid'];
     }
 
     /**

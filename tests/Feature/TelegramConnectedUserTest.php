@@ -67,7 +67,9 @@ it('создаёт ожидаемые индексы таблицы подклю
 });
 
 it('генерирует uuid и устанавливает начальные статусы', function (): void {
+    $providedUuid = Str::uuid()->toString();
     $connection = TelegramConnectedUser::query()->create([
+        'uuid' => $providedUuid,
         'name' => 'Иван',
         'email' => 'ivan@example.com',
         'available_telegram_bot_id' => $this->telegramBot->id,
@@ -77,7 +79,10 @@ it('генерирует uuid и устанавливает начальные �
         ->toBe($connection->id)
         ->and($connection->id)
         ->toBeInt()
-        ->and(Str::isUuid($connection->uuid))
+        ->and($connection->uuid)
+        ->toBeString()
+        ->not->toBe($providedUuid)
+        ->and(Str::isUuid($connection->uuid, 7))
         ->toBeTrue()
         ->and($connection->is_created)
         ->toBeFalse()

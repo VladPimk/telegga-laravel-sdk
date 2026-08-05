@@ -36,7 +36,9 @@ afterEach(function (): void {
 });
 
 it('создаёт таблицу доступных ботов и генерирует локальный uuid', function (): void {
+    $providedUuid = Str::uuid()->toString();
     $bot = AvailableTelegramBot::query()->create([
+        'uuid' => $providedUuid,
         'bot_name' => 'mybot',
     ]);
 
@@ -50,7 +52,10 @@ it('создаёт таблицу доступных ботов и генери�
     ]))->toBeTrue()
         ->and($bot->getKey())
         ->toBeInt()
-        ->and(Str::isUuid($bot->uuid))
+        ->and($bot->uuid)
+        ->toBeString()
+        ->not->toBe($providedUuid)
+        ->and(Str::isUuid($bot->uuid, 7))
         ->toBeTrue()
         ->and($bot->bot_name)
         ->toBe('mybot')
