@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 final class TelegramConnectedUser extends Model
@@ -72,6 +73,19 @@ final class TelegramConnectedUser extends Model
         return $this->belongsTo(
             related: AvailableTelegramBot::class,
             foreignKey: 'available_telegram_bot_id',
+        );
+    }
+
+    /**
+     * Получить принятые события webhook.
+     *
+     * @return HasMany<TeleggaWebhookEvent, $this>
+     */
+    public function webhookEvents(): HasMany
+    {
+        return $this->hasMany(
+            related: TeleggaWebhookEvent::class,
+            foreignKey: 'telegram_connected_user_id',
         );
     }
 }

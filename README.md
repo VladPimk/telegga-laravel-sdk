@@ -426,9 +426,13 @@ Authorization: Bearer <TELEGGA_WEBHOOK_TOKEN>
 
 An empty, missing, or invalid token returns `401`. Tokens are compared securely using `hash_equals`.
 
-The `user.linked` event finds the local record by matching `external_id` with `telegram_connected_users.uuid`, including soft-deleted records for accurate diagnostics. It then checks that the connection was created in Telegga and loads its assigned local bot, including a soft-deleted bot. The received and local bot usernames are converted to lowercase before comparison. Both values use the username without the `@` prefix. Processing stops at the first failed check. The package sets `is_connected` to `true` only after every check succeeds. Repeated event delivery is safe and does not perform a redundant update.
+The `user.linked` event requires every field documented by Telegga, including `event_id`. It finds the local record by matching `external_id` with `telegram_connected_users.uuid`, including soft-deleted records for accurate diagnostics. It then checks that the connection was created in Telegga and loads its assigned local bot, including a soft-deleted bot. The received and local bot usernames are converted to lowercase before comparison. Both values use the username without the `@` prefix. Processing stops at the first failed check.
 
-Successful `user.linked` and `test` events return `200` with JSON containing `success`, the event type, and a result message. A `user.linked` response also contains `external_id`, `bot_username`, and the resulting connection status. The `event_id` field is optional and is included in the response when provided.
+After validation succeeds, the package stores the event in `telegga_webhook_events`, relates it to the local connection, sets `is_connected` to `true` when necessary, and records `processed_at`. The locally generated event `uuid` is separate from Telegga's globally unique `event_id`. `attempts` counts accepted deliveries of the same event, while `first_seen_at` records its first delivery. Events rejected because of a missing, deleted, or mismatched local resource are logged but not stored.
+
+Repeated delivery of a processed `event_id` for the same connection increments `attempts`, returns `200`, and does not load the bot or update the connection again. An unprocessed stored event can complete on a later delivery. Reusing an `event_id` for another connection or event type returns `409 event_id_conflict`. The database unique constraint on `event_id` and row locking prevent concurrent delivery from applying the same event twice.
+
+Successful `user.linked` and `test` events return `200` with JSON containing `success`, the event type, and a result message. A `user.linked` response also contains its required `event_id`, `external_id`, `bot_username`, and the resulting connection status. The `test` event has no `event_id` and is not stored.
 
 Webhook processing uses the following error codes:
 
@@ -443,6 +447,7 @@ Webhook processing uses the following error codes:
 | `404` | `bot_not_found` | The bot assigned to the connection no longer exists locally. |
 | `404` | `bot_deleted` | The bot assigned to the connection was soft-deleted. |
 | `409` | `bot_mismatch` | The webhook contains a different bot username. |
+| `409` | `event_id_conflict` | The `event_id` is already assigned to another connection or event type. |
 | `500` | `internal` | A local database operation failed. |
 
 Expected request failures are logged at `warning` level. Database and processing failures are logged at `error` level so Telegga can retry delivery according to its policy. Logs contain the event identifiers, normalized bot usernames, and the error code, but never contain the bearer token.

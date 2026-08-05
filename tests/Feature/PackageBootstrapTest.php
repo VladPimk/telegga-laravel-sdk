@@ -83,5 +83,7 @@ it('выполняет миграции пакета стандартной ко
     expect(Schema::hasTable('available_telegram_bots'))
         ->toBeTrue()
         ->and(Schema::hasTable('telegram_connected_users'))
+        ->toBeTrue()
+        ->and(Schema::hasTable('telegga_webhook_events'))
         ->toBeTrue();
 });

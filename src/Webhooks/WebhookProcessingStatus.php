@@ -8,6 +8,8 @@ enum WebhookProcessingStatus: string
 {
     case Connected = 'connected';
     case AlreadyConnected = 'already_connected';
+    case Duplicate = 'duplicate';
+    case EventIdConflict = 'event_id_conflict';
     case ConnectionNotFound = 'connection_not_found';
     case ConnectionDeleted = 'connection_deleted';
     case ConnectionNotCreated = 'connection_not_created';
@@ -20,6 +22,10 @@ enum WebhookProcessingStatus: string
      */
     public function successful(): bool
     {
-        return $this === self::Connected || $this === self::AlreadyConnected;
+        return in_array($this, [
+            self::Connected,
+            self::AlreadyConnected,
+            self::Duplicate,
+        ], true);
     }
 }

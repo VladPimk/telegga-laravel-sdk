@@ -12,5 +12,6 @@ final readonly class WebhookProcessingResult
     public function __construct(
         public WebhookProcessingStatus $status,
         public ?string $expectedBotName = null,
+        public ?string $expectedEvent = null,
     ) {}
 }
