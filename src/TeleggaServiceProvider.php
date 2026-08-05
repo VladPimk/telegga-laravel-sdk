@@ -30,7 +30,7 @@ final class TeleggaServiceProvider extends ServiceProvider
             key: 'telegga',
         );
 
-        $this->app->singleton(TeleggaClient::class, function (): TeleggaClient {
+        $this->app->bind(TeleggaClient::class, function (): TeleggaClient {
             return new TeleggaClient(
                 http: $this->app->make(Factory::class),
                 baseUrl: (string) config(key: 'telegga.base_url'),
@@ -40,16 +40,16 @@ final class TeleggaServiceProvider extends ServiceProvider
             );
         });
 
-        $this->app->singleton(BotService::class);
-        $this->app->singleton(ConnectionService::class);
-        $this->app->singleton(UserService::class);
-        $this->app->singleton(MessageService::class);
-        $this->app->singleton(MediaService::class);
-        $this->app->singleton(GroupService::class);
-        $this->app->singleton(BroadcastService::class);
-        $this->app->singleton(WebhookService::class);
-        $this->app->singleton(ConnectionContextResolver::class);
-        $this->app->singleton(TeleggaInterface::class, Telegga::class);
+        $this->app->bind(BotService::class);
+        $this->app->bind(ConnectionService::class);
+        $this->app->bind(UserService::class);
+        $this->app->bind(MessageService::class);
+        $this->app->bind(MediaService::class);
+        $this->app->bind(GroupService::class);
+        $this->app->bind(BroadcastService::class);
+        $this->app->bind(WebhookService::class);
+        $this->app->bind(ConnectionContextResolver::class);
+        $this->app->bind(TeleggaInterface::class, Telegga::class);
     }
 
     /**
