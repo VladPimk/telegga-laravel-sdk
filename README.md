@@ -452,6 +452,22 @@ Webhook processing uses the following error codes:
 
 Expected request failures are logged at `warning` level. Database and processing failures are logged at `error` level so Telegga can retry delivery according to its policy. Logs contain the event identifiers, normalized bot usernames, and the error code, but never contain the bearer token.
 
+### Clearing the webhook event log
+
+Delete webhook event records whose `created_at` value is older than 90 days:
+
+```bash
+php artisan telegga:webhook-events:clear
+```
+
+Pass a positive number of days to use a different retention period:
+
+```bash
+php artisan telegga:webhook-events:clear 30
+```
+
+Records exactly on the retention boundary are preserved. Matching records are deleted in batches of up to 1,000. The command reports the total number of deleted records and rejects zero, negative, fractional, and non-numeric values. Successful execution is logged at `info` level with the retention period and deletion count. Invalid arguments are logged at `warning` level, and database failures are logged at `error` level with the number of records deleted before the failure.
+
 ## Status
 
 The package provides an HTTP client, local management of available bots, a connection model with an explicitly selected bot, connection creation and management, explicit retry of failed requests, all supported message types, message status lookup, user message history, media uploads, groups, member management, broadcasts, and incoming webhooks.

@@ -6,6 +6,7 @@ namespace Telegga\Laravel;
 
 use Illuminate\Http\Client\Factory;
 use Illuminate\Support\ServiceProvider;
+use Telegga\Laravel\Console\Commands\ClearWebhookEventsCommand;
 use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Http\TeleggaClient;
 use Telegga\Laravel\Resolvers\ConnectionContextResolver;
@@ -57,6 +58,12 @@ final class TeleggaServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                ClearWebhookEventsCommand::class,
+            ]);
+        }
+
         $this->loadRoutesFrom(
             path: __DIR__.'/../routes/webhooks.php',
         );
