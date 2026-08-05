@@ -66,9 +66,11 @@ final class TeleggaServiceProvider extends ServiceProvider
             ]);
         }
 
-        $this->loadRoutesFrom(
-            path: __DIR__.'/../routes/webhooks.php',
-        );
+        if ((bool) config(key: 'telegga.webhooks.enabled', default: true)) {
+            $this->loadRoutesFrom(
+                path: __DIR__.'/../routes/webhooks.php',
+            );
+        }
 
         $this->loadMigrationsFrom(
             paths: __DIR__.'/../database/migrations',

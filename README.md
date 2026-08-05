@@ -35,7 +35,9 @@ Configure the Telegga API key and a project-generated token for incoming webhook
 
 ```dotenv
 TELEGGA_API_KEY=tg_live_XXXXXXXXXXXXXXXX
-TELEGGA_WEBHOOK_TOKEN=random-secret-string
+TELEGGA_WEBHOOK_TOKEN=replace-with-a-random-64-character-secret
+TELEGGA_WEBHOOKS_ENABLED=true
+TELEGGA_WEBHOOKS_PREFIX=webhooks/v1/telegram
 TELEGGA_TIMEOUT=15
 TELEGGA_CONNECT_TIMEOUT=5
 TELEGGA_RETRY_TIMES=3
@@ -44,7 +46,7 @@ TELEGGA_RETRY_SLEEP_MS=200
 
 The API base URL defaults to `https://api.telegga.net/api/v1` and must use HTTPS. `TELEGGA_TIMEOUT` limits the total request time, while `TELEGGA_CONNECT_TIMEOUT` limits the time spent establishing a connection. `TELEGGA_RETRY_TIMES` is the total number of attempts, including the first request. `TELEGGA_RETRY_SLEEP_MS` is the base delay used for linear backoff.
 
-Set the same `TELEGGA_WEBHOOK_TOKEN` value as the webhook bearer token in the Telegga admin panel.
+Generate a strong webhook token with `str()->random(64)` and set the same `TELEGGA_WEBHOOK_TOKEN` value as the webhook bearer token in the Telegga admin panel.
 
 ## Available Telegram bots
 
@@ -435,7 +437,7 @@ Broadcasts and their progress are not stored locally. All methods return the ori
 
 ## Incoming webhooks
 
-The package automatically registers this route:
+The package registers this route by default:
 
 ```text
 POST /webhooks/v1/telegram/connect-account
@@ -443,13 +445,17 @@ POST /webhooks/v1/telegram/connect-account
 
 Set the application base URL in the Telegga admin panel. Telegga appends the webhook path automatically.
 
+Set `TELEGGA_WEBHOOKS_ENABLED=false` to disable route registration for applications that only use outgoing API requests. The `TELEGGA_WEBHOOKS_PREFIX` value changes the route prefix and defaults to `webhooks/v1/telegram`. When changing it, make sure that the webhook address configured in Telegga resolves to the resulting route.
+
+The route uses `throttle:60,1` before token validation by default. Publish `config/telegga.php` to replace the rate limit or append application middleware in `telegga.webhooks.middleware`. `VerifyWebhookToken` is always appended by the package and cannot be removed through configuration.
+
 Every request must contain the project token:
 
 ```http
 Authorization: Bearer <TELEGGA_WEBHOOK_TOKEN>
 ```
 
-An empty, missing, or invalid token returns `401`. Tokens are compared securely using `hash_equals`.
+An empty, missing, or invalid token returns `401`. Tokens are compared securely using `hash_equals`. Rejected tokens are logged at `warning` level with the request path and source IP, but the token value is never logged. Requests rejected by the rate limiter return `429` before token validation.
 
 The `user.linked` event requires every field documented by Telegga, including `event_id`. It finds the local record by matching `external_id` with `telegram_connected_users.uuid`, including soft-deleted records for accurate diagnostics. It then checks that the connection was created in Telegga and loads its assigned local bot, including a soft-deleted bot. The received and local bot usernames are converted to lowercase before comparison. Both values use the username without the `@` prefix. Processing stops at the first failed check.
 

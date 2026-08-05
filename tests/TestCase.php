@@ -31,6 +31,9 @@ abstract class TestCase extends Orchestra
         $app['config']->set('telegga.base_url', 'https://api.telegga.net/api/v1');
         $app['config']->set('telegga.api_key', 'tg_live_test');
         $app['config']->set('telegga.webhook_token', 'webhook-secret');
+        $app['config']->set('telegga.webhooks.enabled', true);
+        $app['config']->set('telegga.webhooks.prefix', 'webhooks/v1/telegram');
+        $app['config']->set('telegga.webhooks.middleware', ['throttle:60,1']);
         $app['config']->set('telegga.timeout', 15);
         $app['config']->set('telegga.connect_timeout', 5);
         $app['config']->set('telegga.retry.times', 3);

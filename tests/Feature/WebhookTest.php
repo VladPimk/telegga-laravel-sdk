@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
+use Telegga\Laravel\Http\Middleware\VerifyWebhookToken;
 use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Models\TeleggaWebhookEvent;
 use Telegga\Laravel\Models\TelegramConnectedUser;
@@ -72,7 +73,12 @@ it('регистрирует маршрут webhook по ожидаемому а
         ->and($route?->uri())
         ->toBe('webhooks/v1/telegram/connect-account')
         ->and($route?->methods())
-        ->toContain('POST');
+        ->toContain('POST')
+        ->and($route?->gatherMiddleware())
+        ->toBe([
+            'throttle:60,1',
+            VerifyWebhookToken::class,
+        ]);
 });
 
 it('принимает событие подключения и идемпотентно возвращает результат', function (): void {
@@ -606,6 +612,36 @@ it('отклоняет webhook с неверным bearer токеном', funct
             fn (string $message, array $context): bool => $message === 'Telegga webhook authorization failed.'
                 && $context['error_code'] === 'unauthorized'
                 && ! str_contains(json_encode($context, JSON_THROW_ON_ERROR), 'wrong-secret'),
+        );
+});
+
+it('ограничивает частоту запросов webhook до проверки bearer токена', function (): void {
+    Log::spy();
+
+    for ($attempt = 1; $attempt <= 60; $attempt++) {
+        $this
+            ->withServerVariables(['REMOTE_ADDR' => '203.0.113.10'])
+            ->withToken('invalid-secret')
+            ->postJson('/webhooks/v1/telegram/connect-account', [
+                'event' => 'test',
+            ])
+            ->assertUnauthorized();
+    }
+
+    $this
+        ->withServerVariables(['REMOTE_ADDR' => '203.0.113.10'])
+        ->withToken('invalid-secret')
+        ->postJson('/webhooks/v1/telegram/connect-account', [
+            'event' => 'test',
+        ])
+        ->assertStatus(429);
+
+    Log::shouldHaveReceived('warning')
+        ->times(60)
+        ->withArgs(
+            fn (string $message, array $context): bool => $message === 'Telegga webhook authorization failed.'
+                && $context['ip'] === '203.0.113.10'
+                && $context['error_code'] === 'unauthorized',
         );
 });
 
