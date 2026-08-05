@@ -38,6 +38,8 @@ final class TeleggaServiceProvider extends ServiceProvider
                 apiKey: (string) config(key: 'telegga.api_key'),
                 timeout: (int) config(key: 'telegga.timeout'),
                 connectTimeout: (int) config(key: 'telegga.connect_timeout'),
+                retryTimes: (int) config(key: 'telegga.retry.times', default: 3),
+                retrySleepMilliseconds: (int) config(key: 'telegga.retry.sleep_ms', default: 200),
             );
         });
 

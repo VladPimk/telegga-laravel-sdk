@@ -462,3 +462,42 @@ it('отклоняет некорректный ответ списка груп
 
     test()->fail('Ожидалось исключение GroupException.');
 });
+
+it('считает группу удаленной если повтор подтвердил ее отсутствие в api', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/groups/group-1' => Http::sequence()
+            ->push(['error' => ['code' => 'internal', 'message' => 'Temporary error.']], 503)
+            ->push(['error' => ['code' => 'not_found', 'message' => 'Group was not found.']], 404),
+    ]);
+
+    app(TeleggaInterface::class)->deleteGroup(groupId: 'group-1');
+
+    Http::assertSentCount(2);
+});
+
+it('не скрывает отсутствие группы в первом ответе api', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/groups/group-1' => Http::response([
+            'error' => ['code' => 'not_found', 'message' => 'Group was not found.'],
+        ], 404),
+    ]);
+
+    try {
+        app(TeleggaInterface::class)->deleteGroup(groupId: 'group-1');
+    } catch (GroupException $exception) {
+        expect($exception->apiCode())
+            ->toBe('not_found')
+            ->and($exception->attempts())
+            ->toBe(1)
+            ->and($exception->wasRetried())
+            ->toBeFalse();
+
+        Http::assertSentCount(1);
+
+        return;
+    }
+
+    test()->fail('Ожидалось исключение GroupException.');
+});

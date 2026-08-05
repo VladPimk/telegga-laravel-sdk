@@ -53,6 +53,7 @@ final class UserService
             response: $this->client->post(
                 uri: 'users',
                 data: $data,
+                idempotent: true,
             )->object(),
         );
     }
@@ -116,6 +117,7 @@ final class UserService
             response: $this->client->patch(
                 uri: 'users/'.rawurlencode($userId),
                 data: $data,
+                idempotent: true,
             )->object(),
         );
     }
@@ -127,6 +129,7 @@ final class UserService
     {
         $this->client->delete(
             uri: 'users/'.rawurlencode($userId),
+            idempotent: true,
         );
     }
 
@@ -151,6 +154,7 @@ final class UserService
         $this->client->delete(
             uri: 'users/'.rawurlencode($userId).'/link',
             query: ['bot_id' => $botId],
+            idempotent: true,
         );
     }
 
@@ -163,6 +167,7 @@ final class UserService
             response: $this->client->post(
                 uri: 'users/'.rawurlencode($userId).'/groups',
                 data: ['group_id' => $groupId],
+                idempotent: true,
             )->object(),
         );
     }

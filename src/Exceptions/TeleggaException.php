@@ -37,9 +37,37 @@ abstract class TeleggaException extends RuntimeException
      */
     public function isRetryable(): bool
     {
+        $status = $this->apiStatus();
+
+        return $status === 408
+            || $status === 429
+            || ($status !== null && $status >= 500 && $status <= 599);
+    }
+
+    /**
+     * Получить количество выполненных HTTP-попыток.
+     */
+    public function attempts(): int
+    {
+        return $this->apiException()?->attempts ?? 0;
+    }
+
+    /**
+     * Определить, выполнялся ли повторный HTTP-запрос.
+     */
+    public function wasRetried(): bool
+    {
+        return $this->attempts() > 1;
+    }
+
+    /**
+     * Определить, сообщает ли API об уже достигнутом состоянии.
+     */
+    public function isAlreadyInDesiredState(): bool
+    {
         return in_array(
-            needle: $this->apiStatus(),
-            haystack: [408, 429, 500, 502, 503, 504],
+            needle: $this->apiCode(),
+            haystack: ['already_linked', 'user_not_linked'],
             strict: true,
         );
     }

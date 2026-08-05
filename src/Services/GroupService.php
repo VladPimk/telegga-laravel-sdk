@@ -130,6 +130,7 @@ final class GroupService
                 response: $this->client->put(
                     uri: 'groups/'.rawurlencode($groupId),
                     data: $data,
+                    idempotent: true,
                 )->object(),
             );
         } catch (TeleggaApiException $exception) {
@@ -151,8 +152,13 @@ final class GroupService
         try {
             $this->client->delete(
                 uri: 'groups/'.rawurlencode($groupId),
+                idempotent: true,
             );
         } catch (TeleggaApiException $exception) {
+            if ($exception->wasRetried() && $exception->apiCode === 'not_found') {
+                return;
+            }
+
             throw new GroupException(
                 message: $exception->getMessage(),
                 groupId: $groupId,
@@ -244,6 +250,7 @@ final class GroupService
                 response: $this->client->post(
                     uri: 'groups/'.rawurlencode($groupId).'/members',
                     data: ['user_ids' => $userIds],
+                    idempotent: true,
                 )->object(),
             );
         } catch (TeleggaApiException $exception) {

@@ -38,9 +38,11 @@ TELEGGA_API_KEY=tg_live_XXXXXXXXXXXXXXXX
 TELEGGA_WEBHOOK_TOKEN=random-secret-string
 TELEGGA_TIMEOUT=15
 TELEGGA_CONNECT_TIMEOUT=5
+TELEGGA_RETRY_TIMES=3
+TELEGGA_RETRY_SLEEP_MS=200
 ```
 
-The API base URL defaults to `https://api.telegga.net/api/v1` and must use HTTPS. `TELEGGA_TIMEOUT` limits the total request time, while `TELEGGA_CONNECT_TIMEOUT` limits the time spent establishing a connection.
+The API base URL defaults to `https://api.telegga.net/api/v1` and must use HTTPS. `TELEGGA_TIMEOUT` limits the total request time, while `TELEGGA_CONNECT_TIMEOUT` limits the time spent establishing a connection. `TELEGGA_RETRY_TIMES` is the total number of attempts, including the first request. `TELEGGA_RETRY_SLEEP_MS` is the base delay used for linear backoff.
 
 Set the same `TELEGGA_WEBHOOK_TOKEN` value as the webhook bearer token in the Telegga admin panel.
 
@@ -108,7 +110,28 @@ if (($result->link_status ?? null) === 'pending') {
 
 The `meta` and `groupId` parameters are optional. The package sends them as `meta` and `group_id` in the `POST /users` request. These values are not stored locally.
 
-## Retrying a connection
+## Automatic HTTP retries
+
+The package automatically retries transport failures and HTTP `408`, `429`, and `5xx` responses only for operations that are safe to repeat. By default, a request is attempted up to three times with delays of 200 ms and 400 ms. A numeric `Retry-After` header on a `429` response takes precedence when it requires a longer delay.
+
+Retry delays are synchronous: the current PHP process waits before sending the next attempt. The package does not add jitter or cap a numeric `Retry-After` value, so a large value returned by the API can extend the request duration. A non-numeric `Retry-After` value is ignored and the configured linear delay is used.
+
+All `GET` requests are retried. The following modifying operations are explicitly marked as idempotent and are also retried:
+
+- creating or updating a user through `POST /users`;
+- updating or deleting a user;
+- unlinking a user;
+- adding a user to a group;
+- updating or deleting a group;
+- bulk-adding group members.
+
+Message sending, broadcasts, broadcast cancellation, media uploads, group creation, connection-code regeneration, and membership removal are never retried automatically because the API does not provide an idempotency key or an equally strong replay guarantee for those operations.
+
+If a retried user or group deletion ends with `404 not_found`, the package treats the remote object as already deleted and completes the local operation. If a retried unlink ends with `409 user_not_linked`, the local connection is marked as disconnected. The same `404` or `409` received on the first attempt remains an exception, so invalid identifiers are not silently accepted.
+
+For group deletion, this means that a direct `404 not_found` is reported as an error, while `503` followed by `404 not_found` is accepted as a completed deletion. The API does not provide an idempotency key that would allow the package to distinguish a lost successful response from an object that was already absent.
+
+## Retrying a connection explicitly
 
 A retry is performed only through an explicit call and uses the existing local UUID:
 
@@ -122,7 +145,7 @@ $result = $telegga->retryConnection(
 );
 ```
 
-The package does not perform automatic retries. If `meta` or `groupId` were used during the first attempt, pass them again when explicitly retrying the connection.
+This method is separate from HTTP retries. It repeats the business operation for a local connection that was created locally but was not created in Telegga. If `meta` or `groupId` were used during the first business attempt, pass them again.
 
 When a local record was created before the request failed, its UUID is available from the exception:
 
@@ -360,7 +383,9 @@ $telegga->removeGroupMember(
 );
 ```
 
-Duplicate UUIDs are removed before sending the request. The API accepts up to 10,000 members per request, but the package first performs a Telegga user lookup for every unique local UUID. For large datasets, send connections in separate batches while respecting the API limit. The package does not perform automatic retries.
+Duplicate UUIDs are removed before sending the request. The API accepts up to 10,000 members per request, but the package first performs a Telegga user lookup for every unique local UUID. For large datasets, send connections in separate batches while respecting the API limit. User lookups and the final bulk-add request use the automatic retry policy, so temporary API failures can increase the number of requests up to the configured attempt limit for each lookup.
+
+Membership additions are state-idempotent, but their response counters describe the final attempt. If the first request added members and its response was lost, the repeated request can return `added: false` for one member or `added: 0` for a bulk operation because the requested memberships already exist. The resulting group membership is correct, but the returned counter cannot reconstruct changes made by the lost attempt.
 
 Groups and memberships are not stored locally. Objects and collections are returned without rigid DTOs.
 

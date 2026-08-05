@@ -256,11 +256,13 @@ final class ConnectionService
         try {
             $this->users->delete(userId: $userId);
         } catch (TeleggaApiException $exception) {
-            throw new ConnectionException(
-                message: $exception->getMessage(),
-                connectionUuid: $uuid,
-                previous: $exception,
-            );
+            if (! $exception->wasRetried() || $exception->apiCode !== 'not_found') {
+                throw new ConnectionException(
+                    message: $exception->getMessage(),
+                    connectionUuid: $uuid,
+                    previous: $exception,
+                );
+            }
         }
 
         try {
@@ -309,11 +311,13 @@ final class ConnectionService
                 botId: $context->link->bot_id,
             );
         } catch (TeleggaApiException $exception) {
-            throw new ConnectionException(
-                message: $exception->getMessage(),
-                connectionUuid: $uuid,
-                previous: $exception,
-            );
+            if (! $exception->wasRetried() || $exception->apiCode !== 'user_not_linked') {
+                throw new ConnectionException(
+                    message: $exception->getMessage(),
+                    connectionUuid: $uuid,
+                    previous: $exception,
+                );
+            }
         }
 
         try {

@@ -161,6 +161,54 @@ it('сохраняет необязательный идентификатор �
     });
 });
 
+it('повторяет создание пользователя после временной ошибки api', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/bots' => Http::response([
+            'data' => [['bot_id' => 'bot-1', 'username' => 'mybot', 'status' => 'active']],
+        ]),
+        'api.telegga.net/api/v1/users' => Http::sequence()
+            ->push([
+                'error' => [
+                    'code' => 'internal',
+                    'message' => 'Temporary error.',
+                ],
+            ], 503)
+            ->push([
+                'user_id' => 'telegga-user-1',
+                'link_status' => 'pending',
+                'link_code' => '6U828WSH',
+                'link_url' => 'https://t.me/mybot?start=6U828WSH',
+            ], 201),
+    ]);
+
+    $result = app(TeleggaInterface::class)->createConnection(
+        name: 'Иван',
+        telegramBotUuid: $this->telegramBot->uuid,
+        email: 'ivan@example.com',
+    );
+    $connection = TelegramConnectedUser::query()->sole();
+    $userRequests = Http::recorded(
+        callback: fn (Request $request): bool => $request->method() === 'POST'
+            && $request->url() === 'https://api.telegga.net/api/v1/users',
+    )->values();
+
+    expect($result->user_id)
+        ->toBe('telegga-user-1')
+        ->and($connection->is_created)
+        ->toBeTrue()
+        ->and($connection->is_connected)
+        ->toBeFalse()
+        ->and(TelegramConnectedUser::query()->count())
+        ->toBe(1)
+        ->and($userRequests)
+        ->toHaveCount(2)
+        ->and($userRequests[0][0]->data())
+        ->toBe($userRequests[1][0]->data());
+
+    Http::assertSentCount(3);
+});
+
 it('оставляет локальную запись несозданной при ошибке api', function (): void {
     Http::preventStrayRequests();
     Http::fake([
@@ -193,7 +241,7 @@ it('оставляет локальную запись несозданной п
             ->and($connection->is_connected)
             ->toBeFalse();
 
-        Http::assertSentCount(2);
+        Http::assertSentCount(4);
 
         return;
     }

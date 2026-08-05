@@ -33,5 +33,7 @@ abstract class TestCase extends Orchestra
         $app['config']->set('telegga.webhook_token', 'webhook-secret');
         $app['config']->set('telegga.timeout', 15);
         $app['config']->set('telegga.connect_timeout', 5);
+        $app['config']->set('telegga.retry.times', 3);
+        $app['config']->set('telegga.retry.sleep_ms', 0);
     }
 }

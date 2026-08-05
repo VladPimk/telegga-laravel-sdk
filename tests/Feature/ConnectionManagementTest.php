@@ -548,3 +548,63 @@ it('сбрасывает состояние и пишет критический
 
     test()->fail('Ожидалось исключение ConnectionException.');
 });
+
+it('завершает локальное удаление если повтор подтвердил отсутствие пользователя в api', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+        'is_connected' => true,
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/users/telegga-user-1' => Http::sequence()
+            ->push(['error' => ['code' => 'internal', 'message' => 'Temporary error.']], 503)
+            ->push(['error' => ['code' => 'not_found', 'message' => 'User was not found.']], 404),
+        'api.telegga.net/api/v1/users*' => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+        ]),
+    ]);
+
+    app(TeleggaInterface::class)->deleteConnection(uuid: $connection->uuid);
+
+    expect(TelegramConnectedUser::withTrashed()->find($connection->id)?->trashed())
+        ->toBeTrue();
+
+    Http::assertSentCount(3);
+});
+
+it('сбрасывает локальный статус если повтор подтвердил отсутствие привязки в api', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+        'is_connected' => true,
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/users/telegga-user-1/link*' => Http::sequence()
+            ->push(['error' => ['code' => 'internal', 'message' => 'Temporary error.']], 503)
+            ->push(['error' => ['code' => 'user_not_linked', 'message' => 'User is not linked.']], 409),
+        'api.telegga.net/api/v1/users*' => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+            'links' => [
+                [
+                    'bot_id' => 'bot-active',
+                    'bot_username' => 'mybot',
+                    'status' => 'active',
+                ],
+            ],
+        ]),
+    ]);
+
+    app(TeleggaInterface::class)->unlinkConnection(uuid: $connection->uuid);
+
+    expect($connection->refresh()->is_connected)->toBeFalse();
+
+    Http::assertSentCount(3);
+});

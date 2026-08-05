@@ -31,7 +31,11 @@ it('предоставляет данные вложенной ошибки Tele
         ->and($exception->retryAfter())
         ->toBe(30)
         ->and($exception->isRetryable())
-        ->toBeTrue();
+        ->toBeTrue()
+        ->and($exception->attempts())
+        ->toBe(0)
+        ->and($exception->wasRetried())
+        ->toBeFalse();
 });
 
 it('предоставляет собственные данные прямой ошибки Telegga API', function (): void {
@@ -84,5 +88,38 @@ it('не считает клиентскую ошибку повторяемой
         ->and($exception->apiCode())
         ->toBe('user_not_linked')
         ->and($exception->isRetryable())
-        ->toBeFalse();
+        ->toBeFalse()
+        ->and($exception->isAlreadyInDesiredState())
+        ->toBeTrue();
+});
+
+it('предоставляет количество попыток из вложенной ошибки api', function (): void {
+    $apiException = new TeleggaApiException(
+        message: 'User is not linked.',
+        status: 409,
+        apiCode: 'user_not_linked',
+        attempts: 3,
+    );
+    $exception = new ConnectionException(
+        message: $apiException->getMessage(),
+        connectionUuid: 'connection-uuid',
+        previous: $apiException,
+    );
+
+    expect($exception->attempts())
+        ->toBe(3)
+        ->and($exception->wasRetried())
+        ->toBeTrue()
+        ->and($exception->isAlreadyInDesiredState())
+        ->toBeTrue();
+});
+
+it('считает любой серверный статус повторяемым', function (): void {
+    $exception = new TeleggaApiException(
+        message: 'Not implemented.',
+        status: 501,
+        apiCode: 'internal',
+    );
+
+    expect($exception->isRetryable())->toBeTrue();
 });

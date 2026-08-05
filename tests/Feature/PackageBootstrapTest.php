@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Sleep;
 use Telegga\Laravel\Contracts\TeleggaInterface;
+use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Http\TeleggaClient;
 use Telegga\Laravel\Resolvers\ConnectionContextResolver;
 use Telegga\Laravel\Services\BotService;
@@ -74,6 +76,31 @@ it('использует актуальный api ключ при повторн
         ->toBeTrue()
         ->and($requests[1][0]->hasHeader('Authorization', 'Bearer tg_live_second'))
         ->toBeTrue();
+});
+
+it('использует безопасные настройки повторов если секция retry отсутствует', function (): void {
+    config(['telegga.retry' => []]);
+    Sleep::fake();
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/bots' => Http::failedConnection(),
+    ]);
+
+    try {
+        app(TeleggaClient::class)->get(uri: 'bots');
+    } catch (TeleggaApiException $exception) {
+        expect($exception->attempts)->toBe(3);
+
+        Http::assertSentCount(3);
+        Sleep::assertSequence([
+            Sleep::for(200)->milliseconds(),
+            Sleep::for(400)->milliseconds(),
+        ]);
+
+        return;
+    }
+
+    test()->fail('Ожидалось исключение TeleggaApiException.');
 });
 
 it('выполняет миграции пакета стандартной командой migrate', function (): void {

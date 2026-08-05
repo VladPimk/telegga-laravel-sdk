@@ -20,6 +20,7 @@ final class TeleggaApiException extends TeleggaException
         public readonly ?string $apiCode = null,
         public readonly ?int $retryAfter = null,
         public readonly array $response = [],
+        public readonly int $attempts = 0,
         ?Throwable $previous = null,
     ) {
         parent::__construct(message: $message, previous: $previous);
@@ -28,7 +29,7 @@ final class TeleggaApiException extends TeleggaException
     /**
      * Создать исключение из HTTP-ответа.
      */
-    public static function fromResponse(Response $response): self
+    public static function fromResponse(Response $response, int $attempts = 1): self
     {
         $body = $response->json();
         $data = is_array($body) ? $body : [];
@@ -45,6 +46,7 @@ final class TeleggaApiException extends TeleggaException
             apiCode: $apiCode,
             retryAfter: is_numeric($retryAfter) ? (int) $retryAfter : null,
             response: $data,
+            attempts: $attempts,
         );
     }
 }

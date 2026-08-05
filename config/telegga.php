@@ -8,4 +8,8 @@ return [
     'webhook_token' => env('TELEGGA_WEBHOOK_TOKEN'),
     'timeout' => env('TELEGGA_TIMEOUT', 15),
     'connect_timeout' => env('TELEGGA_CONNECT_TIMEOUT', 5),
+    'retry' => [
+        'times' => env('TELEGGA_RETRY_TIMES', 3),
+        'sleep_ms' => env('TELEGGA_RETRY_SLEEP_MS', 200),
+    ],
 ];
