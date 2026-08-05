@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Telegga\Laravel\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -26,6 +27,18 @@ final class AvailableTelegramBot extends Model
     public function uniqueIds(): array
     {
         return ['uuid'];
+    }
+
+    /**
+     * Привести имя Telegram-бота к нижнему регистру.
+     *
+     * @return Attribute<string, string>
+     */
+    protected function botName(): Attribute
+    {
+        return Attribute::make(
+            set: fn (string $value): string => str()->lower($value),
+        );
     }
 
     /**

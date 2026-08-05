@@ -61,7 +61,7 @@ final class BotService
         try {
             $exists = $this->getAll()->contains(
                 fn (object $bot): bool => is_string($bot->username ?? null)
-                    && $bot->username === $botName,
+                    && str()->lower($bot->username) === $botName,
             );
         } catch (TeleggaApiException $exception) {
             throw new BotException(
@@ -149,10 +149,12 @@ final class BotService
      */
     public function find(string $botName, ?string $status = null): object
     {
+        $botName = str()->lower($botName);
+
         try {
             $bot = $this->getAll()->first(
                 fn (object $bot): bool => is_string($bot->username ?? null)
-                    && $bot->username === $botName
+                    && str()->lower($bot->username) === $botName
                     && ($status === null || ($bot->status ?? null) === $status),
             );
         } catch (TeleggaApiException $exception) {
@@ -209,7 +211,7 @@ final class BotService
      */
     private function validateName(string $botName): string
     {
-        $botName = trim($botName);
+        $botName = str()->lower(trim($botName));
 
         if (preg_match('/^[A-Za-z0-9_]+$/', $botName) !== 1) {
             throw new BotException(

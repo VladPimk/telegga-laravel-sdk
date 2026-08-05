@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Telegga\Laravel\Models\AvailableTelegramBot;
@@ -117,6 +119,10 @@ it('принимает тестовое событие и возвращает �
 });
 
 it('возвращает ошибку для неизвестного external id', function (): void {
+    Log::spy();
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
     $this
         ->withToken('webhook-secret')
         ->postJson('/webhooks/v1/telegram/connect-account', [
@@ -132,11 +138,198 @@ it('возвращает ошибку для неизвестного external i
             'event_id' => $this->eventId,
             'error' => [
                 'code' => 'connection_not_found',
-                'message' => 'Connection was not found for the provided external_id and bot_username.',
+                'message' => 'Telegram connection was not found for the provided external_id.',
+                'details' => [
+                    'external_id' => 'unknown-external-id',
+                    'received_bot_username' => 'mybot',
+                ],
             ],
         ]);
 
+    $queries = collect(DB::getQueryLog());
+    DB::disableQueryLog();
+
     expect(TelegramConnectedUser::query()->doesntExist())
+        ->toBeTrue()
+        ->and($queries->filter(
+            fn (array $query): bool => str_contains($query['query'], 'telegram_connected_users'),
+        ))
+        ->toHaveCount(1)
+        ->and($queries->filter(
+            fn (array $query): bool => str_contains($query['query'], 'available_telegram_bots'),
+        ))
+        ->toBeEmpty();
+
+    Log::shouldHaveReceived('warning')
+        ->once()
+        ->withArgs(
+            fn (string $message, array $context): bool => $message === 'Telegga webhook request was rejected.'
+                && $context['error_code'] === 'connection_not_found'
+                && $context['external_id'] === 'unknown-external-id',
+        );
+});
+
+it('возвращает отдельную ошибку для удалённого подключения', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+    $connection->delete();
+
+    $this
+        ->withToken('webhook-secret')
+        ->postJson('/webhooks/v1/telegram/connect-account', [
+            'event' => 'user.linked',
+            'event_id' => $this->eventId,
+            'external_id' => $connection->uuid,
+            'bot_username' => 'mybot',
+        ])
+        ->assertNotFound()
+        ->assertExactJson([
+            'success' => false,
+            'event' => 'user.linked',
+            'event_id' => $this->eventId,
+            'error' => [
+                'code' => 'connection_deleted',
+                'message' => 'Telegram connection for the provided external_id has been deleted.',
+                'details' => [
+                    'external_id' => $connection->uuid,
+                    'received_bot_username' => 'mybot',
+                ],
+            ],
+        ]);
+
+    expect(TelegramConnectedUser::withTrashed()->find($connection->id)?->is_connected)
+        ->toBeFalse();
+});
+
+it('возвращает отдельную ошибку для не созданного в Telegga подключения', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+
+    $this
+        ->withToken('webhook-secret')
+        ->postJson('/webhooks/v1/telegram/connect-account', [
+            'event' => 'user.linked',
+            'event_id' => $this->eventId,
+            'external_id' => $connection->uuid,
+            'bot_username' => 'mybot',
+        ])
+        ->assertConflict()
+        ->assertExactJson([
+            'success' => false,
+            'event' => 'user.linked',
+            'event_id' => $this->eventId,
+            'error' => [
+                'code' => 'connection_not_created',
+                'message' => 'Telegram connection has not been created in Telegga.',
+                'details' => [
+                    'external_id' => $connection->uuid,
+                    'received_bot_username' => 'mybot',
+                ],
+            ],
+        ]);
+
+    expect($connection->refresh()->is_connected)
+        ->toBeFalse();
+});
+
+it('возвращает отдельную ошибку для удалённого связанного бота', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+    $this->telegramBot->delete();
+
+    $this
+        ->withToken('webhook-secret')
+        ->postJson('/webhooks/v1/telegram/connect-account', [
+            'event' => 'user.linked',
+            'event_id' => $this->eventId,
+            'external_id' => $connection->uuid,
+            'bot_username' => 'mybot',
+        ])
+        ->assertNotFound()
+        ->assertExactJson([
+            'success' => false,
+            'event' => 'user.linked',
+            'event_id' => $this->eventId,
+            'error' => [
+                'code' => 'bot_deleted',
+                'message' => 'Telegram bot assigned to the connection has been deleted.',
+                'details' => [
+                    'external_id' => $connection->uuid,
+                    'received_bot_username' => 'mybot',
+                    'expected_bot_username' => 'mybot',
+                ],
+            ],
+        ]);
+
+    expect($connection->refresh()->is_connected)
+        ->toBeFalse();
+});
+
+it('возвращает отдельную ошибку для отсутствующего связанного бота', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+
+    Schema::disableForeignKeyConstraints();
+    $this->telegramBot->forceDelete();
+    Schema::enableForeignKeyConstraints();
+
+    $this
+        ->withToken('webhook-secret')
+        ->postJson('/webhooks/v1/telegram/connect-account', [
+            'event' => 'user.linked',
+            'event_id' => $this->eventId,
+            'external_id' => $connection->uuid,
+            'bot_username' => 'mybot',
+        ])
+        ->assertNotFound()
+        ->assertExactJson([
+            'success' => false,
+            'event' => 'user.linked',
+            'event_id' => $this->eventId,
+            'error' => [
+                'code' => 'bot_not_found',
+                'message' => 'Telegram bot assigned to the connection was not found.',
+                'details' => [
+                    'external_id' => $connection->uuid,
+                    'received_bot_username' => 'mybot',
+                ],
+            ],
+        ]);
+
+    expect($connection->refresh()->is_connected)
+        ->toBeFalse();
+});
+
+it('сравнивает имя бота без учёта регистра', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+
+    $this
+        ->withToken('webhook-secret')
+        ->postJson('/webhooks/v1/telegram/connect-account', [
+            'event' => 'user.linked',
+            'event_id' => $this->eventId,
+            'external_id' => $connection->uuid,
+            'bot_username' => 'MyBot',
+        ])
+        ->assertOk()
+        ->assertJsonPath('data.bot_username', 'mybot');
+
+    expect($connection->refresh()->is_connected)
         ->toBeTrue();
 });
 
@@ -155,14 +348,19 @@ it('возвращает ошибку при несовпадении имени
             'external_id' => $connection->uuid,
             'bot_username' => '@mybot',
         ])
-        ->assertNotFound()
+        ->assertConflict()
         ->assertExactJson([
             'success' => false,
             'event' => 'user.linked',
             'event_id' => $this->eventId,
             'error' => [
-                'code' => 'connection_not_found',
-                'message' => 'Connection was not found for the provided external_id and bot_username.',
+                'code' => 'bot_mismatch',
+                'message' => 'Telegram connection is assigned to a different bot.',
+                'details' => [
+                    'external_id' => $connection->uuid,
+                    'received_bot_username' => '@mybot',
+                    'expected_bot_username' => 'mybot',
+                ],
             ],
         ]);
 
@@ -203,6 +401,8 @@ it('отклоняет webhook без bearer токена', function (): void {
 });
 
 it('отклоняет webhook с неверным bearer токеном', function (): void {
+    Log::spy();
+
     $this
         ->withToken('wrong-secret')
         ->postJson('/webhooks/v1/telegram/connect-account', [
@@ -216,6 +416,14 @@ it('отклоняет webhook с неверным bearer токеном', funct
                 'message' => 'Invalid webhook token.',
             ],
         ]);
+
+    Log::shouldHaveReceived('warning')
+        ->once()
+        ->withArgs(
+            fn (string $message, array $context): bool => $message === 'Telegga webhook authorization failed.'
+                && $context['error_code'] === 'unauthorized'
+                && ! str_contains(json_encode($context, JSON_THROW_ON_ERROR), 'wrong-secret'),
+        );
 });
 
 it('отклоняет webhook при пустом токене в конфигурации', function (): void {
@@ -237,6 +445,8 @@ it('отклоняет webhook при пустом токене в конфиг�
 });
 
 it('отклоняет payload без названия события', function (): void {
+    Log::spy();
+
     $this
         ->withToken('webhook-secret')
         ->postJson('/webhooks/v1/telegram/connect-account')
@@ -248,6 +458,13 @@ it('отклоняет payload без названия события', function
                 'message' => 'Webhook event is required.',
             ],
         ]);
+
+    Log::shouldHaveReceived('warning')
+        ->once()
+        ->withArgs(
+            fn (string $message, array $context): bool => $message === 'Telegga webhook request validation failed.'
+                && $context['error_code'] === 'invalid_request',
+        );
 });
 
 it('принимает событие подключения без event id', function (): void {
@@ -385,6 +602,7 @@ it('отклоняет событие подключения без имени �
 
 it('возвращает json с серверной ошибкой при недоступной локальной таблице', function (): void {
     Schema::drop('telegram_connected_users');
+    Log::spy();
 
     $this
         ->withToken('webhook-secret')
@@ -404,4 +622,12 @@ it('возвращает json с серверной ошибкой при нед
                 'message' => 'Webhook could not be processed.',
             ],
         ]);
+
+    Log::shouldHaveReceived('error')
+        ->once()
+        ->withArgs(
+            fn (string $message, array $context): bool => $message === 'Telegga webhook could not be processed.'
+                && $context['error_code'] === 'internal'
+                && $context['external_id'] === 'unknown-external-id',
+        );
 });

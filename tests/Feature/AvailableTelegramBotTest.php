@@ -123,7 +123,7 @@ it('повторно возвращает существующего локал�
         ->toBe(1);
 });
 
-it('требует точного соответствия username из api локальному имени', function (string $apiUsername): void {
+it('отклоняет username из api с лишним символом', function (string $apiUsername): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
@@ -151,8 +151,29 @@ it('требует точного соответствия username из api л�
     test()->fail('Ожидалось исключение BotException.');
 })->with([
     'username с лишним символом @' => '@mybot',
-    'username в другом регистре' => 'MyBot',
 ]);
+
+it('сопоставляет и сохраняет имя бота в нижнем регистре', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/bots' => Http::response([
+            'data' => [
+                [
+                    'bot_id' => 'remote-bot-id',
+                    'username' => 'MyBot',
+                    'status' => 'active',
+                ],
+            ],
+        ]),
+    ]);
+
+    $bot = app(TeleggaInterface::class)->addTelegramBot(botName: 'MYBOT');
+
+    expect($bot->bot_name)
+        ->toBe('mybot')
+        ->and($bot->refresh()->bot_name)
+        ->toBe('mybot');
+});
 
 it('отклоняет некорректное имя бота', function (string $botName): void {
     Http::preventStrayRequests();

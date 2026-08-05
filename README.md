@@ -54,7 +54,7 @@ $bot = $telegga->addTelegramBot(
 );
 ```
 
-The package accepts and stores the username without the `@` prefix, matching the format returned by the API. During validation through `GET /bots`, the returned `username` is compared with the local name using an exact, case-sensitive match. The package does not store `bot_id` or any other bot data returned by the API. The model `uuid` is generated locally.
+The package accepts and stores the username without the `@` prefix, matching the format returned by the API. Local and API usernames are converted to lowercase before comparison, and the local value is stored in lowercase. The package does not store `bot_id` or any other bot data returned by the API. The model `uuid` is generated locally.
 
 Retrieving locally registered bots does not send an API request:
 
@@ -140,7 +140,7 @@ try {
 
 ## Managing connections
 
-All connection operations accept the UUID of the local record. The package compares the `bot_username` returned by Telegga with the local `bot_name` using an exact, case-sensitive match. Both values use the username without the `@` prefix. Internal Telegga user and bot identifiers are not stored locally.
+All connection operations accept the UUID of the local record. The package compares the `bot_username` returned by Telegga with the local `bot_name` after converting both values to lowercase. Both values use the username without the `@` prefix. Internal Telegga user and bot identifiers are not stored locally.
 
 Retrieve a user together with links and groups:
 
@@ -426,11 +426,26 @@ Authorization: Bearer <TELEGGA_WEBHOOK_TOKEN>
 
 An empty, missing, or invalid token returns `401`. Tokens are compared securely using `hash_equals`.
 
-The `user.linked` event finds the local record by matching `external_id` with `telegram_connected_users.uuid`. The returned `bot_username` is also matched directly against the associated local bot name. Both values use the username without the `@` prefix. The package then sets `is_connected` to `true`. Repeated event delivery is safe and returns the same successful result.
+The `user.linked` event finds the local record by matching `external_id` with `telegram_connected_users.uuid`, including soft-deleted records for accurate diagnostics. It then checks that the connection was created in Telegga and loads its assigned local bot, including a soft-deleted bot. The received and local bot usernames are converted to lowercase before comparison. Both values use the username without the `@` prefix. Processing stops at the first failed check. The package sets `is_connected` to `true` only after every check succeeds. Repeated event delivery is safe and does not perform a redundant update.
 
 Successful `user.linked` and `test` events return `200` with JSON containing `success`, the event type, and a result message. A `user.linked` response also contains `external_id`, `bot_username`, and the resulting connection status. The `event_id` field is optional and is included in the response when provided.
 
-An invalid payload or unsupported event type returns `400`, an invalid token returns `401`, and a missing local connection or bot mismatch returns `404`. A local database error is converted into a JSON `500` response so Telegga can retry delivery according to its policy. Lookup and processing errors are written to the Laravel log with `external_id`, `bot_username`, and the provided `event_id`, without storing the bearer token.
+Webhook processing uses the following error codes:
+
+| HTTP status | Error code | Meaning |
+| --- | --- | --- |
+| `400` | `invalid_request` | Required event data is missing or invalid. |
+| `400` | `unsupported_event` | The event type is not supported. |
+| `401` | `unauthorized` | The webhook token is missing or invalid. |
+| `404` | `connection_not_found` | No local connection exists for the provided `external_id`. |
+| `404` | `connection_deleted` | The local connection was soft-deleted. |
+| `409` | `connection_not_created` | The local connection was not created in Telegga. |
+| `404` | `bot_not_found` | The bot assigned to the connection no longer exists locally. |
+| `404` | `bot_deleted` | The bot assigned to the connection was soft-deleted. |
+| `409` | `bot_mismatch` | The webhook contains a different bot username. |
+| `500` | `internal` | A local database operation failed. |
+
+Expected request failures are logged at `warning` level. Database and processing failures are logged at `error` level so Telegga can retry delivery according to its policy. Logs contain the event identifiers, normalized bot usernames, and the error code, but never contain the bearer token.
 
 ## Status
 
