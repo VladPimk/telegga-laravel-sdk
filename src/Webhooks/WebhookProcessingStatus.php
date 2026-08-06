@@ -12,7 +12,6 @@ enum WebhookProcessingStatus: string
     case EventIdConflict = 'event_id_conflict';
     case ConnectionNotFound = 'connection_not_found';
     case ConnectionDeleted = 'connection_deleted';
-    case ConnectionNotCreated = 'connection_not_created';
     case BotNotFound = 'bot_not_found';
     case BotDeleted = 'bot_deleted';
     case BotMismatch = 'bot_mismatch';

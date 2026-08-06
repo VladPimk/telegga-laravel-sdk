@@ -398,7 +398,7 @@ it('возвращает отдельную ошибку для удалённо
         ->toBeTrue();
 });
 
-it('возвращает отдельную ошибку для не созданного в Telegga подключения', function (): void {
+it('восстанавливает локальное состояние по авторизованному user linked', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'available_telegram_bot_id' => $this->telegramBot->id,
@@ -409,25 +409,30 @@ it('возвращает отдельную ошибку для не созда�
         ->postJson('/webhooks/v1/telegram/connect-account', userLinkedWebhookPayload(overrides: [
             'external_id' => $connection->uuid,
         ]))
-        ->assertConflict()
+        ->assertOk()
         ->assertExactJson([
-            'success' => false,
+            'success' => true,
             'event' => 'user.linked',
             'event_id' => $this->eventId,
-            'error' => [
-                'code' => 'connection_not_created',
-                'message' => 'Telegram connection has not been created in Telegga.',
-                'details' => [
-                    'external_id' => $connection->uuid,
-                    'received_bot_username' => 'mybot',
-                ],
+            'message' => 'Telegram connection marked as connected.',
+            'data' => [
+                'external_id' => $connection->uuid,
+                'bot_username' => 'mybot',
+                'is_connected' => true,
             ],
         ]);
 
-    expect($connection->refresh()->is_connected)
-        ->toBeFalse()
-        ->and(TeleggaWebhookEvent::query()->doesntExist())
-        ->toBeTrue();
+    $connection->refresh();
+    $webhookEvent = TeleggaWebhookEvent::query()->sole();
+
+    expect($connection->is_created)
+        ->toBeTrue()
+        ->and($connection->is_connected)
+        ->toBeTrue()
+        ->and($webhookEvent->telegram_connected_user_id)
+        ->toBe($connection->id)
+        ->and($webhookEvent->processed_at)
+        ->not->toBeNull();
 });
 
 it('возвращает отдельную ошибку для удалённого связанного бота', function (): void {

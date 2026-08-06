@@ -33,6 +33,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Reconciled local state when remote connection deletion succeeds but local deletion fails.
 - Hardened handling of asymmetric user list responses and invalid HTTP client configuration.
 - Clarified optional connection link fields in the documentation.
+- Reconciled both local creation and connection state from an authenticated `user.linked` webhook.
 
 ## [1.0.1] - 2026-08-03
 

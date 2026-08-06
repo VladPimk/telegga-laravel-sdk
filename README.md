@@ -496,9 +496,9 @@ Authorization: Bearer <TELEGGA_WEBHOOK_TOKEN>
 
 An empty, missing, or invalid token returns `401`. Tokens are compared securely using `hash_equals`. Rejected tokens are logged at `warning` level with the request path and source IP, but the token value is never logged. Requests rejected by the rate limiter return `429` before token validation.
 
-The `user.linked` event requires every field documented by Telegga, including `event_id`. It finds the local record by matching `external_id` with `telegram_connected_users.uuid`, including soft-deleted records for accurate diagnostics. It then checks that the connection was created in Telegga and loads its assigned local bot, including a soft-deleted bot. The received and local bot usernames are converted to lowercase before comparison. Both values use the username without the `@` prefix. Processing stops at the first failed check.
+The `user.linked` event requires every field documented by Telegga, including `event_id`. It finds the local record by matching `external_id` with `telegram_connected_users.uuid`, including soft-deleted records for accurate diagnostics, and loads its assigned local bot, including a soft-deleted bot. The received and local bot usernames are converted to lowercase before comparison. Both values use the username without the `@` prefix. Processing stops at the first failed check.
 
-After validation succeeds, the package stores the event in `telegga_webhook_events`, relates it to the local connection, sets `is_connected` to `true` when necessary, and records `processed_at`. The locally generated event `uuid` is separate from Telegga's globally unique `event_id`. `attempts` counts accepted deliveries of the same event, while `first_seen_at` records its first delivery. Events rejected because of a missing, deleted, or mismatched local resource are logged but not stored.
+After validation succeeds, the package treats the authenticated `user.linked` event as authoritative confirmation that the Telegga user exists and is linked. It first stores the event in `telegga_webhook_events` and relates it to the local connection. It then uses a database transaction to atomically set both `is_created` and `is_connected` to `true` when necessary and record `processed_at`. Registering the event before this transaction preserves an unprocessed event when processing fails, allowing a later delivery to finish it. This repairs local state when the API operation succeeded but its response or local synchronization failed. The locally generated event `uuid` is separate from Telegga's globally unique `event_id`. `attempts` counts accepted deliveries of the same event, while `first_seen_at` records its first delivery. Events rejected because of a missing, deleted, or mismatched local resource are logged but not stored.
 
 Repeated delivery of a processed `event_id` for the same connection increments `attempts`, returns `200`, and does not load the bot or update the connection again. An unprocessed stored event can complete on a later delivery. Reusing an `event_id` for another connection or event type returns `409 event_id_conflict`. The database unique constraint on `event_id` and row locking prevent concurrent delivery from applying the same event twice.
 
@@ -513,14 +513,13 @@ Webhook processing uses the following error codes:
 | `401` | `unauthorized` | The webhook token is missing or invalid. |
 | `404` | `connection_not_found` | No local connection exists for the provided `external_id`. |
 | `404` | `connection_deleted` | The local connection was soft-deleted. |
-| `409` | `connection_not_created` | The local connection was not created in Telegga. |
 | `404` | `bot_not_found` | The bot assigned to the connection no longer exists locally. |
 | `404` | `bot_deleted` | The bot assigned to the connection was soft-deleted. |
 | `409` | `bot_mismatch` | The webhook contains a different bot username. |
 | `409` | `event_id_conflict` | The `event_id` is already assigned to another connection or event type. |
 | `500` | `internal` | A local database operation failed. |
 
-Expected request failures are logged at `warning` level. Database and processing failures are logged at `error` level so Telegga can retry delivery according to its policy. Logs contain the event identifiers, normalized bot usernames, and the error code, but never contain the bearer token.
+Expected request failures are logged at `warning` level. Unknown, deleted, or mismatched resources return terminal `404` or `409` responses and are not retried. Database and processing failures return `500` and are logged at `error` level so Telegga can retry delivery according to its policy. Logs contain the event identifiers, normalized bot usernames, and the error code, but never contain the bearer token.
 
 ### Clearing the webhook event log
 

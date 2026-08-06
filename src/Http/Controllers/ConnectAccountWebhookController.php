@@ -345,7 +345,6 @@ final class ConnectAccountWebhookController
             WebhookProcessingStatus::ConnectionDeleted,
             WebhookProcessingStatus::BotNotFound,
             WebhookProcessingStatus::BotDeleted => 404,
-            WebhookProcessingStatus::ConnectionNotCreated,
             WebhookProcessingStatus::BotMismatch,
             WebhookProcessingStatus::EventIdConflict => 409,
             WebhookProcessingStatus::Connected,
@@ -362,7 +361,6 @@ final class ConnectAccountWebhookController
         return match ($status) {
             WebhookProcessingStatus::ConnectionNotFound => 'Telegram connection was not found for the provided external_id.',
             WebhookProcessingStatus::ConnectionDeleted => 'Telegram connection for the provided external_id has been deleted.',
-            WebhookProcessingStatus::ConnectionNotCreated => 'Telegram connection has not been created in Telegga.',
             WebhookProcessingStatus::BotNotFound => 'Telegram bot assigned to the connection was not found.',
             WebhookProcessingStatus::BotDeleted => 'Telegram bot assigned to the connection has been deleted.',
             WebhookProcessingStatus::BotMismatch => 'Telegram connection is assigned to a different bot.',

@@ -37,12 +37,6 @@ final class WebhookService
             );
         }
 
-        if (! $connection->is_created) {
-            return new WebhookProcessingResult(
-                status: WebhookProcessingStatus::ConnectionNotCreated,
-            );
-        }
-
         $webhookEvent = $this->findEvent(eventId: $eventId);
 
         if ($webhookEvent !== null) {
@@ -274,13 +268,21 @@ final class WebhookService
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                $status = WebhookProcessingStatus::AlreadyConnected;
+                $status = $lockedConnection->is_connected
+                    ? WebhookProcessingStatus::AlreadyConnected
+                    : WebhookProcessingStatus::Connected;
+                $attributes = [];
+
+                if (! $lockedConnection->is_created) {
+                    $attributes['is_created'] = true;
+                }
 
                 if (! $lockedConnection->is_connected) {
-                    $lockedConnection->update([
-                        'is_connected' => true,
-                    ]);
-                    $status = WebhookProcessingStatus::Connected;
+                    $attributes['is_connected'] = true;
+                }
+
+                if ($attributes !== []) {
+                    $lockedConnection->update(attributes: $attributes);
                 }
 
                 $lockedEvent->update([
