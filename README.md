@@ -31,6 +31,15 @@ The package uses its bundled configuration by default. Publish the configuration
 php artisan vendor:publish --tag=telegga-config
 ```
 
+By default, an optional connection `user_id` belongs to `App\Models\User` through the `users` table. Applications with a different user model or table must publish the configuration and change both values before running package migrations:
+
+```php
+'user_model' => App\Domain\Accounts\Models\User::class,
+'users_table' => 'account_users',
+```
+
+The configured model and table must represent the same application user entity. The package currently expects its primary key to be an unsigned big integer named `id`. Changing either setting after the package migration has run requires an application migration that updates the existing foreign key.
+
 Configure the Telegga API key and a project-generated token for incoming webhooks:
 
 ```dotenv

@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Structured API error metadata for status-aware handling.
 - Typed response DTOs and route-specific mappers for every JSON API response.
 - Access to unknown response fields through each DTO's `raw()` method.
+- Configurable application user model and table for optional local connection relationships.
 
 ### Changed
 

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\CustomUser;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -30,6 +31,7 @@ beforeEach(function (): void {
 afterEach(function (): void {
     Schema::dropIfExists('telegram_connected_users');
     Schema::dropIfExists('available_telegram_bots');
+    Schema::dropIfExists('custom_users');
     Schema::dropIfExists('users');
 });
 
@@ -111,6 +113,73 @@ it('связывает подключение с пользователем пр
         ->toBeInstanceOf(User::class)
         ->and($connection->user->is($user))
         ->toBeTrue();
+});
+
+it('использует настроенные модель и таблицу пользователя проекта', function (): void {
+    Schema::dropIfExists('telegram_connected_users');
+    Schema::create('custom_users', function (Blueprint $table): void {
+        $table->id();
+        $table->string('name');
+        $table->timestamps();
+    });
+    config()->set('telegga.user_model', CustomUser::class);
+    config()->set('telegga.users_table', 'custom_users');
+
+    $connectionMigration = require __DIR__.'/../../database/migrations/2026_07_31_000002_create_telegram_connected_users_table.php';
+    $connectionMigration->up();
+
+    $user = CustomUser::query()->create([
+        'name' => 'Иван',
+    ]);
+    $connection = TelegramConnectedUser::query()->create([
+        'user_id' => $user->getKey(),
+        'name' => $user->name,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+    $foreignKeys = collect(Schema::getForeignKeys('telegram_connected_users'));
+
+    expect($connection->user)
+        ->toBeInstanceOf(CustomUser::class)
+        ->and($connection->user->is($user))
+        ->toBeTrue()
+        ->and($foreignKeys->contains(
+            fn (array $foreignKey): bool => $foreignKey['columns'] === ['user_id']
+                && $foreignKey['foreign_table'] === 'custom_users'
+                && $foreignKey['foreign_columns'] === ['id']
+                && $foreignKey['on_delete'] === 'set null',
+        ))
+        ->toBeTrue();
+
+    $user->delete();
+    $connection->refresh();
+
+    expect($connection->user_id)
+        ->toBeNull()
+        ->and($connection->user)
+        ->toBeNull();
+});
+
+it('отклоняет некорректный класс модели пользователя проекта', function (): void {
+    config()->set('telegga.user_model', stdClass::class);
+
+    expect(fn () => (new TelegramConnectedUser)->user())
+        ->toThrow(LogicException::class, 'Telegga user_model must be an Eloquent model class.');
+});
+
+it('отклоняет несовпадающие модель и таблицу пользователя проекта', function (): void {
+    config()->set('telegga.user_model', CustomUser::class);
+
+    expect(fn () => (new TelegramConnectedUser)->user())
+        ->toThrow(LogicException::class, 'Telegga user_model must use the configured users_table.');
+});
+
+it('отклоняет пустое имя таблицы пользователей проекта', function (): void {
+    Schema::dropIfExists('telegram_connected_users');
+    config()->set('telegga.users_table', '');
+    $connectionMigration = require __DIR__.'/../../database/migrations/2026_07_31_000002_create_telegram_connected_users_table.php';
+
+    expect(fn () => $connectionMigration->up())
+        ->toThrow(LogicException::class, 'Telegga users_table must be a non-empty table name.');
 });
 
 it('позволяет пользователю проекта иметь несколько подключений', function (): void {

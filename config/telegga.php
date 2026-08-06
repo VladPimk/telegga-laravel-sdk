@@ -1,10 +1,13 @@
 <?php
 
 declare(strict_types=1);
+use App\Models\User;
 
 return [
     'base_url' => env('TELEGGA_BASE_URL', 'https://api.telegga.net/api/v1'),
     'api_key' => env('TELEGGA_API_KEY'),
+    'user_model' => User::class,
+    'users_table' => 'users',
     'webhook_token' => env('TELEGGA_WEBHOOK_TOKEN'),
     'webhooks' => [
         'enabled' => env('TELEGGA_WEBHOOKS_ENABLED', true),

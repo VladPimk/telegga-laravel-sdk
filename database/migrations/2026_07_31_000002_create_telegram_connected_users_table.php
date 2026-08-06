@@ -13,7 +13,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('telegram_connected_users', function (Blueprint $table): void {
+        $usersTable = config(key: 'telegga.users_table');
+
+        if (! is_string($usersTable) || trim($usersTable) === '') {
+            throw new LogicException('Telegga users_table must be a non-empty table name.');
+        }
+
+        Schema::create('telegram_connected_users', function (Blueprint $table) use ($usersTable): void {
             $table->id();
             $table->uuid('uuid')->index();
             $table->string('name');
@@ -21,7 +27,7 @@ return new class extends Migration
             $table->unsignedBigInteger('user_id')->nullable()->index();
             $table->foreign('user_id', 'fk_telegram_connected_users_user_id')
                 ->references('id')
-                ->on('users')
+                ->on($usersTable)
                 ->nullOnDelete();
             $table->unsignedBigInteger('available_telegram_bot_id')->index();
             $table->foreign('available_telegram_bot_id', 'fk_telegram_connected_users_available_telegram_bot_id')

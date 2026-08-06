@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Sleep;
@@ -33,7 +34,11 @@ it('регистрирует публичный контракт и конфиг
         ->and(config('telegga.timeout'))
         ->toBe(15)
         ->and(config('telegga.connect_timeout'))
-        ->toBe(5);
+        ->toBe(5)
+        ->and(config('telegga.user_model'))
+        ->toBe(User::class)
+        ->and(config('telegga.users_table'))
+        ->toBe('users');
 });
 
 it('создаёт новый экземпляр для каждого разрешения сервисов пакета', function (): void {

@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Telegga\Laravel\Models;
 
-use App\Models\User;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use LogicException;
 
 final class TelegramConnectedUser extends Model
 {
@@ -56,11 +56,14 @@ final class TelegramConnectedUser extends Model
     /**
      * Получить пользователя проекта.
      *
-     * @return BelongsTo<User, $this>
+     * @return BelongsTo<Model, $this>
      */
     public function user(): BelongsTo
     {
-        return $this->belongsTo(related: User::class);
+        return $this->belongsTo(
+            related: $this->userModel(),
+            foreignKey: 'user_id',
+        );
     }
 
     /**
@@ -87,5 +90,30 @@ final class TelegramConnectedUser extends Model
             related: TeleggaWebhookEvent::class,
             foreignKey: 'telegram_connected_user_id',
         );
+    }
+
+    /**
+     * Получить настроенный класс модели пользователя проекта.
+     *
+     * @return class-string<Model>
+     */
+    private function userModel(): string
+    {
+        $userModel = config(key: 'telegga.user_model');
+        $usersTable = config(key: 'telegga.users_table');
+
+        if (! is_string($userModel) || ! is_subclass_of($userModel, Model::class)) {
+            throw new LogicException('Telegga user_model must be an Eloquent model class.');
+        }
+
+        if (! is_string($usersTable) || trim($usersTable) === '') {
+            throw new LogicException('Telegga users_table must be a non-empty table name.');
+        }
+
+        if ((new $userModel)->getTable() !== $usersTable) {
+            throw new LogicException('Telegga user_model must use the configured users_table.');
+        }
+
+        return $userModel;
     }
 }
