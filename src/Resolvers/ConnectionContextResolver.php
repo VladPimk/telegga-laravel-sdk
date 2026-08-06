@@ -198,6 +198,6 @@ final class ConnectionContextResolver
     private function linkMatchesBot(UserLinkData $link, string $botName): bool
     {
         return $link->bot_username !== null
-            && $link->bot_username === $botName;
+            && str()->lower($link->bot_username) === str()->lower($botName);
     }
 }

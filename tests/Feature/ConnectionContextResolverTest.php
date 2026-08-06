@@ -101,6 +101,38 @@ it('разрешает контекст подключения через акт
     });
 });
 
+it('сопоставляет имя бота без учёта регистра', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/users*' => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+            'links' => [
+                [
+                    'bot_id' => 'bot-active',
+                    'bot_username' => 'MyBot',
+                    'status' => 'active',
+                ],
+            ],
+        ]),
+    ]);
+
+    $context = app(ConnectionContextResolver::class)->resolve(
+        uuid: $connection->uuid,
+    );
+
+    expect($context->link->bot_id)
+        ->toBe('bot-active')
+        ->and($context->link->bot_username)
+        ->toBe('MyBot');
+});
+
 it('разрешает пользователя Telegga без активной привязки к боту', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
