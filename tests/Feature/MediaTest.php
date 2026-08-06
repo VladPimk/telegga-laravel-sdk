@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Telegga\Laravel\Contracts\TeleggaInterface;
+use Telegga\Laravel\Dto\MediaData;
 use Telegga\Laravel\Exceptions\MediaException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 
@@ -29,12 +30,12 @@ it('загружает медиафайл multipart запросом без по
     );
 
     expect($media)
-        ->toBeInstanceOf(stdClass::class)
+        ->toBeInstanceOf(MediaData::class)
         ->and($media->media_id)
         ->toBe('media-1')
         ->and($media->mime_type)
         ->toBe('image/jpeg')
-        ->and($media->new_api_field)
+        ->and($media->raw()->new_api_field)
         ->toBe('new-value');
 
     Http::assertSent(function (Request $request) use ($contents, $filename): bool {
@@ -68,12 +69,12 @@ it('получает метаданные медиафайла без потер
     );
 
     expect($media)
-        ->toBeInstanceOf(stdClass::class)
+        ->toBeInstanceOf(MediaData::class)
         ->and($media->media_id)
         ->toBe($mediaId)
         ->and($media->filename)
         ->toBe('photo.jpg')
-        ->and($media->new_api_field)
+        ->and($media->raw()->new_api_field)
         ->toBe('new-value');
 
     Http::assertSent(function (Request $request) use ($mediaId): bool {

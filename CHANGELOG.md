@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Configurable request and connection timeouts.
 - Structured API error metadata for status-aware handling.
+- Typed response DTOs and route-specific mappers for every JSON API response.
+- Access to unknown response fields through each DTO's `raw()` method.
 
 ### Changed
 
@@ -17,6 +19,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Message history requests now require an explicit date range.
 - Bot and connection link resolution no longer repeat equivalent searches.
 - Webhook payload validation now uses Laravel validation while preserving the existing response contract.
+- Public API response contracts now use typed DTOs and typed collections instead of unstructured objects.
+- Group listing now supports cursor pagination through `GroupPageData`.
+- Bulk group membership results now expose documented `not_found` external identifiers.
 
 ### Fixed
 

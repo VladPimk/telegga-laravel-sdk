@@ -8,6 +8,9 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Telegga\Laravel\Contracts\TeleggaInterface;
+use Telegga\Laravel\Dto\MessageData;
+use Telegga\Laravel\Dto\MessagePageData;
+use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\MessageException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Models\AvailableTelegramBot;
@@ -78,20 +81,20 @@ it('получает историю сообщений только для ук�
     );
 
     expect($page)
-        ->toBeInstanceOf(stdClass::class)
+        ->toBeInstanceOf(MessagePageData::class)
         ->and($page->data)
         ->toBeInstanceOf(Collection::class)
         ->and($page->data)
         ->toHaveCount(1)
         ->and($page->data->first())
-        ->toBeInstanceOf(stdClass::class)
+        ->toBeInstanceOf(MessageData::class)
         ->and($page->data->first()->message_id)
         ->toBe('message-1')
-        ->and($page->data->first()->new_message_field)
+        ->and($page->data->first()->raw()->new_message_field)
         ->toBe('new-value')
         ->and($page->next_cursor)
         ->toBe('next-page')
-        ->and($page->new_page_field)
+        ->and($page->raw()->new_page_field)
         ->toBe('new-value');
 
     Http::assertSent(function (Request $request): bool {
@@ -243,20 +246,22 @@ it('отклоняет пользователя Telegga без user_id', functio
             from: new DateTimeImmutable('2026-07-01T00:00:00Z'),
             to: new DateTimeImmutable('2026-07-30T23:59:59Z'),
         );
-    } catch (MessageException $exception) {
+    } catch (ConnectionException $exception) {
         expect($exception->getMessage())
-            ->toBe('Telegga user response does not contain user_id.')
+            ->toBe('Telegga returned an invalid user lookup response: required string field "user_id" is missing or invalid.')
             ->and($exception->connectionUuid)
             ->toBe($connection->uuid)
             ->and($exception->getPrevious())
-            ->toBeNull();
+            ->toBeInstanceOf(TeleggaApiException::class)
+            ->and($exception->getPrevious()?->apiCode)
+            ->toBe('invalid_response');
 
         Http::assertSentCount(1);
 
         return;
     }
 
-    test()->fail('Ожидалось исключение MessageException.');
+    test()->fail('Ожидалось исключение ConnectionException.');
 });
 
 it('скрывает ошибку api при получении истории сообщений', function (): void {

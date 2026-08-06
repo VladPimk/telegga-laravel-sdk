@@ -6,6 +6,21 @@ namespace Telegga\Laravel\Contracts;
 
 use DateTimeInterface;
 use Illuminate\Support\Collection;
+use Telegga\Laravel\Dto\BotData;
+use Telegga\Laravel\Dto\BroadcastCancellationData;
+use Telegga\Laravel\Dto\BroadcastCreatedData;
+use Telegga\Laravel\Dto\BroadcastData;
+use Telegga\Laravel\Dto\ConnectionData;
+use Telegga\Laravel\Dto\GroupData;
+use Telegga\Laravel\Dto\GroupMembersAddedData;
+use Telegga\Laravel\Dto\GroupPageData;
+use Telegga\Laravel\Dto\MediaData;
+use Telegga\Laravel\Dto\MessageData;
+use Telegga\Laravel\Dto\MessagePageData;
+use Telegga\Laravel\Dto\QueuedMessageData;
+use Telegga\Laravel\Dto\UserData;
+use Telegga\Laravel\Dto\UserGroupMembershipData;
+use Telegga\Laravel\Dto\UserPageData;
 use Telegga\Laravel\Models\AvailableTelegramBot;
 
 interface TeleggaInterface
@@ -22,7 +37,7 @@ interface TeleggaInterface
         ?int $userId = null,
         array $meta = [],
         ?string $groupId = null,
-    ): object;
+    ): ConnectionData;
 
     /**
      * Повторно отправить существующее подключение.
@@ -33,12 +48,12 @@ interface TeleggaInterface
         string $uuid,
         array $meta = [],
         ?string $groupId = null,
-    ): object;
+    ): ConnectionData;
 
     /**
      * Получить подключённого пользователя.
      */
-    public function getConnection(string $uuid): object;
+    public function getConnection(string $uuid): UserData;
 
     /**
      * Получить список подключений Telegga.
@@ -48,14 +63,14 @@ interface TeleggaInterface
         ?string $telegramBotUuid = null,
         ?string $status = null,
         ?string $cursor = null,
-    ): object;
+    ): UserPageData;
 
     /**
      * Обновить подключённого пользователя.
      *
      * @param  array<string, mixed>  $data
      */
-    public function updateConnection(string $uuid, array $data): object;
+    public function updateConnection(string $uuid, array $data): UserData;
 
     /**
      * Удалить подключённого пользователя.
@@ -65,7 +80,7 @@ interface TeleggaInterface
     /**
      * Выпустить новый код подключения.
      */
-    public function regenerateConnectionCode(string $uuid): object;
+    public function regenerateConnectionCode(string $uuid): ConnectionData;
 
     /**
      * Отвязать подключённого пользователя от бота.
@@ -79,26 +94,24 @@ interface TeleggaInterface
         string $uuid,
         string $name,
         ?string $description = null,
-    ): object;
+    ): GroupData;
 
     /**
      * Получить группы бота подключения.
-     *
-     * @return Collection<int, object>
      */
-    public function getGroups(string $uuid): Collection;
+    public function getGroups(string $uuid, ?string $cursor = null): GroupPageData;
 
     /**
      * Получить группу.
      */
-    public function getGroup(string $groupId): object;
+    public function getGroup(string $groupId): GroupData;
 
     /**
      * Обновить группу.
      *
      * @param  array<string, mixed>  $data
      */
-    public function updateGroup(string $groupId, array $data): object;
+    public function updateGroup(string $groupId, array $data): GroupData;
 
     /**
      * Удалить группу.
@@ -108,7 +121,7 @@ interface TeleggaInterface
     /**
      * Добавить подключение в группу через маршрут пользователя.
      */
-    public function addConnectionToGroup(string $uuid, string $groupId): object;
+    public function addConnectionToGroup(string $uuid, string $groupId): UserGroupMembershipData;
 
     /**
      * Удалить подключение из группы через маршрут пользователя.
@@ -120,7 +133,7 @@ interface TeleggaInterface
      *
      * @param  array<int, string>  $uuids
      */
-    public function addGroupMembers(string $groupId, array $uuids): object;
+    public function addGroupMembers(string $groupId, array $uuids): GroupMembersAddedData;
 
     /**
      * Удалить подключение из группы через групповой маршрут.
@@ -137,17 +150,17 @@ interface TeleggaInterface
         string $type,
         array $data = [],
         ?string $groupId = null,
-    ): object;
+    ): BroadcastCreatedData;
 
     /**
      * Получить прогресс рассылки.
      */
-    public function getBroadcast(string $broadcastId): object;
+    public function getBroadcast(string $broadcastId): BroadcastData;
 
     /**
      * Отменить рассылку.
      */
-    public function cancelBroadcast(string $broadcastId): object;
+    public function cancelBroadcast(string $broadcastId): BroadcastCancellationData;
 
     /**
      * Отправить сообщение.
@@ -158,12 +171,12 @@ interface TeleggaInterface
         string $uuid,
         string $type,
         array $data = [],
-    ): object;
+    ): QueuedMessageData;
 
     /**
      * Получить сообщение по идентификатору.
      */
-    public function getMessage(string $messageId): object;
+    public function getMessage(string $messageId): MessageData;
 
     /**
      * Получить историю сообщений пользователя.
@@ -174,22 +187,22 @@ interface TeleggaInterface
         DateTimeInterface $to,
         ?string $status = null,
         ?string $cursor = null,
-    ): object;
+    ): MessagePageData;
 
     /**
      * Загрузить медиафайл.
      */
-    public function uploadMedia(string $contents, string $filename): object;
+    public function uploadMedia(string $contents, string $filename): MediaData;
 
     /**
      * Получить метаданные медиафайла.
      */
-    public function getMedia(string $mediaId): object;
+    public function getMedia(string $mediaId): MediaData;
 
     /**
      * Получить список доступных ботов.
      *
-     * @return Collection<int, object>
+     * @return Collection<int, BotData>
      */
     public function getBots(): Collection;
 

@@ -8,6 +8,10 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Telegga\Laravel\Contracts\TeleggaInterface;
+use Telegga\Laravel\Dto\GroupData;
+use Telegga\Laravel\Dto\GroupMembersAddedData;
+use Telegga\Laravel\Dto\GroupPageData;
+use Telegga\Laravel\Dto\UserGroupMembershipData;
 use Telegga\Laravel\Exceptions\GroupException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Models\AvailableTelegramBot;
@@ -73,10 +77,10 @@ it('создаёт группу для бота локального подкл�
     );
 
     expect($group)
-        ->toBeInstanceOf(stdClass::class)
+        ->toBeInstanceOf(GroupData::class)
         ->and($group->group_id)
         ->toBe('group-1')
-        ->and($group->new_api_field)
+        ->and($group->raw()->new_api_field)
         ->toBe('new-value');
 
     Http::assertSent(function (Request $request): bool {
@@ -90,7 +94,7 @@ it('создаёт группу для бота локального подкл�
     });
 });
 
-it('возвращает коллекцию групп бота локального подключения', function (): void {
+it('возвращает страницу групп бота локального подключения', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -107,6 +111,8 @@ it('возвращает коллекцию групп бота локально
                     'new_api_field' => 'new-value',
                 ],
             ],
+            'next_cursor' => 'next-page',
+            'new_page_field' => 'new-page-value',
         ]),
         'api.telegga.net/api/v1/users*' => Http::response([
             'user_id' => 'telegga-user-1',
@@ -121,22 +127,29 @@ it('возвращает коллекцию групп бота локально
         ]),
     ]);
 
-    $groups = app(TeleggaInterface::class)->getGroups(
+    $page = app(TeleggaInterface::class)->getGroups(
         uuid: $connection->uuid,
+        cursor: ' current-page ',
     );
 
-    expect($groups)
+    expect($page)
+        ->toBeInstanceOf(GroupPageData::class)
+        ->and($page->data)
         ->toBeInstanceOf(Collection::class)
-        ->and($groups)
+        ->and($page->data)
         ->toHaveCount(1)
-        ->and($groups->first())
-        ->toBeInstanceOf(stdClass::class)
-        ->and($groups->first()->new_api_field)
-        ->toBe('new-value');
+        ->and($page->data->first())
+        ->toBeInstanceOf(GroupData::class)
+        ->and($page->data->first()->raw()->new_api_field)
+        ->toBe('new-value')
+        ->and($page->next_cursor)
+        ->toBe('next-page')
+        ->and($page->raw()->new_page_field)
+        ->toBe('new-page-value');
 
     Http::assertSent(function (Request $request): bool {
         return $request->method() === 'GET'
-            && $request->url() === 'https://api.telegga.net/api/v1/groups?bot_id=bot-active';
+            && $request->url() === 'https://api.telegga.net/api/v1/groups?bot_id=bot-active&cursor=current-page';
     });
 });
 
@@ -173,9 +186,11 @@ it('получает обновляет и удаляет группу', functio
     );
     app(TeleggaInterface::class)->deleteGroup(groupId: 'group-1');
 
-    expect($group->members_count)
+    expect($group)
+        ->toBeInstanceOf(GroupData::class)
+        ->and($group->members_count)
         ->toBe(10)
-        ->and($group->new_api_field)
+        ->and($group->raw()->new_api_field)
         ->toBe('new-value')
         ->and($updated->name)
         ->toBe('Premium');
@@ -234,9 +249,11 @@ it('управляет членством через маршруты польз
         groupId: 'group-1',
     );
 
-    expect($result->added)
+    expect($result)
+        ->toBeInstanceOf(UserGroupMembershipData::class)
+        ->and($result->added)
         ->toBeFalse()
-        ->and($result->new_api_field)
+        ->and($result->raw()->new_api_field)
         ->toBe('new-value');
 
     Http::assertSent(function (Request $request): bool {
@@ -269,6 +286,7 @@ it('преобразует локальные uuid при массовом до�
     Http::fake([
         'api.telegga.net/api/v1/groups/group-1/members' => Http::response([
             'added' => 2,
+            'not_found' => [$second->uuid],
             'new_api_field' => 'new-value',
         ]),
         "api.telegga.net/api/v1/users?external_id={$first->uuid}" => Http::response([
@@ -286,9 +304,15 @@ it('преобразует локальные uuid при массовом до�
         uuids: [$first->uuid, $second->uuid, $first->uuid],
     );
 
-    expect($result->added)
+    expect($result)
+        ->toBeInstanceOf(GroupMembersAddedData::class)
+        ->and($result->added)
         ->toBe(2)
-        ->and($result->new_api_field)
+        ->and($result->not_found)
+        ->toBeInstanceOf(Collection::class)
+        ->and($result->not_found->all())
+        ->toBe([$second->uuid])
+        ->and($result->raw()->new_api_field)
         ->toBe('new-value');
 
     Http::assertSent(function (Request $request): bool {

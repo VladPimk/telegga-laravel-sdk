@@ -48,6 +48,29 @@ The API base URL defaults to `https://api.telegga.net/api/v1` and must use HTTPS
 
 Generate a strong webhook token with `str()->random(64)` and set the same `TELEGGA_WEBHOOK_TOKEN` value as the webhook bearer token in the Telegga admin panel.
 
+## API response DTOs
+
+Public methods return typed response DTOs instead of unstructured objects. DTO property names intentionally match the Telegga JSON fields in `snake_case`, so the package contract remains transparent:
+
+```php
+$message = $telegga->getMessage(messageId: $messageId);
+
+$status = $message->status;
+$telegramMessageId = $message->telegram_message_id;
+```
+
+Required documented fields are validated by route-specific response mappers. A successful HTTP response with a missing required field or an invalid field type throws `TeleggaApiException` with the `invalid_response` API code. Optional fields are exposed as nullable properties.
+
+Nested response arrays are returned as typed Laravel collections. For example, `UserData::$links` contains `UserLinkData` objects and `MessageData::$delivery_attempts` contains `DeliveryAttemptData` objects. Paginated responses use `UserPageData`, `MessagePageData`, or `GroupPageData`, with a typed `data` collection and nullable `next_cursor`.
+
+Every DTO retains the original API object. Newly added API fields remain available without an immediate package update:
+
+```php
+$newValue = $message->raw()->new_api_field ?? null;
+```
+
+Request payloads remain open arrays where the API supports different message or broadcast fields. DTO mapping applies only to responses.
+
 ## Available Telegram bots
 
 Before creating connections, register a bot that is available to the Telegga service:
@@ -103,7 +126,7 @@ $result = $telegga->createConnection(
 );
 ```
 
-When `link_status` is `pending`, the returned object exposes `link_url`, `link_code`, and `expires_at`. If the user is already connected, Telegga returns `link_status: active` without issuing a new code, so these fields may be absent.
+When `link_status` is `pending`, the returned `ConnectionData` exposes `link_url`, `link_code`, and `expires_at`. If the user is already connected, Telegga returns `link_status: active` without issuing a new code, so these nullable fields may be `null`.
 
 ```php
 if (($result->link_status ?? null) === 'pending') {
@@ -192,7 +215,7 @@ foreach ($page->data as $connection) {
 $nextCursor = $page->next_cursor;
 ```
 
-The package resolves the local bot UUID to the internal `bot_id`. The `data` field is returned as a collection of the original API objects, while a missing `next_cursor` is normalized to `null`.
+The package resolves the local bot UUID to the internal `bot_id`. The method returns `UserPageData`; its `data` field is a collection of `UserData` objects, while a missing `next_cursor` is normalized to `null`.
 
 Update the display name, email, or status:
 
@@ -269,7 +292,7 @@ For `location`, pass `latitude` and `longitude` in `data`. For `contact`, pass `
 
 The method supports `text`, `photo`, `video`, `document`, `audio`, `voice`, `animation`, `sticker`, `location`, and `contact`. The `data` payload is not restricted by a rigid DTO, so new fields and types can be used without updating the package. Values for `external_id`, `bot_id`, and `type` supplied in `data` are always replaced with values resolved by the package, while `user_id` is removed. The recipient is determined exclusively by the local connection UUID.
 
-The method returns the original API response object with `message_id`, `status`, and `created_at`. Messages and their statuses are not stored locally.
+The method returns `QueuedMessageData` with `message_id`, `status`, and nullable `created_at`. Messages and their statuses are not stored locally.
 
 ## Message status
 
@@ -281,7 +304,7 @@ $message = $telegga->getMessage(
 );
 ```
 
-The method returns the original API response object with the status, attempt count, delivery timestamps, and `delivery_attempts`.
+The method returns `MessageData` with the status, attempt count, delivery timestamps, and a collection of `DeliveryAttemptData` objects in `delivery_attempts`.
 
 ## User message history
 
@@ -305,7 +328,7 @@ $nextCursor = $page->next_cursor;
 
 The `from` and `to` parameters are required, ensuring that every history request has an explicit date range. The `status` and `cursor` parameters are optional. Dates are sent to the API in RFC 3339 format.
 
-The `data` field is returned as a `Collection` of objects without a rigid DTO, keeping new API fields available to the application. `next_cursor` contains the next page cursor or `null`. The public interface does not support retrieving the full service message history without specifying a local connection.
+The method returns `MessagePageData`. Its `data` field is a `Collection` of `MessageData` objects, and `next_cursor` contains the next page cursor or `null`. Unknown API fields remain available through each DTO's `raw()` method. The public interface does not support retrieving the full service message history without specifying a local connection.
 
 ## Media files
 
@@ -328,7 +351,7 @@ $metadata = $telegga->getMedia(
 );
 ```
 
-Both methods return the original API response objects without rigid DTOs. Empty contents, empty filenames, and payloads larger than the API-wide 50 MB limit are rejected before an HTTP request is sent. Telegga determines the media type from its contents and applies the type-specific limit, including the 10 MB photo limit. Neither the file, its path, nor its `media_id` is stored locally.
+Both methods return `MediaData`. Empty contents, empty filenames, and payloads larger than the API-wide 50 MB limit are rejected before an HTTP request is sent. Telegga determines the media type from its contents and applies the type-specific limit, including the 10 MB photo limit. Neither the file, its path, nor its `media_id` is stored locally.
 
 ## Groups
 
@@ -341,8 +364,19 @@ $group = $telegga->createGroup(
     description: 'VIP customers',
 );
 
-$groups = $telegga->getGroups(uuid: $connectionUuid);
+$page = $telegga->getGroups(
+    uuid: $connectionUuid,
+    cursor: $cursor,
+);
+
+foreach ($page->data as $group) {
+    $groupId = $group->group_id;
+}
+
+$nextCursor = $page->next_cursor;
 ```
+
+`cursor` is optional. The method returns `GroupPageData`; pass its `next_cursor` value to retrieve the next page. A missing or empty `next_cursor` is normalized to `null`.
 
 Retrieving, updating, and deleting a group uses the `group_id` returned by the API:
 
@@ -392,7 +426,9 @@ Duplicate UUIDs are removed before sending the request. The API accepts up to 10
 
 Membership additions are state-idempotent, but their response counters describe the final attempt. If the first request added members and its response was lost, the repeated request can return `added: false` for one member or `added: 0` for a bulk operation because the requested memberships already exist. The resulting group membership is correct, but the returned counter cannot reconstruct changes made by the lost attempt.
 
-Groups and memberships are not stored locally. Objects and collections are returned without rigid DTOs.
+`GroupMembersAddedData::$not_found` is a collection of `external_id` values for which Telegga did not find a user. An empty collection means that every requested identifier was resolved.
+
+Groups and memberships are not stored locally. Group responses use `GroupData`, single membership additions use `UserGroupMembershipData`, and bulk additions use `GroupMembersAddedData`.
 
 ## Broadcasts
 
@@ -436,7 +472,7 @@ $result = $telegga->cancelBroadcast(
 );
 ```
 
-Broadcasts and their progress are not stored locally. All methods return the original API response objects without rigid DTOs.
+Broadcasts and their progress are not stored locally. Starting, reading, and cancelling broadcasts return `BroadcastCreatedData`, `BroadcastData`, and `BroadcastCancellationData` respectively.
 
 ## Incoming webhooks
 

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Telegga\Laravel\Resolvers;
 
 use Illuminate\Database\QueryException;
+use Telegga\Laravel\Dto\UserData;
+use Telegga\Laravel\Dto\UserLinkData;
 use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Models\TelegramConnectedUser;
@@ -24,8 +26,8 @@ final class ConnectionContextResolver
      *
      * @return object{
      *     connection: TelegramConnectedUser,
-     *     user: object,
-     *     link: object
+     *     user: UserData,
+     *     link: UserLinkData
      * }
      */
     public function resolve(string $uuid): object
@@ -57,7 +59,7 @@ final class ConnectionContextResolver
      *
      * @return object{
      *     connection: TelegramConnectedUser,
-     *     user: object
+     *     user: UserData
      * }
      */
     public function resolveUser(string $uuid): object
@@ -92,8 +94,8 @@ final class ConnectionContextResolver
      *
      * @return object{
      *     connection: TelegramConnectedUser,
-     *     user: object,
-     *     link: object
+     *     user: UserData,
+     *     link: UserLinkData
      * }
      */
     public function resolveBot(string $uuid): object
@@ -151,19 +153,13 @@ final class ConnectionContextResolver
     /**
      * Найти доступную привязку пользователя к боту.
      */
-    private function findBotLink(object $user, string $botName, bool $activeOnly): ?object
+    private function findBotLink(UserData $user, string $botName, bool $activeOnly): ?UserLinkData
     {
-        if (! is_array($user->links ?? null)) {
-            return null;
-        }
-
         $fallback = null;
 
         foreach ($user->links as $link) {
             if (
-                is_object($link)
-                && $this->linkMatchesBot(link: $link, botName: $botName)
-                && is_string($link->bot_id ?? null)
+                $this->linkMatchesBot(link: $link, botName: $botName)
                 && $link->bot_id !== ''
             ) {
                 if (($link->status ?? null) === 'active') {
@@ -199,9 +195,9 @@ final class ConnectionContextResolver
     /**
      * Проверить принадлежность привязки выбранному Telegram-боту.
      */
-    private function linkMatchesBot(object $link, string $botName): bool
+    private function linkMatchesBot(UserLinkData $link, string $botName): bool
     {
-        return is_string($link->bot_username ?? null)
+        return $link->bot_username !== null
             && $link->bot_username === $botName;
     }
 }

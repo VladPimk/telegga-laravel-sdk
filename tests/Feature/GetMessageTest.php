@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Telegga\Laravel\Contracts\TeleggaInterface;
+use Telegga\Laravel\Dto\DeliveryAttemptData;
+use Telegga\Laravel\Dto\MessageData;
 use Telegga\Laravel\Exceptions\MessageException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 
@@ -37,16 +39,18 @@ it('получает статус сообщения без потери нов�
     );
 
     expect($message)
-        ->toBeInstanceOf(stdClass::class)
+        ->toBeInstanceOf(MessageData::class)
         ->and($message->message_id)
         ->toBe($messageId)
         ->and($message->status)
         ->toBe('sent')
         ->and($message->delivery_attempts)
         ->toHaveCount(1)
+        ->and($message->delivery_attempts->first())
+        ->toBeInstanceOf(DeliveryAttemptData::class)
         ->and($message->delivery_attempts[0]->ok)
         ->toBeTrue()
-        ->and($message->new_api_field)
+        ->and($message->raw()->new_api_field)
         ->toBe('new-value');
 
     Http::assertSent(function (Request $request) use ($messageId): bool {

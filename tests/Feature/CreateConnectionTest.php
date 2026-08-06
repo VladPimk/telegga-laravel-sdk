@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Telegga\Laravel\Contracts\TeleggaInterface;
+use Telegga\Laravel\Dto\ConnectionData;
 use Telegga\Laravel\Exceptions\BotException;
 use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
@@ -90,7 +91,7 @@ it('создаёт независимое подключение через вы
     $connection = TelegramConnectedUser::query()->sole();
 
     expect($result)
-        ->toBeInstanceOf(stdClass::class)
+        ->toBeInstanceOf(ConnectionData::class)
         ->and($result->external_id)
         ->toBe($connection->uuid)
         ->and($result->link_url)
@@ -162,24 +163,33 @@ it('сохраняет необязательный идентификатор �
 });
 
 it('повторяет создание пользователя после временной ошибки api', function (): void {
+    $userRequestAttempt = 0;
+
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
             'data' => [['bot_id' => 'bot-1', 'username' => 'mybot', 'status' => 'active']],
         ]),
-        'api.telegga.net/api/v1/users' => Http::sequence()
-            ->push([
-                'error' => [
-                    'code' => 'internal',
-                    'message' => 'Temporary error.',
-                ],
-            ], 503)
-            ->push([
+        'api.telegga.net/api/v1/users' => function (Request $request) use (&$userRequestAttempt) {
+            $userRequestAttempt++;
+
+            if ($userRequestAttempt === 1) {
+                return Http::response([
+                    'error' => [
+                        'code' => 'internal',
+                        'message' => 'Temporary error.',
+                    ],
+                ], 503);
+            }
+
+            return Http::response([
                 'user_id' => 'telegga-user-1',
+                'external_id' => $request->data()['external_id'],
                 'link_status' => 'pending',
                 'link_code' => '6U828WSH',
                 'link_url' => 'https://t.me/mybot?start=6U828WSH',
-            ], 201),
+            ], 201);
+        },
     ]);
 
     $result = app(TeleggaInterface::class)->createConnection(

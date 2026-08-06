@@ -7,6 +7,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Telegga\Laravel\Contracts\TeleggaInterface;
+use Telegga\Laravel\Dto\QueuedMessageData;
 use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\MessageException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
@@ -74,12 +75,12 @@ it('передаёт тип и данные сообщения в единый �
     );
 
     expect($result)
-        ->toBeInstanceOf(stdClass::class)
+        ->toBeInstanceOf(QueuedMessageData::class)
         ->and($result->message_id)
         ->toBe('message-1')
         ->and($result->status)
         ->toBe('queued')
-        ->and($result->new_api_field)
+        ->and($result->raw()->new_api_field)
         ->toBe('new-value');
 
     Http::assertSent(function (Request $request) use ($connection, $data, $type): bool {

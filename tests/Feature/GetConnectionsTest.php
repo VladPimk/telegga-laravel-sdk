@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Telegga\Laravel\Contracts\TeleggaInterface;
+use Telegga\Laravel\Dto\UserData;
+use Telegga\Laravel\Dto\UserPageData;
 use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Models\AvailableTelegramBot;
@@ -45,12 +47,13 @@ it('получает страницу подключений по email стат
     );
 
     expect($page)
-        ->toBeInstanceOf(stdClass::class)
+        ->toBeInstanceOf(UserPageData::class)
         ->and($page->data)
         ->toBeInstanceOf(Collection::class)
         ->and($page->data)
         ->toHaveCount(1)
-        ->and($page->data->first()->new_api_field)
+        ->and($page->data->first())->toBeInstanceOf(UserData::class)
+        ->and($page->data->first()->raw()->new_api_field)
         ->toBe('new-value')
         ->and($page->next_cursor)
         ->toBe('next-cursor');

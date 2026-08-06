@@ -8,6 +8,8 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Telegga\Laravel\Dto\UserData;
+use Telegga\Laravel\Dto\UserLinkData;
 use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Models\AvailableTelegramBot;
@@ -79,16 +81,16 @@ it('разрешает контекст подключения через акт
         ->and($context->connection->is($connection))
         ->toBeTrue()
         ->and($context->user)
-        ->toBeInstanceOf(stdClass::class)
+        ->toBeInstanceOf(UserData::class)
         ->and($context->user->user_id)
         ->toBe('telegga-user-1')
-        ->and($context->user->new_user_field)
+        ->and($context->user->raw()->new_user_field)
         ->toBe('new-value')
         ->and($context->link)
-        ->toBeInstanceOf(stdClass::class)
+        ->toBeInstanceOf(UserLinkData::class)
         ->and($context->link->bot_id)
         ->toBe('bot-active')
-        ->and($context->link->new_api_field)
+        ->and($context->link->raw()->new_api_field)
         ->toBe('new-value')
         ->and($connection->getAttributes())
         ->not->toHaveKeys(['bot_id', 'telegga_user_id']);
@@ -129,6 +131,8 @@ it('разрешает пользователя Telegga без активной 
         ->toBeInstanceOf(stdClass::class)
         ->and($context->connection->is($connection))
         ->toBeTrue()
+        ->and($context->user)
+        ->toBeInstanceOf(UserData::class)
         ->and($context->user->user_id)
         ->toBe('telegga-user-1')
         ->and($context)

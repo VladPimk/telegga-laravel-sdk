@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Telegga\Laravel\Contracts\TeleggaInterface;
+use Telegga\Laravel\Dto\UserData;
 use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Models\AvailableTelegramBot;
@@ -65,10 +66,10 @@ it('получает пользователя Telegga по uuid локально
     );
 
     expect($user)
-        ->toBeInstanceOf(stdClass::class)
+        ->toBeInstanceOf(UserData::class)
         ->and($user->user_id)
         ->toBe('telegga-user-1')
-        ->and($user->new_api_field)
+        ->and($user->raw()->new_api_field)
         ->toBe('new-value');
 
     Http::assertSent(function (Request $request): bool {
@@ -115,7 +116,7 @@ it('обновляет пользователя Telegga и локальные и
 
     $connection->refresh();
 
-    expect($user->new_api_field)
+    expect($user->raw()->new_api_field)
         ->toBe('new-value')
         ->and($connection->name)
         ->toBe('Иван Петров')
@@ -221,13 +222,25 @@ it('отклоняет невалидный тип email в ответе Telegga
         ]),
     ]);
 
-    expect(fn (): object => app(TeleggaInterface::class)->updateConnection(
-        uuid: $connection->uuid,
-        data: ['email' => 'new@example.com'],
-    ))->toThrow(
-        TeleggaApiException::class,
-        'Telegga returned an invalid user email.',
-    );
+    try {
+        app(TeleggaInterface::class)->updateConnection(
+            uuid: $connection->uuid,
+            data: ['email' => 'new@example.com'],
+        );
+    } catch (ConnectionException $exception) {
+        expect($exception->getMessage())
+            ->toBe('Telegga returned an invalid user update response: optional string field "email" is invalid.')
+            ->and($exception->connectionUuid)
+            ->toBe($connection->uuid)
+            ->and($exception->getPrevious())
+            ->toBeInstanceOf(TeleggaApiException::class)
+            ->and($exception->getPrevious()?->apiCode)
+            ->toBe('invalid_response');
+
+        return;
+    }
+
+    test()->fail('Expected ConnectionException.');
 });
 
 it('не отправляет пустое обновление подключения', function (): void {
@@ -272,11 +285,13 @@ it('останавливает операцию при отсутствии user
         );
     } catch (ConnectionException $exception) {
         expect($exception->getMessage())
-            ->toBe('Telegga user response does not contain user_id.')
+            ->toBe('Telegga returned an invalid user lookup response: required string field "user_id" is missing or invalid.')
             ->and($exception->connectionUuid)
             ->toBe($connection->uuid)
             ->and($exception->getPrevious())
-            ->toBeNull();
+            ->toBeInstanceOf(TeleggaApiException::class)
+            ->and($exception->getPrevious()?->apiCode)
+            ->toBe('invalid_response');
 
         Http::assertSentCount(1);
 

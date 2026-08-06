@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace Telegga\Laravel\Services;
 
+use Telegga\Laravel\Dto\BroadcastCancellationData;
+use Telegga\Laravel\Dto\BroadcastCreatedData;
+use Telegga\Laravel\Dto\BroadcastData;
 use Telegga\Laravel\Exceptions\BroadcastException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Http\TeleggaClient;
+use Telegga\Laravel\Mappers\BroadcastResponseMapper;
 use Telegga\Laravel\Resolvers\ConnectionContextResolver;
 
 final class BroadcastService
@@ -17,6 +21,7 @@ final class BroadcastService
     public function __construct(
         private readonly TeleggaClient $client,
         private readonly ConnectionContextResolver $contexts,
+        private readonly BroadcastResponseMapper $mapper,
     ) {}
 
     /**
@@ -29,7 +34,7 @@ final class BroadcastService
         string $type,
         array $data = [],
         ?string $groupId = null,
-    ): object {
+    ): BroadcastCreatedData {
         if (trim($uuid) === '') {
             throw new BroadcastException(
                 message: 'Connection UUID cannot be empty.',
@@ -68,7 +73,7 @@ final class BroadcastService
         $data['type'] = trim($type);
 
         try {
-            return $this->ensureObject(
+            return $this->mapper->fromStart(
                 response: $this->client->post(
                     uri: 'broadcasts',
                     data: $data,
@@ -86,12 +91,12 @@ final class BroadcastService
     /**
      * Получить прогресс рассылки.
      */
-    public function get(string $broadcastId): object
+    public function get(string $broadcastId): BroadcastData
     {
         $this->validateBroadcastId(broadcastId: $broadcastId);
 
         try {
-            return $this->ensureObject(
+            return $this->mapper->fromGet(
                 response: $this->client->get(
                     uri: 'broadcasts/'.rawurlencode($broadcastId),
                 )->object(),
@@ -108,12 +113,12 @@ final class BroadcastService
     /**
      * Отменить рассылку.
      */
-    public function cancel(string $broadcastId): object
+    public function cancel(string $broadcastId): BroadcastCancellationData
     {
         $this->validateBroadcastId(broadcastId: $broadcastId);
 
         try {
-            return $this->ensureObject(
+            return $this->mapper->fromCancel(
                 response: $this->client->post(
                     uri: 'broadcasts/'.rawurlencode($broadcastId).'/cancel',
                 )->object(),
@@ -138,21 +143,5 @@ final class BroadcastService
                 broadcastId: $broadcastId,
             );
         }
-    }
-
-    /**
-     * Проверить объект ответа рассылки.
-     */
-    private function ensureObject(mixed $response): object
-    {
-        if (! is_object($response)) {
-            throw new TeleggaApiException(
-                message: 'Telegga returned an invalid broadcast response.',
-                status: 0,
-                apiCode: 'invalid_response',
-            );
-        }
-
-        return $response;
     }
 }

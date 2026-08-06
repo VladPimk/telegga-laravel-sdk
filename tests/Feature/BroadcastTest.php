@@ -7,6 +7,9 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Telegga\Laravel\Contracts\TeleggaInterface;
+use Telegga\Laravel\Dto\BroadcastCancellationData;
+use Telegga\Laravel\Dto\BroadcastCreatedData;
+use Telegga\Laravel\Dto\BroadcastData;
 use Telegga\Laravel\Exceptions\BroadcastException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Models\AvailableTelegramBot;
@@ -77,12 +80,12 @@ it('запускает рассылку всем пользователям бо
     );
 
     expect($broadcast)
-        ->toBeInstanceOf(stdClass::class)
+        ->toBeInstanceOf(BroadcastCreatedData::class)
         ->and($broadcast->broadcast_id)
         ->toBe('broadcast-1')
         ->and($broadcast->status)
         ->toBe('pending')
-        ->and($broadcast->new_api_field)
+        ->and($broadcast->raw()->new_api_field)
         ->toBe('new-value');
 
     Http::assertSent(function (Request $request): bool {
@@ -165,13 +168,15 @@ it('получает прогресс рассылки без потери но�
         broadcastId: 'broadcast-1',
     );
 
-    expect($broadcast->status)
+    expect($broadcast)
+        ->toBeInstanceOf(BroadcastData::class)
+        ->and($broadcast->status)
         ->toBe('in_progress')
         ->and($broadcast->total)
         ->toBe(2003)
         ->and($broadcast->sent)
         ->toBe(1200)
-        ->and($broadcast->new_api_field)
+        ->and($broadcast->raw()->new_api_field)
         ->toBe('new-value');
 
     Http::assertSent(function (Request $request): bool {
@@ -194,11 +199,13 @@ it('отменяет рассылку и возвращает результат
         broadcastId: 'broadcast-1',
     );
 
-    expect($result->status)
+    expect($result)
+        ->toBeInstanceOf(BroadcastCancellationData::class)
+        ->and($result->status)
         ->toBe('cancelled')
         ->and($result->cancelled_messages)
         ->toBe(803)
-        ->and($result->new_api_field)
+        ->and($result->raw()->new_api_field)
         ->toBe('new-value');
 
     Http::assertSent(function (Request $request): bool {

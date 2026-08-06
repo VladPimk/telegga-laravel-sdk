@@ -7,9 +7,11 @@ namespace Telegga\Laravel\Services;
 use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
+use Telegga\Laravel\Dto\BotData;
 use Telegga\Laravel\Exceptions\BotException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Http\TeleggaClient;
+use Telegga\Laravel\Mappers\BotResponseMapper;
 use Telegga\Laravel\Models\AvailableTelegramBot;
 use Throwable;
 
@@ -25,6 +27,7 @@ final class BotService
     public function __construct(
         private readonly TeleggaClient $client,
         private readonly Repository $cache,
+        private readonly BotResponseMapper $mapper,
     ) {
         $scope = implode('|', [
             (string) config(key: 'telegga.base_url'),
@@ -37,7 +40,7 @@ final class BotService
     /**
      * Получить список доступных ботов.
      *
-     * @return Collection<int, object>
+     * @return Collection<int, BotData>
      */
     public function getAll(): Collection
     {
@@ -51,31 +54,13 @@ final class BotService
     /**
      * Получить актуальный список доступных ботов из API.
      *
-     * @return Collection<int, object>
+     * @return Collection<int, BotData>
      */
     private function fetchAll(): Collection
     {
-        $response = $this->client->get(uri: 'bots')->object();
-
-        if (! is_object($response) || ! is_array($response->data ?? null)) {
-            throw new TeleggaApiException(
-                message: 'Telegga returned an invalid bot list response.',
-                status: 0,
-                apiCode: 'invalid_response',
-            );
-        }
-
-        foreach ($response->data as $bot) {
-            if (! is_object($bot)) {
-                throw new TeleggaApiException(
-                    message: 'Telegga returned an invalid bot list response.',
-                    status: 0,
-                    apiCode: 'invalid_response',
-                );
-            }
-        }
-
-        return collect($response->data)->values();
+        return $this->mapper->fromList(
+            response: $this->client->get(uri: 'bots')->object(),
+        );
     }
 
     /**
@@ -87,8 +72,7 @@ final class BotService
 
         try {
             $exists = $this->getAll()->contains(
-                fn (object $bot): bool => is_string($bot->username ?? null)
-                    && str()->lower($bot->username) === $botName,
+                fn (BotData $bot): bool => str()->lower($bot->username) === $botName,
             );
         } catch (TeleggaApiException $exception) {
             throw new BotException(
@@ -174,15 +158,14 @@ final class BotService
     /**
      * Найти Telegram-бота в API по имени и статусу.
      */
-    public function find(string $botName, ?string $status = null): object
+    public function find(string $botName, ?string $status = null): BotData
     {
         $botName = str()->lower($botName);
 
         try {
             $bot = $this->getAll()->first(
-                fn (object $bot): bool => is_string($bot->username ?? null)
-                    && str()->lower($bot->username) === $botName
-                    && ($status === null || ($bot->status ?? null) === $status),
+                fn (BotData $bot): bool => str()->lower($bot->username) === $botName
+                    && ($status === null || $bot->status === $status),
             );
         } catch (TeleggaApiException $exception) {
             throw new BotException(
@@ -192,7 +175,7 @@ final class BotService
             );
         }
 
-        if (! is_object($bot) || ! is_string($bot->bot_id ?? null) || trim($bot->bot_id) === '') {
+        if (! $bot instanceof BotData) {
             throw new BotException(
                 message: $status === 'active'
                     ? 'Active Telegram bot is not available in Telegga.'

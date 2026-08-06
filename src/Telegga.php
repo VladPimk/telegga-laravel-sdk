@@ -7,6 +7,21 @@ namespace Telegga\Laravel;
 use DateTimeInterface;
 use Illuminate\Support\Collection;
 use Telegga\Laravel\Contracts\TeleggaInterface;
+use Telegga\Laravel\Dto\BotData;
+use Telegga\Laravel\Dto\BroadcastCancellationData;
+use Telegga\Laravel\Dto\BroadcastCreatedData;
+use Telegga\Laravel\Dto\BroadcastData;
+use Telegga\Laravel\Dto\ConnectionData;
+use Telegga\Laravel\Dto\GroupData;
+use Telegga\Laravel\Dto\GroupMembersAddedData;
+use Telegga\Laravel\Dto\GroupPageData;
+use Telegga\Laravel\Dto\MediaData;
+use Telegga\Laravel\Dto\MessageData;
+use Telegga\Laravel\Dto\MessagePageData;
+use Telegga\Laravel\Dto\QueuedMessageData;
+use Telegga\Laravel\Dto\UserData;
+use Telegga\Laravel\Dto\UserGroupMembershipData;
+use Telegga\Laravel\Dto\UserPageData;
 use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Services\BotService;
 use Telegga\Laravel\Services\BroadcastService;
@@ -41,7 +56,7 @@ final class Telegga implements TeleggaInterface
         ?int $userId = null,
         array $meta = [],
         ?string $groupId = null,
-    ): object {
+    ): ConnectionData {
         return $this->connections->create(
             name: $name,
             telegramBotUuid: $telegramBotUuid,
@@ -61,7 +76,7 @@ final class Telegga implements TeleggaInterface
         string $uuid,
         array $meta = [],
         ?string $groupId = null,
-    ): object {
+    ): ConnectionData {
         return $this->connections->retry(
             uuid: $uuid,
             meta: $meta,
@@ -72,7 +87,7 @@ final class Telegga implements TeleggaInterface
     /**
      * Получить подключённого пользователя.
      */
-    public function getConnection(string $uuid): object
+    public function getConnection(string $uuid): UserData
     {
         return $this->connections->get(uuid: $uuid);
     }
@@ -85,7 +100,7 @@ final class Telegga implements TeleggaInterface
         ?string $telegramBotUuid = null,
         ?string $status = null,
         ?string $cursor = null,
-    ): object {
+    ): UserPageData {
         return $this->connections->getAll(
             email: $email,
             telegramBotUuid: $telegramBotUuid,
@@ -99,7 +114,7 @@ final class Telegga implements TeleggaInterface
      *
      * @param  array<string, mixed>  $data
      */
-    public function updateConnection(string $uuid, array $data): object
+    public function updateConnection(string $uuid, array $data): UserData
     {
         return $this->connections->update(
             uuid: $uuid,
@@ -118,7 +133,7 @@ final class Telegga implements TeleggaInterface
     /**
      * Выпустить новый код подключения.
      */
-    public function regenerateConnectionCode(string $uuid): object
+    public function regenerateConnectionCode(string $uuid): ConnectionData
     {
         return $this->connections->regenerateCode(uuid: $uuid);
     }
@@ -138,7 +153,7 @@ final class Telegga implements TeleggaInterface
         string $uuid,
         string $name,
         ?string $description = null,
-    ): object {
+    ): GroupData {
         return $this->groups->create(
             uuid: $uuid,
             name: $name,
@@ -148,18 +163,19 @@ final class Telegga implements TeleggaInterface
 
     /**
      * Получить группы бота подключения.
-     *
-     * @return Collection<int, object>
      */
-    public function getGroups(string $uuid): Collection
+    public function getGroups(string $uuid, ?string $cursor = null): GroupPageData
     {
-        return $this->groups->getAll(uuid: $uuid);
+        return $this->groups->getAll(
+            uuid: $uuid,
+            cursor: $cursor,
+        );
     }
 
     /**
      * Получить группу.
      */
-    public function getGroup(string $groupId): object
+    public function getGroup(string $groupId): GroupData
     {
         return $this->groups->get(groupId: $groupId);
     }
@@ -169,7 +185,7 @@ final class Telegga implements TeleggaInterface
      *
      * @param  array<string, mixed>  $data
      */
-    public function updateGroup(string $groupId, array $data): object
+    public function updateGroup(string $groupId, array $data): GroupData
     {
         return $this->groups->update(
             groupId: $groupId,
@@ -188,7 +204,7 @@ final class Telegga implements TeleggaInterface
     /**
      * Добавить подключение в группу через маршрут пользователя.
      */
-    public function addConnectionToGroup(string $uuid, string $groupId): object
+    public function addConnectionToGroup(string $uuid, string $groupId): UserGroupMembershipData
     {
         return $this->groups->addConnection(
             uuid: $uuid,
@@ -212,7 +228,7 @@ final class Telegga implements TeleggaInterface
      *
      * @param  array<int, string>  $uuids
      */
-    public function addGroupMembers(string $groupId, array $uuids): object
+    public function addGroupMembers(string $groupId, array $uuids): GroupMembersAddedData
     {
         return $this->groups->addMembers(
             groupId: $groupId,
@@ -241,7 +257,7 @@ final class Telegga implements TeleggaInterface
         string $type,
         array $data = [],
         ?string $groupId = null,
-    ): object {
+    ): BroadcastCreatedData {
         return $this->broadcasts->start(
             uuid: $uuid,
             type: $type,
@@ -253,7 +269,7 @@ final class Telegga implements TeleggaInterface
     /**
      * Получить прогресс рассылки.
      */
-    public function getBroadcast(string $broadcastId): object
+    public function getBroadcast(string $broadcastId): BroadcastData
     {
         return $this->broadcasts->get(broadcastId: $broadcastId);
     }
@@ -261,7 +277,7 @@ final class Telegga implements TeleggaInterface
     /**
      * Отменить рассылку.
      */
-    public function cancelBroadcast(string $broadcastId): object
+    public function cancelBroadcast(string $broadcastId): BroadcastCancellationData
     {
         return $this->broadcasts->cancel(broadcastId: $broadcastId);
     }
@@ -275,7 +291,7 @@ final class Telegga implements TeleggaInterface
         string $uuid,
         string $type,
         array $data = [],
-    ): object {
+    ): QueuedMessageData {
         return $this->messages->send(
             uuid: $uuid,
             type: $type,
@@ -286,7 +302,7 @@ final class Telegga implements TeleggaInterface
     /**
      * Получить сообщение по идентификатору.
      */
-    public function getMessage(string $messageId): object
+    public function getMessage(string $messageId): MessageData
     {
         return $this->messages->get(messageId: $messageId);
     }
@@ -300,7 +316,7 @@ final class Telegga implements TeleggaInterface
         DateTimeInterface $to,
         ?string $status = null,
         ?string $cursor = null,
-    ): object {
+    ): MessagePageData {
         return $this->messages->getHistory(
             uuid: $uuid,
             status: $status,
@@ -313,7 +329,7 @@ final class Telegga implements TeleggaInterface
     /**
      * Загрузить медиафайл.
      */
-    public function uploadMedia(string $contents, string $filename): object
+    public function uploadMedia(string $contents, string $filename): MediaData
     {
         return $this->media->upload(
             contents: $contents,
@@ -324,7 +340,7 @@ final class Telegga implements TeleggaInterface
     /**
      * Получить метаданные медиафайла.
      */
-    public function getMedia(string $mediaId): object
+    public function getMedia(string $mediaId): MediaData
     {
         return $this->media->get(mediaId: $mediaId);
     }
@@ -332,7 +348,7 @@ final class Telegga implements TeleggaInterface
     /**
      * Получить список доступных ботов.
      *
-     * @return Collection<int, object>
+     * @return Collection<int, BotData>
      */
     public function getBots(): Collection
     {

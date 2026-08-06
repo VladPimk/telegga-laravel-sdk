@@ -6,6 +6,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Telegga\Laravel\Contracts\TeleggaInterface;
+use Telegga\Laravel\Dto\BotData;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 
 it('получает доступных ботов через публичный интерфейс', function () {
@@ -29,12 +30,12 @@ it('получает доступных ботов через публичный
     expect($bots)
         ->toBeInstanceOf(Collection::class)
         ->and($bots)->toHaveCount(1)
-        ->and($bots->first())->toBeInstanceOf(stdClass::class)
+        ->and($bots->first())->toBeInstanceOf(BotData::class)
         ->and($bots->first()->bot_id)->toBe('bot-1')
         ->and($bots->first()->username)->toBe('mybot')
         ->and($bots->first()->display_name)->toBe('Уведомления')
         ->and($bots->first()->status)->toBe('active')
-        ->and($bots->first()->new_api_field)->toBe('new-value');
+        ->and($bots->first()->raw()->new_api_field)->toBe('new-value');
 
     Http::assertSent(function (Request $request): bool {
         return $request->method() === 'GET'

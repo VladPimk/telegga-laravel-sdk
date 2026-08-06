@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace Telegga\Laravel\Services;
 
 use DateTimeInterface;
-use Illuminate\Support\Collection;
+use Telegga\Laravel\Dto\MessageData;
+use Telegga\Laravel\Dto\MessagePageData;
+use Telegga\Laravel\Dto\QueuedMessageData;
 use Telegga\Laravel\Exceptions\MessageException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Http\TeleggaClient;
+use Telegga\Laravel\Mappers\MessageResponseMapper;
 use Telegga\Laravel\Resolvers\ConnectionContextResolver;
 
 final class MessageService
@@ -19,6 +22,7 @@ final class MessageService
     public function __construct(
         private readonly TeleggaClient $client,
         private readonly ConnectionContextResolver $connections,
+        private readonly MessageResponseMapper $mapper,
     ) {}
 
     /**
@@ -30,7 +34,7 @@ final class MessageService
         string $uuid,
         string $type,
         array $data = [],
-    ): object {
+    ): QueuedMessageData {
         if (trim($uuid) === '') {
             throw new MessageException(
                 message: 'Connection UUID cannot be empty.',
@@ -58,7 +62,7 @@ final class MessageService
         $data['type'] = trim($type);
 
         try {
-            $response = $this->ensureObject(
+            $response = $this->mapper->fromSend(
                 response: $this->client->post(
                     uri: 'messages',
                     data: $data,
@@ -78,7 +82,7 @@ final class MessageService
     /**
      * Получить сообщение по идентификатору.
      */
-    public function get(string $messageId): object
+    public function get(string $messageId): MessageData
     {
         if (trim($messageId) === '') {
             throw new MessageException(
@@ -88,7 +92,7 @@ final class MessageService
         }
 
         try {
-            return $this->ensureObject(
+            return $this->mapper->fromGet(
                 response: $this->client->get(
                     uri: 'messages/'.rawurlencode($messageId),
                 )->object(),
@@ -111,7 +115,7 @@ final class MessageService
         DateTimeInterface $to,
         ?string $status = null,
         ?string $cursor = null,
-    ): object {
+    ): MessagePageData {
         if (trim($uuid) === '') {
             throw new MessageException(
                 message: 'Connection UUID cannot be empty.',
@@ -127,14 +131,7 @@ final class MessageService
         }
 
         $context = $this->connections->resolveUser(uuid: $uuid);
-        $userId = $context->user->user_id ?? null;
-
-        if (! is_string($userId) || trim($userId) === '') {
-            throw new MessageException(
-                message: 'Telegga user response does not contain user_id.',
-                connectionUuid: $uuid,
-            );
-        }
+        $userId = $context->user->user_id;
 
         $query = [
             'user_id' => $userId,
@@ -151,7 +148,7 @@ final class MessageService
         }
 
         try {
-            return $this->ensurePage(
+            return $this->mapper->fromList(
                 response: $this->client->get(
                     uri: 'messages',
                     query: $query,
@@ -164,68 +161,5 @@ final class MessageService
                 previous: $exception,
             );
         }
-    }
-
-    /**
-     * Проверить объект ответа сообщения.
-     */
-    private function ensureObject(mixed $response): object
-    {
-        if (! is_object($response)) {
-            throw new TeleggaApiException(
-                message: 'Telegga returned an invalid message response.',
-                status: 0,
-                apiCode: 'invalid_response',
-            );
-        }
-
-        return $response;
-    }
-
-    /**
-     * Проверить страницу истории сообщений.
-     *
-     * @return object{
-     *     data: Collection<int, object>,
-     *     next_cursor: string|null
-     * }
-     */
-    private function ensurePage(mixed $response): object
-    {
-        $response = $this->ensureObject(response: $response);
-        $data = $response->data ?? null;
-
-        if (! is_array($data)) {
-            throw new TeleggaApiException(
-                message: 'Telegga returned an invalid message history response.',
-                status: 0,
-                apiCode: 'invalid_response',
-            );
-        }
-
-        foreach ($data as $message) {
-            if (! is_object($message)) {
-                throw new TeleggaApiException(
-                    message: 'Telegga returned an invalid message history response.',
-                    status: 0,
-                    apiCode: 'invalid_response',
-                );
-            }
-        }
-
-        $nextCursor = $response->next_cursor ?? null;
-
-        if ($nextCursor !== null && ! is_string($nextCursor)) {
-            throw new TeleggaApiException(
-                message: 'Telegga returned an invalid message history response.',
-                status: 0,
-                apiCode: 'invalid_response',
-            );
-        }
-
-        $response->data = collect($data)->values();
-        $response->next_cursor = $nextCursor;
-
-        return $response;
     }
 }

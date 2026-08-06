@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Telegga\Laravel\Services;
 
+use Telegga\Laravel\Dto\MediaData;
 use Telegga\Laravel\Exceptions\MediaException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Http\TeleggaClient;
+use Telegga\Laravel\Mappers\MediaResponseMapper;
 
 final class MediaService
 {
@@ -17,12 +19,13 @@ final class MediaService
      */
     public function __construct(
         private readonly TeleggaClient $client,
+        private readonly MediaResponseMapper $mapper,
     ) {}
 
     /**
      * Загрузить медиафайл.
      */
-    public function upload(string $contents, string $filename): object
+    public function upload(string $contents, string $filename): MediaData
     {
         if ($contents === '') {
             throw new MediaException(
@@ -46,7 +49,7 @@ final class MediaService
         }
 
         try {
-            return $this->ensureObject(
+            return $this->mapper->fromUpload(
                 response: $this->client->upload(
                     uri: 'media',
                     contents: $contents,
@@ -65,7 +68,7 @@ final class MediaService
     /**
      * Получить метаданные медиафайла.
      */
-    public function get(string $mediaId): object
+    public function get(string $mediaId): MediaData
     {
         if (trim($mediaId) === '') {
             throw new MediaException(
@@ -75,7 +78,7 @@ final class MediaService
         }
 
         try {
-            return $this->ensureObject(
+            return $this->mapper->fromGet(
                 response: $this->client->get(
                     uri: 'media/'.rawurlencode($mediaId),
                 )->object(),
@@ -87,21 +90,5 @@ final class MediaService
                 previous: $exception,
             );
         }
-    }
-
-    /**
-     * Проверить объект ответа медиафайла.
-     */
-    private function ensureObject(mixed $response): object
-    {
-        if (! is_object($response)) {
-            throw new TeleggaApiException(
-                message: 'Telegga returned an invalid media response.',
-                status: 0,
-                apiCode: 'invalid_response',
-            );
-        }
-
-        return $response;
     }
 }

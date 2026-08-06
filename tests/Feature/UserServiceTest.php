@@ -5,6 +5,9 @@ declare(strict_types=1);
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
+use Telegga\Laravel\Dto\ConnectionData;
+use Telegga\Laravel\Dto\UserData;
+use Telegga\Laravel\Dto\UserPageData;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Services\UserService;
 
@@ -29,12 +32,12 @@ it('создаёт пользователя Telegga без потери новы
     );
 
     expect($user)
-        ->toBeInstanceOf(stdClass::class)
+        ->toBeInstanceOf(ConnectionData::class)
         ->and($user->user_id)
         ->toBe('telegga-user-1')
         ->and($user->external_id)
         ->toBe('connection-uuid')
-        ->and($user->new_api_field)
+        ->and($user->raw()->new_api_field)
         ->toBe('new-value');
 
     Http::assertSent(function (Request $request): bool {
@@ -68,12 +71,12 @@ it('получает пользователя Telegga по external_id без п
     );
 
     expect($user)
-        ->toBeInstanceOf(stdClass::class)
+        ->toBeInstanceOf(UserData::class)
         ->and($user->user_id)
         ->toBe('telegga-user-1')
         ->and($user->external_id)
         ->toBe('connection-uuid')
-        ->and($user->new_api_field)
+        ->and($user->raw()->new_api_field)
         ->toBe('new-value');
 
     Http::assertSent(function (Request $request): bool {
@@ -101,7 +104,9 @@ it('получает страницу пользователей Telegga по em
         query: ['email' => 'ivan@example.com'],
     );
 
-    expect($page->data)
+    expect($page)
+        ->toBeInstanceOf(UserPageData::class)
+        ->and($page->data)
         ->toBeInstanceOf(Collection::class)
         ->and($page->data)
         ->toHaveCount(1)

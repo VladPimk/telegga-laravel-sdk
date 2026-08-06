@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace Telegga\Laravel\Services;
 
-use Illuminate\Support\Collection;
+use Telegga\Laravel\Dto\GroupData;
+use Telegga\Laravel\Dto\GroupMembersAddedData;
+use Telegga\Laravel\Dto\GroupPageData;
+use Telegga\Laravel\Dto\UserGroupMembershipData;
 use Telegga\Laravel\Exceptions\GroupException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Http\TeleggaClient;
+use Telegga\Laravel\Mappers\GroupResponseMapper;
 use Telegga\Laravel\Resolvers\ConnectionContextResolver;
 
 final class GroupService
@@ -19,6 +23,7 @@ final class GroupService
         private readonly TeleggaClient $client,
         private readonly ConnectionContextResolver $contexts,
         private readonly UserService $users,
+        private readonly GroupResponseMapper $mapper,
     ) {}
 
     /**
@@ -28,7 +33,7 @@ final class GroupService
         string $uuid,
         string $name,
         ?string $description = null,
-    ): object {
+    ): GroupData {
         if (trim($name) === '') {
             throw new GroupException(
                 message: 'Group name cannot be empty.',
@@ -47,7 +52,7 @@ final class GroupService
         }
 
         try {
-            return $this->ensureObject(
+            return $this->mapper->fromCreate(
                 response: $this->client->post(
                     uri: 'groups',
                     data: $data,
@@ -64,18 +69,21 @@ final class GroupService
 
     /**
      * Получить группы бота подключения.
-     *
-     * @return Collection<int, object>
      */
-    public function getAll(string $uuid): Collection
+    public function getAll(string $uuid, ?string $cursor = null): GroupPageData
     {
         $context = $this->contexts->resolveBot(uuid: $uuid);
+        $query = ['bot_id' => $context->link->bot_id];
+
+        if ($cursor !== null && trim($cursor) !== '') {
+            $query['cursor'] = trim($cursor);
+        }
 
         try {
-            return $this->ensureCollection(
+            return $this->mapper->fromList(
                 response: $this->client->get(
                     uri: 'groups',
-                    query: ['bot_id' => $context->link->bot_id],
+                    query: $query,
                 )->object(),
             );
         } catch (TeleggaApiException $exception) {
@@ -90,12 +98,12 @@ final class GroupService
     /**
      * Получить группу.
      */
-    public function get(string $groupId): object
+    public function get(string $groupId): GroupData
     {
         $this->validateGroupId(groupId: $groupId);
 
         try {
-            return $this->ensureObject(
+            return $this->mapper->fromGet(
                 response: $this->client->get(
                     uri: 'groups/'.rawurlencode($groupId),
                 )->object(),
@@ -114,7 +122,7 @@ final class GroupService
      *
      * @param  array<string, mixed>  $data
      */
-    public function update(string $groupId, array $data): object
+    public function update(string $groupId, array $data): GroupData
     {
         $this->validateGroupId(groupId: $groupId);
 
@@ -126,7 +134,7 @@ final class GroupService
         }
 
         try {
-            return $this->ensureObject(
+            return $this->mapper->fromUpdate(
                 response: $this->client->put(
                     uri: 'groups/'.rawurlencode($groupId),
                     data: $data,
@@ -170,15 +178,11 @@ final class GroupService
     /**
      * Добавить подключение в группу через маршрут пользователя.
      */
-    public function addConnection(string $uuid, string $groupId): object
+    public function addConnection(string $uuid, string $groupId): UserGroupMembershipData
     {
         $this->validateGroupId(groupId: $groupId);
         $context = $this->contexts->resolveUser(uuid: $uuid);
-        $userId = $this->getUserId(
-            user: $context->user,
-            uuid: $uuid,
-            groupId: $groupId,
-        );
+        $userId = $context->user->user_id;
 
         try {
             return $this->users->addToGroup(
@@ -202,11 +206,7 @@ final class GroupService
     {
         $this->validateGroupId(groupId: $groupId);
         $context = $this->contexts->resolveUser(uuid: $uuid);
-        $userId = $this->getUserId(
-            user: $context->user,
-            uuid: $uuid,
-            groupId: $groupId,
-        );
+        $userId = $context->user->user_id;
 
         try {
             $this->users->removeFromGroup(
@@ -228,7 +228,7 @@ final class GroupService
      *
      * @param  array<int, string>  $uuids
      */
-    public function addMembers(string $groupId, array $uuids): object
+    public function addMembers(string $groupId, array $uuids): GroupMembersAddedData
     {
         $this->validateGroupId(groupId: $groupId);
         $uuids = $this->normalizeUuids(uuids: $uuids, groupId: $groupId);
@@ -236,17 +236,13 @@ final class GroupService
 
         foreach ($uuids as $uuid) {
             $context = $this->contexts->resolveUser(uuid: $uuid);
-            $userIds[] = $this->getUserId(
-                user: $context->user,
-                uuid: $uuid,
-                groupId: $groupId,
-            );
+            $userIds[] = $context->user->user_id;
         }
 
         $userIds = array_values(array_unique($userIds));
 
         try {
-            return $this->ensureObject(
+            return $this->mapper->fromAddMembers(
                 response: $this->client->post(
                     uri: 'groups/'.rawurlencode($groupId).'/members',
                     data: ['user_ids' => $userIds],
@@ -269,11 +265,7 @@ final class GroupService
     {
         $this->validateGroupId(groupId: $groupId);
         $context = $this->contexts->resolveUser(uuid: $uuid);
-        $userId = $this->getUserId(
-            user: $context->user,
-            uuid: $uuid,
-            groupId: $groupId,
-        );
+        $userId = $context->user->user_id;
 
         try {
             $this->client->delete(
@@ -300,24 +292,6 @@ final class GroupService
                 groupId: $groupId,
             );
         }
-    }
-
-    /**
-     * Получить идентификатор пользователя Telegga.
-     */
-    private function getUserId(object $user, string $uuid, string $groupId): string
-    {
-        $userId = $user->user_id ?? null;
-
-        if (! is_string($userId) || trim($userId) === '') {
-            throw new GroupException(
-                message: 'Telegga user response does not contain user_id.',
-                groupId: $groupId,
-                connectionUuid: $uuid,
-            );
-        }
-
-        return $userId;
     }
 
     /**
@@ -359,49 +333,5 @@ final class GroupService
         }
 
         return $normalized;
-    }
-
-    /**
-     * Проверить объект ответа группы.
-     */
-    private function ensureObject(mixed $response): object
-    {
-        if (! is_object($response)) {
-            throw new TeleggaApiException(
-                message: 'Telegga returned an invalid group response.',
-                status: 0,
-                apiCode: 'invalid_response',
-            );
-        }
-
-        return $response;
-    }
-
-    /**
-     * Проверить список групп.
-     *
-     * @return Collection<int, object>
-     */
-    private function ensureCollection(mixed $response): Collection
-    {
-        if (! is_object($response) || ! is_array($response->data ?? null)) {
-            throw new TeleggaApiException(
-                message: 'Telegga returned an invalid group list response.',
-                status: 0,
-                apiCode: 'invalid_response',
-            );
-        }
-
-        foreach ($response->data as $group) {
-            if (! is_object($group)) {
-                throw new TeleggaApiException(
-                    message: 'Telegga returned an invalid group list response.',
-                    status: 0,
-                    apiCode: 'invalid_response',
-                );
-            }
-        }
-
-        return collect($response->data)->values();
     }
 }

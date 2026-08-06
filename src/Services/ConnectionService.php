@@ -6,6 +6,9 @@ namespace Telegga\Laravel\Services;
 
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Log;
+use Telegga\Laravel\Dto\ConnectionData;
+use Telegga\Laravel\Dto\UserData;
+use Telegga\Laravel\Dto\UserPageData;
 use Telegga\Laravel\Exceptions\BotException;
 use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
@@ -37,7 +40,7 @@ final class ConnectionService
         ?int $userId = null,
         array $meta = [],
         ?string $groupId = null,
-    ): object {
+    ): ConnectionData {
         if (trim($name) === '') {
             throw new ConnectionException(message: 'Connection name cannot be empty.');
         }
@@ -84,7 +87,7 @@ final class ConnectionService
         string $uuid,
         array $meta = [],
         ?string $groupId = null,
-    ): object {
+    ): ConnectionData {
         try {
             $connection = TelegramConnectedUser::query()
                 ->with('telegramBot')
@@ -137,10 +140,10 @@ final class ConnectionService
     /**
      * Получить подключённого пользователя Telegga.
      */
-    public function get(string $uuid): object
+    public function get(string $uuid): UserData
     {
         $context = $this->contexts->resolveUser(uuid: $uuid);
-        $userId = $this->getUserId(user: $context->user, uuid: $uuid);
+        $userId = $context->user->user_id;
 
         try {
             return $this->users->get(userId: $userId);
@@ -161,7 +164,7 @@ final class ConnectionService
         ?string $telegramBotUuid = null,
         ?string $status = null,
         ?string $cursor = null,
-    ): object {
+    ): UserPageData {
         $query = [];
 
         if ($email !== null) {
@@ -211,7 +214,7 @@ final class ConnectionService
      *
      * @param  array<string, mixed>  $data
      */
-    public function update(string $uuid, array $data): object
+    public function update(string $uuid, array $data): UserData
     {
         if ($data === []) {
             throw new ConnectionException(
@@ -221,7 +224,7 @@ final class ConnectionService
         }
 
         $context = $this->contexts->resolveUser(uuid: $uuid);
-        $userId = $this->getUserId(user: $context->user, uuid: $uuid);
+        $userId = $context->user->user_id;
 
         try {
             $response = $this->users->update(
@@ -251,7 +254,7 @@ final class ConnectionService
     public function delete(string $uuid): void
     {
         $context = $this->contexts->resolveUser(uuid: $uuid);
-        $userId = $this->getUserId(user: $context->user, uuid: $uuid);
+        $userId = $context->user->user_id;
 
         try {
             $this->users->delete(userId: $userId);
@@ -278,10 +281,10 @@ final class ConnectionService
     /**
      * Выпустить новый код подключения пользователя.
      */
-    public function regenerateCode(string $uuid): object
+    public function regenerateCode(string $uuid): ConnectionData
     {
         $context = $this->contexts->resolveBot(uuid: $uuid);
-        $userId = $this->getUserId(user: $context->user, uuid: $uuid);
+        $userId = $context->user->user_id;
 
         try {
             return $this->users->regenerateCode(
@@ -303,7 +306,7 @@ final class ConnectionService
     public function unlink(string $uuid): void
     {
         $context = $this->contexts->resolveBot(uuid: $uuid);
-        $userId = $this->getUserId(user: $context->user, uuid: $uuid);
+        $userId = $context->user->user_id;
 
         try {
             $this->users->unlink(
@@ -343,7 +346,7 @@ final class ConnectionService
         AvailableTelegramBot $telegramBot,
         array $meta = [],
         ?string $groupId = null,
-    ): object {
+    ): ConnectionData {
         try {
             $bot = $this->bots->find(
                 botName: $telegramBot->bot_name,
@@ -370,7 +373,7 @@ final class ConnectionService
             'is_created' => true,
         ];
 
-        if (($response->link_status ?? null) === 'active') {
+        if ($response->link_status === 'active') {
             $attributes['is_connected'] = true;
         }
 
@@ -408,23 +411,6 @@ final class ConnectionService
         }
 
         return $groupId;
-    }
-
-    /**
-     * Получить идентификатор пользователя Telegga.
-     */
-    private function getUserId(object $user, string $uuid): string
-    {
-        $userId = $user->user_id ?? null;
-
-        if (! is_string($userId) || trim($userId) === '') {
-            throw new ConnectionException(
-                message: 'Telegga user response does not contain user_id.',
-                connectionUuid: $uuid,
-            );
-        }
-
-        return $userId;
     }
 
     /**
@@ -476,7 +462,7 @@ final class ConnectionService
      */
     private function synchronize(
         TelegramConnectedUser $connection,
-        object $response,
+        UserData $response,
         array $data,
     ): void {
         $attributes = [];
