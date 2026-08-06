@@ -426,7 +426,9 @@ final class ConnectionService
                     'is_connected' => false,
                 ]);
 
-            $storedConnection = TelegramConnectedUser::query()->find($connection->getKey());
+            $storedConnection = TelegramConnectedUser::query()
+                ->whereKey($connection->getKey())
+                ->first();
             $stateSynchronized = $storedConnection === null
                 || (! $storedConnection->is_created && ! $storedConnection->is_connected);
         } catch (Throwable $exception) {

@@ -7,7 +7,18 @@ namespace Telegga\Laravel\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property int $id
+ * @property string $uuid
+ * @property int $telegram_connected_user_id
+ * @property string $event_id
+ * @property string $event
+ * @property int $attempts
+ * @property Carbon $first_seen_at
+ * @property Carbon|null $processed_at
+ */
 final class TeleggaWebhookEvent extends Model
 {
     use HasUuids;

@@ -287,7 +287,7 @@ final class GroupService
     /**
      * Нормализовать UUID подключений.
      *
-     * @param  array<int, string>  $uuids
+     * @param  array<int, mixed>  $uuids
      * @return array<int, string>
      */
     private function normalizeUuids(array $uuids, string $groupId): array

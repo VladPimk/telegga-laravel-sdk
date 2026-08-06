@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Sleep;
@@ -20,6 +21,16 @@ use Telegga\Laravel\Services\UserService;
 use Telegga\Laravel\Services\WebhookService;
 use Telegga\Laravel\Telegga;
 use Telegga\Laravel\TeleggaServiceProvider;
+
+afterEach(function (): void {
+    Schema::disableForeignKeyConstraints();
+    Schema::dropIfExists('telegga_webhook_events');
+    Schema::dropIfExists('telegram_connected_users');
+    Schema::dropIfExists('available_telegram_bots');
+    Schema::dropIfExists('users');
+    Schema::dropIfExists('migrations');
+    Schema::enableForeignKeyConstraints();
+});
 
 it('загружает сервис провайдер пакета', function () {
     expect($this->app->getProvider(TeleggaServiceProvider::class))
@@ -109,6 +120,12 @@ it('использует безопасные настройки повторо�
 });
 
 it('выполняет миграции пакета стандартной командой migrate', function (): void {
+    Schema::create('users', function (Blueprint $table): void {
+        $table->id();
+        $table->string('name');
+        $table->timestamps();
+    });
+
     $this->artisan('migrate', ['--force' => true])
         ->assertExitCode(0);
 

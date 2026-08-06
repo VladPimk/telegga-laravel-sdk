@@ -49,7 +49,9 @@ abstract class TeleggaException extends RuntimeException
      */
     public function attempts(): int
     {
-        return $this->apiException()?->attempts ?? 0;
+        $exception = $this->apiException();
+
+        return $exception === null ? 0 : $exception->attempts;
     }
 
     /**

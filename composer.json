@@ -30,6 +30,7 @@
         "symfony/http-foundation": "^7.2 || ^8.0"
     },
     "require-dev": {
+        "larastan/larastan": "^3.10",
         "laravel/pint": "^1.24",
         "orchestra/testbench": "^10.0 || ^11.0",
         "pestphp/pest": "^3.8"
@@ -62,7 +63,14 @@
         "sort-packages": true
     },
     "scripts": {
+        "analyse": "phpstan analyse --memory-limit=1G",
+        "check": [
+            "@format:check",
+            "@analyse",
+            "@test"
+        ],
         "format": "pint",
+        "format:check": "pint --test",
         "test": "pest --compact"
     },
     "minimum-stability": "stable",

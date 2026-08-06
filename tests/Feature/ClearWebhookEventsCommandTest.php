@@ -167,7 +167,8 @@ it('удаляет большой журнал чанками по тысяче 
     expect(TeleggaWebhookEvent::query()->doesntExist())
         ->toBeTrue()
         ->and($queries->filter(
-            fn (array $query): bool => str_starts_with($query['query'], 'delete from "telegga_webhook_events"'),
+            fn (array $query): bool => str_starts_with(strtolower($query['query']), 'delete from')
+                && str_contains(strtolower($query['query']), 'telegga_webhook_events'),
         ))
         ->toHaveCount(2);
 });

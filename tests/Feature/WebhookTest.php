@@ -872,7 +872,14 @@ it('отклоняет событие подключения без имени �
 });
 
 it('возвращает json с серверной ошибкой при недоступной локальной таблице', function (): void {
-    Schema::drop('telegram_connected_users');
+    Schema::disableForeignKeyConstraints();
+
+    try {
+        Schema::drop('telegram_connected_users');
+    } finally {
+        Schema::enableForeignKeyConstraints();
+    }
+
     Log::spy();
 
     $this

@@ -546,6 +546,16 @@ php artisan telegga:webhook-events:clear 30
 
 Records exactly on the retention boundary are preserved. Matching records are deleted in batches of up to 1,000. The command reports the total number of deleted records and rejects zero, negative, fractional, and non-numeric values. Successful execution is logged at `info` level with the retention period and deletion count. Invalid arguments are logged at `warning` level, and database failures are logged at `error` level with the number of records deleted before the failure.
 
+## Development
+
+Run all local quality checks with one command:
+
+```bash
+composer check
+```
+
+This checks formatting with Pint, analyses `src` with Larastan at level 6, and runs the Pest test suite. GitHub Actions repeats these checks for every push to `main` and `hotfix/**`, every pull request targeting `main`, and every manual workflow run. The test matrix covers PHP 8.3 and 8.4 with Laravel 12 and 13. A separate MySQL 8.4 job complements the default SQLite test run.
+
 ## Status
 
 The package provides an HTTP client, local management of available bots, a connection model with an explicitly selected bot, connection creation and management, explicit retry of failed requests, all supported message types, message status lookup, user message history, media uploads, groups, member management, broadcasts, and incoming webhooks.

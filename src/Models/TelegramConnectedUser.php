@@ -11,6 +11,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use LogicException;
 
+/**
+ * @property int $id
+ * @property string $uuid
+ * @property string $name
+ * @property string|null $email
+ * @property int|null $user_id
+ * @property int $available_telegram_bot_id
+ * @property bool $is_connected
+ * @property bool $is_created
+ * @property-read AvailableTelegramBot|null $telegramBot
+ */
 final class TelegramConnectedUser extends Model
 {
     use HasUuids;

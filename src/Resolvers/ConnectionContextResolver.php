@@ -219,7 +219,7 @@ final class ConnectionContextResolver
                 $this->linkMatchesBot(link: $link, botName: $botName)
                 && $link->bot_id !== ''
             ) {
-                if (($link->status ?? null) === 'active') {
+                if ($link->status === 'active') {
                     return $link;
                 }
 
