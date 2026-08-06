@@ -55,15 +55,12 @@ it('создаёт пользователя Telegga без потери новы
 });
 
 it('получает пользователя Telegga по external_id без потери новых полей', function (): void {
+    $response = $this->apiFixture(path: 'users/find-by-external-id');
+    $response['new_api_field'] = 'new-value';
+
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users?external_id=connection-uuid' => Http::response([
-            'user_id' => 'telegga-user-1',
-            'external_id' => 'connection-uuid',
-            'status' => 'active',
-            'links' => [],
-            'new_api_field' => 'new-value',
-        ]),
+        'api.telegga.net/api/v1/users?external_id=connection-uuid' => Http::response($response),
     ]);
 
     $user = app(UserService::class)->findByExternalId(
@@ -88,16 +85,9 @@ it('получает пользователя Telegga по external_id без п
 it('получает страницу пользователей Telegga по email', function (): void {
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users?email=ivan%40example.com' => Http::response([
-            'data' => [
-                [
-                    'user_id' => 'telegga-user-1',
-                    'external_id' => 'connection-uuid',
-                    'email' => 'ivan@example.com',
-                ],
-            ],
-            'next_cursor' => 'next-cursor',
-        ]),
+        'api.telegga.net/api/v1/users?email=ivan%40example.com' => Http::response(
+            $this->apiFixture(path: 'users/list-by-email'),
+        ),
     ]);
 
     $page = app(UserService::class)->getAll(
@@ -137,7 +127,7 @@ it('не допускает поиск по external_id через списоч�
 it('отклоняет успешный ответ пользователя с некорректным json', function (): void {
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users*' => Http::response(
+        'api.telegga.net/api/v1/users?external_id=connection-uuid' => Http::response(
             body: 'not-json',
             status: 200,
         ),

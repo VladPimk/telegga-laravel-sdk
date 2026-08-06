@@ -4,12 +4,52 @@ declare(strict_types=1);
 
 namespace Telegga\Laravel\Tests;
 
+use App\Providers\TestDatabaseServiceProvider;
 use Illuminate\Foundation\Application;
+use Illuminate\Support\Facades\Schema;
 use Orchestra\Testbench\TestCase as Orchestra;
+use RuntimeException;
 use Telegga\Laravel\TeleggaServiceProvider;
 
 abstract class TestCase extends Orchestra
 {
+    /**
+     * Загрузить JSON-фикстуру ответа Telegga API.
+     *
+     * @return array<string, mixed>
+     */
+    protected function apiFixture(string $path): array
+    {
+        $fixturePath = __DIR__.'/Fixtures/Api/'.$path.'.json';
+        $contents = file_get_contents($fixturePath);
+
+        if ($contents === false) {
+            throw new RuntimeException("Telegga API fixture could not be read: {$path}.");
+        }
+
+        $fixture = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
+
+        if (! is_array($fixture)) {
+            throw new RuntimeException("Telegga API fixture must contain a JSON object: {$path}.");
+        }
+
+        return $fixture;
+    }
+
+    /**
+     * Удалить таблицу подключений для проверки ошибок недоступной схемы.
+     */
+    protected function dropConnectionTable(): void
+    {
+        Schema::disableForeignKeyConstraints();
+
+        try {
+            Schema::dropIfExists('telegram_connected_users');
+        } finally {
+            Schema::enableForeignKeyConstraints();
+        }
+    }
+
     /**
      * Получить сервис-провайдеры пакета.
      *
@@ -18,7 +58,10 @@ abstract class TestCase extends Orchestra
      */
     protected function getPackageProviders($app): array
     {
-        return [TeleggaServiceProvider::class];
+        return [
+            TestDatabaseServiceProvider::class,
+            TeleggaServiceProvider::class,
+        ];
     }
 
     /**
@@ -38,5 +81,13 @@ abstract class TestCase extends Orchestra
         $app['config']->set('telegga.connect_timeout', 5);
         $app['config']->set('telegga.retry.times', 3);
         $app['config']->set('telegga.retry.sleep_ms', 0);
+    }
+
+    /**
+     * Включить проверку внешних ключей после обновления тестовой схемы.
+     */
+    protected function defineDatabaseMigrationsAfterDatabaseRefreshed()
+    {
+        Schema::enableForeignKeyConstraints();
     }
 }

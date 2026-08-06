@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
@@ -19,28 +18,12 @@ use Telegga\Laravel\Models\TelegramConnectedUser;
 
 beforeEach(function (): void {
     Model::preventLazyLoading();
-    Schema::enableForeignKeyConstraints();
-
-    Schema::create('users', function (Blueprint $table): void {
-        $table->id();
-        $table->string('name');
-        $table->timestamps();
-    });
-
-    $botMigration = require __DIR__.'/../../database/migrations/2026_07_31_000001_create_available_telegram_bots_table.php';
-    $botMigration->up();
-
-    $connectionMigration = require __DIR__.'/../../database/migrations/2026_07_31_000002_create_telegram_connected_users_table.php';
-    $connectionMigration->up();
 
     $this->telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
 });
 
 afterEach(function (): void {
     Model::preventLazyLoading(false);
-    Schema::dropIfExists('telegram_connected_users');
-    Schema::dropIfExists('available_telegram_bots');
-    Schema::dropIfExists('users');
 });
 
 it('создаёт независимое подключение через выбранного активного бота', function (): void {
@@ -503,7 +486,7 @@ it('скрывает ошибку базы данных при создании 
 it('скрывает ошибку базы данных при поиске подключения', function (): void {
     $uuid = (string) Str::uuid();
 
-    Schema::drop('telegram_connected_users');
+    $this->dropConnectionTable();
     Http::preventStrayRequests();
 
     try {

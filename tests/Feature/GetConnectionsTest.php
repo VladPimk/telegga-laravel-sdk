@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Dto\UserData;
@@ -14,30 +13,13 @@ use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Models\AvailableTelegramBot;
 
-beforeEach(function (): void {
-    $migration = require __DIR__.'/../../database/migrations/2026_07_31_000001_create_available_telegram_bots_table.php';
-    $migration->up();
-});
-
-afterEach(function (): void {
-    Schema::dropIfExists('available_telegram_bots');
-});
-
 it('получает страницу подключений по email статусу и курсору', function (): void {
+    $response = $this->apiFixture(path: 'users/list-by-email');
+    $response['data'][0]['new_api_field'] = 'new-value';
+
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users*' => Http::response([
-            'data' => [
-                [
-                    'user_id' => 'telegga-user-1',
-                    'external_id' => 'connection-uuid',
-                    'email' => 'ivan@example.com',
-                    'status' => 'active',
-                    'new_api_field' => 'new-value',
-                ],
-            ],
-            'next_cursor' => 'next-cursor',
-        ]),
+        'api.telegga.net/api/v1/users?email=ivan%40example.com&status=active&cursor=current-cursor' => Http::response($response),
     ]);
 
     $page = app(TeleggaInterface::class)->getConnections(
@@ -79,7 +61,7 @@ it('преобразует локальный uuid бота в bot_id для с�
                 ],
             ],
         ]),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        'api.telegga.net/api/v1/users?bot_id=bot-1' => Http::response([
             'data' => [],
         ]),
     ]);
@@ -99,6 +81,12 @@ it('преобразует локальный uuid бота в bot_id для с�
         return $request->method() === 'GET'
             && $request->url() === 'https://api.telegga.net/api/v1/users?bot_id=bot-1';
     });
+
+    Http::assertSent(function (Request $request): bool {
+        return $request->method() === 'GET'
+            && $request->url() === 'https://api.telegga.net/api/v1/bots';
+    });
+
     Http::assertSentCount(2);
 });
 
@@ -125,7 +113,7 @@ it('не выполняет запрос для неизвестного лок�
 it('скрывает некорректный ответ списка подключений', function (): void {
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users*' => Http::response([
+        'api.telegga.net/api/v1/users' => Http::response([
             'data' => 'invalid',
         ]),
     ]);

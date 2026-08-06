@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Illuminate\Console\Command;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -35,22 +34,6 @@ function createWebhookEventForCleanup(
 
 beforeEach(function (): void {
     Carbon::setTestNow('2026-08-05 12:00:00');
-    Schema::enableForeignKeyConstraints();
-
-    Schema::create('users', function (Blueprint $table): void {
-        $table->id();
-        $table->string('name');
-        $table->timestamps();
-    });
-
-    $botMigration = require __DIR__.'/../../database/migrations/2026_07_31_000001_create_available_telegram_bots_table.php';
-    $botMigration->up();
-
-    $connectionMigration = require __DIR__.'/../../database/migrations/2026_07_31_000002_create_telegram_connected_users_table.php';
-    $connectionMigration->up();
-
-    $eventMigration = require __DIR__.'/../../database/migrations/2026_08_05_000003_create_telegga_webhook_events_table.php';
-    $eventMigration->up();
 
     $telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
     $this->connection = TelegramConnectedUser::query()->create([
@@ -62,10 +45,6 @@ beforeEach(function (): void {
 
 afterEach(function (): void {
     Carbon::setTestNow();
-    Schema::dropIfExists('telegga_webhook_events');
-    Schema::dropIfExists('telegram_connected_users');
-    Schema::dropIfExists('available_telegram_bots');
-    Schema::dropIfExists('users');
 });
 
 it('по умолчанию удаляет только события старше девяноста дней', function (): void {

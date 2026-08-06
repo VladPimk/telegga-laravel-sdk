@@ -3,10 +3,8 @@
 declare(strict_types=1);
 
 use Illuminate\Database\QueryException;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Telegga\Laravel\Dto\UserData;
 use Telegga\Laravel\Dto\UserLinkData;
@@ -17,27 +15,7 @@ use Telegga\Laravel\Models\TelegramConnectedUser;
 use Telegga\Laravel\Resolvers\ConnectionContextResolver;
 
 beforeEach(function (): void {
-    Schema::enableForeignKeyConstraints();
-
-    Schema::create('users', function (Blueprint $table): void {
-        $table->id();
-        $table->string('name');
-        $table->timestamps();
-    });
-
-    $botMigration = require __DIR__.'/../../database/migrations/2026_07_31_000001_create_available_telegram_bots_table.php';
-    $botMigration->up();
-
-    $connectionMigration = require __DIR__.'/../../database/migrations/2026_07_31_000002_create_telegram_connected_users_table.php';
-    $connectionMigration->up();
-
     $this->telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
-});
-
-afterEach(function (): void {
-    Schema::dropIfExists('telegram_connected_users');
-    Schema::dropIfExists('available_telegram_bots');
-    Schema::dropIfExists('users');
 });
 
 it('разрешает контекст подключения через активную привязку Telegga', function (): void {
@@ -49,7 +27,7 @@ it('разрешает контекст подключения через акт
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'status' => 'active',
@@ -110,7 +88,7 @@ it('сопоставляет имя бота без учёта регистра'
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'links' => [
@@ -142,7 +120,7 @@ it('разрешает пользователя Telegga без активной 
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'links' => [
@@ -180,7 +158,7 @@ it('отдаёт приоритет активной привязке при р�
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'links' => [
@@ -262,7 +240,7 @@ it('скрывает ошибку api при поиске пользовател
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'error' => [
                 'code' => 'not_found',
                 'message' => 'User was not found.',
@@ -297,7 +275,7 @@ it('отклоняет пользователя Telegga без активной 
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'links' => [
@@ -335,7 +313,7 @@ it('не принимает привязку при неполном совпа�
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'links' => [
@@ -365,7 +343,7 @@ it('не принимает привязку при неполном совпа�
 it('скрывает ошибку базы данных при поиске локального подключения', function (): void {
     $uuid = Str::uuid()->toString();
 
-    Schema::drop('telegram_connected_users');
+    $this->dropConnectionTable();
     Http::preventStrayRequests();
 
     try {
@@ -387,7 +365,7 @@ it('скрывает ошибку базы данных при поиске ло
 it('скрывает ошибку базы данных при пакетном поиске подключений', function (): void {
     $uuid = Str::uuid()->toString();
 
-    Schema::drop('telegram_connected_users');
+    $this->dropConnectionTable();
     Http::preventStrayRequests();
 
     try {

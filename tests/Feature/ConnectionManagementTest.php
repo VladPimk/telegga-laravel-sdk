@@ -2,11 +2,9 @@
 
 declare(strict_types=1);
 
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Dto\UserData;
 use Telegga\Laravel\Exceptions\ConnectionException;
@@ -15,27 +13,7 @@ use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Models\TelegramConnectedUser;
 
 beforeEach(function (): void {
-    Schema::enableForeignKeyConstraints();
-
-    Schema::create('users', function (Blueprint $table): void {
-        $table->id();
-        $table->string('name');
-        $table->timestamps();
-    });
-
-    $botMigration = require __DIR__.'/../../database/migrations/2026_07_31_000001_create_available_telegram_bots_table.php';
-    $botMigration->up();
-
-    $connectionMigration = require __DIR__.'/../../database/migrations/2026_07_31_000002_create_telegram_connected_users_table.php';
-    $connectionMigration->up();
-
     $this->telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
-});
-
-afterEach(function (): void {
-    Schema::dropIfExists('telegram_connected_users');
-    Schema::dropIfExists('available_telegram_bots');
-    Schema::dropIfExists('users');
 });
 
 it('получает пользователя Telegga по uuid локального подключения', function (): void {
@@ -55,7 +33,7 @@ it('получает пользователя Telegga по uuid локально
             'groups' => [],
             'new_api_field' => 'new-value',
         ]),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
         ]),
@@ -99,7 +77,7 @@ it('обновляет пользователя Telegga и локальные и
             'status' => 'disabled',
             'new_api_field' => 'new-value',
         ]),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
         ]),
@@ -151,7 +129,7 @@ it('очищает локальный email после успешной очис
             'external_id' => $connection->uuid,
             'email' => '',
         ]),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
         ]),
@@ -182,7 +160,7 @@ it('сохраняет локальный email при обновлении то
             'display_name' => 'Иван Петров',
             'email' => null,
         ]),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
         ]),
@@ -216,7 +194,7 @@ it('отклоняет невалидный тип email в ответе Telegga
             'external_id' => $connection->uuid,
             'email' => ['invalid'],
         ]),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
         ]),
@@ -274,7 +252,7 @@ it('останавливает операцию при отсутствии user
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users/{$connection->uuid}" => Http::response([
             'external_id' => $connection->uuid,
         ]),
     ]);
@@ -317,7 +295,7 @@ it('выпускает новый код через bot id ожидающей п
             'link_code' => 'NEWCODE1',
             'link_url' => 'https://t.me/mybot?start=NEWCODE1',
         ]),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'links' => [
@@ -353,7 +331,7 @@ it('не выпускает код без привязки пользовате�
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'links' => [],
@@ -394,7 +372,7 @@ it('отвязывает пользователя и сбрасывает лок
             body: null,
             status: 204,
         ),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'links' => [
@@ -434,7 +412,7 @@ it('удаляет локальную запись только после уд�
             body: null,
             status: 204,
         ),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
         ]),
@@ -473,7 +451,7 @@ it('сохраняет локальную запись при ошибке уд�
                 'message' => 'Internal error.',
             ],
         ], 500),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
         ]),
@@ -521,7 +499,7 @@ it('сбрасывает состояние и пишет критический
             body: null,
             status: 204,
         ),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
         ]),
@@ -577,7 +555,7 @@ it('завершает локальное удаление если повтор
         "api.telegga.net/api/v1/users/{$connection->uuid}" => Http::sequence()
             ->push(['error' => ['code' => 'internal', 'message' => 'Temporary error.']], 503)
             ->push(['error' => ['code' => 'not_found', 'message' => 'User was not found.']], 404),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
         ]),
@@ -604,7 +582,7 @@ it('сбрасывает локальный статус если повтор �
         "api.telegga.net/api/v1/users/{$connection->uuid}/link*" => Http::sequence()
             ->push(['error' => ['code' => 'internal', 'message' => 'Temporary error.']], 503)
             ->push(['error' => ['code' => 'user_not_linked', 'message' => 'User is not linked.']], 409),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'links' => [

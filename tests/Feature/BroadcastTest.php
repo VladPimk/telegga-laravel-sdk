@@ -2,10 +2,8 @@
 
 declare(strict_types=1);
 
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Schema;
 use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Dto\BroadcastCancellationData;
 use Telegga\Laravel\Dto\BroadcastCreatedData;
@@ -16,27 +14,7 @@ use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Models\TelegramConnectedUser;
 
 beforeEach(function (): void {
-    Schema::enableForeignKeyConstraints();
-
-    Schema::create('users', function (Blueprint $table): void {
-        $table->id();
-        $table->string('name');
-        $table->timestamps();
-    });
-
-    $botMigration = require __DIR__.'/../../database/migrations/2026_07_31_000001_create_available_telegram_bots_table.php';
-    $botMigration->up();
-
-    $connectionMigration = require __DIR__.'/../../database/migrations/2026_07_31_000002_create_telegram_connected_users_table.php';
-    $connectionMigration->up();
-
     $this->telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
-});
-
-afterEach(function (): void {
-    Schema::dropIfExists('telegram_connected_users');
-    Schema::dropIfExists('available_telegram_bots');
-    Schema::dropIfExists('users');
 });
 
 it('запускает рассылку всем пользователям бота подключения', function (): void {
@@ -53,7 +31,7 @@ it('запускает рассылку всем пользователям бо
             'status' => 'pending',
             'new_api_field' => 'new-value',
         ], 202),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'links' => [
@@ -98,6 +76,11 @@ it('запускает рассылку всем пользователям бо
             ];
     });
 
+    Http::assertSent(function (Request $request) use ($connection): bool {
+        return $request->method() === 'GET'
+            && $request->url() === "https://api.telegga.net/api/v1/users?external_id={$connection->uuid}";
+    });
+
     Http::assertSentCount(2);
 });
 
@@ -114,7 +97,7 @@ it('запускает медиа рассылку участникам указ
             'broadcast_id' => 'broadcast-1',
             'status' => 'pending',
         ], 202),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'links' => [

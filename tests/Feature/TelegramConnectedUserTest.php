@@ -11,28 +11,17 @@ use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Models\TelegramConnectedUser;
 
 beforeEach(function (): void {
-    Schema::enableForeignKeyConstraints();
-
-    Schema::create('users', function (Blueprint $table): void {
-        $table->id();
-        $table->string('name');
-        $table->timestamps();
-    });
-
-    $botMigration = require __DIR__.'/../../database/migrations/2026_07_31_000001_create_available_telegram_bots_table.php';
-    $botMigration->up();
-
-    $connectionMigration = require __DIR__.'/../../database/migrations/2026_07_31_000002_create_telegram_connected_users_table.php';
-    $connectionMigration->up();
-
     $this->telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
 });
 
 afterEach(function (): void {
-    Schema::dropIfExists('telegram_connected_users');
-    Schema::dropIfExists('available_telegram_bots');
-    Schema::dropIfExists('custom_users');
-    Schema::dropIfExists('users');
+    Schema::disableForeignKeyConstraints();
+
+    try {
+        Schema::dropIfExists('custom_users');
+    } finally {
+        Schema::enableForeignKeyConstraints();
+    }
 });
 
 it('создаёт таблицу подключений с ожидаемыми колонками', function (): void {
@@ -116,7 +105,7 @@ it('связывает подключение с пользователем пр
 });
 
 it('использует настроенные модель и таблицу пользователя проекта', function (): void {
-    Schema::dropIfExists('telegram_connected_users');
+    $this->dropConnectionTable();
     Schema::create('custom_users', function (Blueprint $table): void {
         $table->id();
         $table->string('name');
@@ -174,7 +163,7 @@ it('отклоняет несовпадающие модель и таблицу
 });
 
 it('отклоняет пустое имя таблицы пользователей проекта', function (): void {
-    Schema::dropIfExists('telegram_connected_users');
+    $this->dropConnectionTable();
     config()->set('telegga.users_table', '');
     $connectionMigration = require __DIR__.'/../../database/migrations/2026_07_31_000002_create_telegram_connected_users_table.php';
 

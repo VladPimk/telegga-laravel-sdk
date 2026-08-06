@@ -1,0 +1,23 @@
+{
+    "user_id": "telegga-user-1",
+    "external_id": "connection-uuid",
+    "display_name": "Иван",
+    "created_at": "2026-07-20T15:33:00+01:00",
+    "email": "ivan@example.com",
+    "status": "active",
+    "links": [
+        {
+            "bot_id": "bot-active",
+            "bot_username": "mybot",
+            "status": "active",
+            "linked_at": "2026-07-20T15:35:00+01:00"
+        }
+    ],
+    "groups": [
+        {
+            "group_id": "group-1",
+            "name": "VIP",
+            "bot_id": "bot-active"
+        }
+    ]
+}

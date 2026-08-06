@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Telegga\Laravel\Models\AvailableTelegramBot;
@@ -10,36 +9,12 @@ use Telegga\Laravel\Models\TeleggaWebhookEvent;
 use Telegga\Laravel\Models\TelegramConnectedUser;
 
 beforeEach(function (): void {
-    Schema::enableForeignKeyConstraints();
-
-    Schema::create('users', function (Blueprint $table): void {
-        $table->id();
-        $table->string('name');
-        $table->timestamps();
-    });
-
-    $botMigration = require __DIR__.'/../../database/migrations/2026_07_31_000001_create_available_telegram_bots_table.php';
-    $botMigration->up();
-
-    $connectionMigration = require __DIR__.'/../../database/migrations/2026_07_31_000002_create_telegram_connected_users_table.php';
-    $connectionMigration->up();
-
-    $eventMigration = require __DIR__.'/../../database/migrations/2026_08_05_000003_create_telegga_webhook_events_table.php';
-    $eventMigration->up();
-
     $telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
     $this->connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
         'available_telegram_bot_id' => $telegramBot->id,
     ]);
-});
-
-afterEach(function (): void {
-    Schema::dropIfExists('telegga_webhook_events');
-    Schema::dropIfExists('telegram_connected_users');
-    Schema::dropIfExists('available_telegram_bots');
-    Schema::dropIfExists('users');
 });
 
 it('создаёт таблицу событий webhook с ожидаемыми колонками', function (): void {
