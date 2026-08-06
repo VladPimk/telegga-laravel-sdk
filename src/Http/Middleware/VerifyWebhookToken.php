@@ -8,6 +8,8 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
+use Telegga\Laravel\Http\Responses\WebhookResponse;
+use Telegga\Laravel\Http\Responses\WebhookResponseCode;
 
 final class VerifyWebhookToken
 {
@@ -30,16 +32,9 @@ final class VerifyWebhookToken
                 'error_code' => 'unauthorized',
             ]);
 
-            return response()->json(
-                data: [
-                    'success' => false,
-                    'error' => [
-                        'code' => 'unauthorized',
-                        'message' => 'Invalid webhook token.',
-                    ],
-                ],
-                status: 401,
-            );
+            return WebhookResponse::error(
+                code: WebhookResponseCode::Unauthorized,
+            )->toResponse($request);
         }
 
         return $next($request);

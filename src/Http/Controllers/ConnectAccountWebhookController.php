@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Telegga\Laravel\Http\Controllers;
 
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Telegga\Laravel\Exceptions\WebhookException;
+use Telegga\Laravel\Http\Responses\WebhookResponse;
+use Telegga\Laravel\Http\Responses\WebhookResponseCode;
 use Telegga\Laravel\Services\WebhookService;
 use Telegga\Laravel\Webhooks\WebhookProcessingResult;
-use Telegga\Laravel\Webhooks\WebhookProcessingStatus;
 
 final class ConnectAccountWebhookController
 {
@@ -25,7 +25,7 @@ final class ConnectAccountWebhookController
     /**
      * Обработать webhook подключения.
      */
-    public function __invoke(Request $request): JsonResponse
+    public function __invoke(Request $request): WebhookResponse
     {
         $eventValidation = Validator::make(
             data: $request->all(),
@@ -56,7 +56,7 @@ final class ConnectAccountWebhookController
     /**
      * Обработать проверочное событие.
      */
-    private function handleTest(Request $request): JsonResponse
+    private function handleTest(Request $request): WebhookResponse
     {
         $validation = Validator::make(
             data: $request->all(),
@@ -79,17 +79,16 @@ final class ConnectAccountWebhookController
             );
         }
 
-        return response()->json(data: [
-            'success' => true,
-            'event' => 'test',
-            'message' => 'Webhook accepted.',
-        ]);
+        return WebhookResponse::success(
+            code: WebhookResponseCode::Accepted,
+            event: 'test',
+        );
     }
 
     /**
      * Обработать событие подключения пользователя.
      */
-    private function handleUserLinked(Request $request, string $event): JsonResponse
+    private function handleUserLinked(Request $request, string $event): WebhookResponse
     {
         $payloadValidation = Validator::make(
             data: $request->all(),
@@ -155,10 +154,8 @@ final class ConnectAccountWebhookController
                 'exception' => $exception,
             ]);
 
-            return $this->errorResponse(
-                code: 'internal',
-                message: 'Webhook could not be processed.',
-                status: 500,
+            return WebhookResponse::error(
+                code: WebhookResponseCode::Internal,
                 event: $event,
                 eventId: $eventId,
             );
@@ -186,17 +183,15 @@ final class ConnectAccountWebhookController
     /**
      * Создать ответ для неподдерживаемого события.
      */
-    private function unsupportedEvent(string $event): JsonResponse
+    private function unsupportedEvent(string $event): WebhookResponse
     {
         Log::warning('Telegga webhook event is not supported.', [
             'event' => $event,
             'error_code' => 'unsupported_event',
         ]);
 
-        return $this->errorResponse(
-            code: 'unsupported_event',
-            message: 'Webhook event is not supported.',
-            status: 400,
+        return WebhookResponse::error(
+            code: WebhookResponseCode::UnsupportedEvent,
             event: $event,
         );
     }
@@ -210,22 +205,17 @@ final class ConnectAccountWebhookController
         string $eventId,
         string $externalId,
         string $botName,
-    ): JsonResponse {
-        return response()->json(data: [
-            'success' => true,
-            'event' => $event,
-            'event_id' => $eventId,
-            'message' => match ($result->status) {
-                WebhookProcessingStatus::Duplicate => 'Webhook event has already been processed.',
-                WebhookProcessingStatus::AlreadyConnected => 'Telegram connection is already connected.',
-                default => 'Telegram connection marked as connected.',
-            },
-            'data' => [
+    ): WebhookResponse {
+        return WebhookResponse::success(
+            code: WebhookResponseCode::fromProcessingStatus(status: $result->status),
+            event: $event,
+            eventId: $eventId,
+            data: [
                 'external_id' => $externalId,
                 'bot_username' => $botName,
                 'is_connected' => true,
             ],
-        ]);
+        );
     }
 
     /**
@@ -235,7 +225,7 @@ final class ConnectAccountWebhookController
         string $message,
         ?string $event = null,
         ?string $eventId = null,
-    ): JsonResponse {
+    ): WebhookResponse {
         Log::warning('Telegga webhook request validation failed.', [
             'event' => $event,
             'event_id' => $eventId,
@@ -243,52 +233,11 @@ final class ConnectAccountWebhookController
             'error_message' => $message,
         ]);
 
-        return $this->errorResponse(
-            code: 'invalid_request',
+        return WebhookResponse::error(
+            code: WebhookResponseCode::InvalidRequest,
             message: $message,
-            status: 400,
             event: $event,
             eventId: $eventId,
-        );
-    }
-
-    /**
-     * Создать ответ об ошибке webhook.
-     *
-     * @param  array<string, string>  $details
-     */
-    private function errorResponse(
-        string $code,
-        string $message,
-        int $status,
-        ?string $event = null,
-        ?string $eventId = null,
-        array $details = [],
-    ): JsonResponse {
-        $data = [
-            'success' => false,
-        ];
-
-        if ($event !== null) {
-            $data['event'] = $event;
-        }
-
-        if ($eventId !== null) {
-            $data['event_id'] = $eventId;
-        }
-
-        $data['error'] = [
-            'code' => $code,
-            'message' => $message,
-        ];
-
-        if ($details !== []) {
-            $data['error']['details'] = $details;
-        }
-
-        return response()->json(
-            data: $data,
-            status: $status,
         );
     }
 
@@ -301,7 +250,7 @@ final class ConnectAccountWebhookController
         string $eventId,
         string $externalId,
         string $botName,
-    ): JsonResponse {
+    ): WebhookResponse {
         $details = [
             'external_id' => $externalId,
             'received_bot_username' => $botName,
@@ -325,49 +274,11 @@ final class ConnectAccountWebhookController
             'error_code' => $result->status->value,
         ]);
 
-        return $this->errorResponse(
-            code: $result->status->value,
-            message: $this->processingErrorMessage(status: $result->status),
-            status: $this->processingErrorStatus(status: $result->status),
+        return WebhookResponse::error(
+            code: WebhookResponseCode::fromProcessingStatus(status: $result->status),
             event: $event,
             eventId: $eventId,
             details: $details,
         );
-    }
-
-    /**
-     * Получить HTTP-статус ошибки обработки webhook.
-     */
-    private function processingErrorStatus(WebhookProcessingStatus $status): int
-    {
-        return match ($status) {
-            WebhookProcessingStatus::ConnectionNotFound,
-            WebhookProcessingStatus::ConnectionDeleted,
-            WebhookProcessingStatus::BotNotFound,
-            WebhookProcessingStatus::BotDeleted => 404,
-            WebhookProcessingStatus::BotMismatch,
-            WebhookProcessingStatus::EventIdConflict => 409,
-            WebhookProcessingStatus::Connected,
-            WebhookProcessingStatus::AlreadyConnected,
-            WebhookProcessingStatus::Duplicate => 500,
-        };
-    }
-
-    /**
-     * Получить сообщение ошибки обработки webhook.
-     */
-    private function processingErrorMessage(WebhookProcessingStatus $status): string
-    {
-        return match ($status) {
-            WebhookProcessingStatus::ConnectionNotFound => 'Telegram connection was not found for the provided external_id.',
-            WebhookProcessingStatus::ConnectionDeleted => 'Telegram connection for the provided external_id has been deleted.',
-            WebhookProcessingStatus::BotNotFound => 'Telegram bot assigned to the connection was not found.',
-            WebhookProcessingStatus::BotDeleted => 'Telegram bot assigned to the connection has been deleted.',
-            WebhookProcessingStatus::BotMismatch => 'Telegram connection is assigned to a different bot.',
-            WebhookProcessingStatus::EventIdConflict => 'Webhook event_id is already assigned to a different connection or event.',
-            WebhookProcessingStatus::Connected,
-            WebhookProcessingStatus::AlreadyConnected,
-            WebhookProcessingStatus::Duplicate => 'Webhook could not be processed.',
-        };
     }
 }
