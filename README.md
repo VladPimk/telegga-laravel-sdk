@@ -190,7 +190,7 @@ try {
 
 ## Managing connections
 
-All connection operations accept the UUID of the local record. The package compares the `bot_username` returned by Telegga with the local `bot_name` after converting both values to lowercase. Both values use the username without the `@` prefix. Internal Telegga user and bot identifiers are not stored locally.
+All connection operations accept the UUID of the local record. For user routes that accept either identifier, the package sends this UUID directly as Telegga's `external_id` without first resolving the internal `user_id`. The package compares the `bot_username` returned by Telegga with the local `bot_name` after converting both values to lowercase. Both values use the username without the `@` prefix. Internal Telegga user and bot identifiers are not stored locally.
 
 Retrieve a user together with links and groups:
 
@@ -308,7 +308,7 @@ The method returns `MessageData` with the status, attempt count, delivery timest
 
 ## User message history
 
-Message history is always requested through a local connection UUID. The package finds the Telegga user by the local `external_id`, resolves the internal `user_id`, and always passes that identifier to `GET /messages`:
+Message history is always requested through a local connection UUID. After checking the local connection, the package passes this UUID directly to `GET /messages` as the supported external value of `user_id`, without an additional Telegga user lookup:
 
 ```php
 $page = $telegga->getMessages(
@@ -408,7 +408,7 @@ $telegga->removeConnectionFromGroup(
 );
 ```
 
-Group member routes accept local UUIDs, which the package resolves to internal Telegga `user_id` values:
+Group member routes accept local UUIDs and pass them directly to Telegga as supported `external_id` values:
 
 ```php
 $result = $telegga->addGroupMembers(
@@ -422,7 +422,7 @@ $telegga->removeGroupMember(
 );
 ```
 
-Duplicate UUIDs are removed before sending the request. The API accepts up to 10,000 members per request, but the package first performs a Telegga user lookup for every unique local UUID. For large datasets, send connections in separate batches while respecting the API limit. User lookups and the final bulk-add request use the automatic retry policy, so temporary API failures can increase the number of requests up to the configured attempt limit for each lookup.
+`addGroupMembers()` processes only the UUIDs explicitly passed to the method; it never selects every local connection. Duplicate UUIDs are removed, and the requested connections are checked with one local database query before any HTTP request. The package then sends one `POST /groups/{id}/members` request with the UUIDs in `external_ids`. The API accepts up to 10,000 identifiers per request.
 
 Membership additions are state-idempotent, but their response counters describe the final attempt. If the first request added members and its response was lost, the repeated request can return `added: false` for one member or `added: 0` for a bulk operation because the requested memberships already exist. The resulting group membership is correct, but the returned counter cannot reconstruct changes made by the lost attempt.
 

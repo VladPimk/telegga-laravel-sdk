@@ -47,7 +47,7 @@ it('получает пользователя Telegga по uuid локально
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users/telegga-user-1' => Http::response([
+        "api.telegga.net/api/v1/users/{$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'display_name' => 'Иван',
@@ -72,12 +72,12 @@ it('получает пользователя Telegga по uuid локально
         ->and($user->raw()->new_api_field)
         ->toBe('new-value');
 
-    Http::assertSent(function (Request $request): bool {
+    Http::assertSent(function (Request $request) use ($connection): bool {
         return $request->method() === 'GET'
-            && $request->url() === 'https://api.telegga.net/api/v1/users/telegga-user-1';
+            && $request->url() === "https://api.telegga.net/api/v1/users/{$connection->uuid}";
     });
 
-    Http::assertSentCount(2);
+    Http::assertSentCount(1);
 });
 
 it('обновляет пользователя Telegga и локальные имя и email', function (): void {
@@ -91,7 +91,7 @@ it('обновляет пользователя Telegga и локальные и
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users/telegga-user-1' => Http::response([
+        "api.telegga.net/api/v1/users/{$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'display_name' => 'Иван Петров',
@@ -125,9 +125,9 @@ it('обновляет пользователя Telegga и локальные и
         ->and($connection->is_connected)
         ->toBeTrue();
 
-    Http::assertSent(function (Request $request): bool {
+    Http::assertSent(function (Request $request) use ($connection): bool {
         return $request->method() === 'PATCH'
-            && $request->url() === 'https://api.telegga.net/api/v1/users/telegga-user-1'
+            && $request->url() === "https://api.telegga.net/api/v1/users/{$connection->uuid}"
             && $request->data() === [
                 'display_name' => 'Иван Петров',
                 'email' => 'new@example.com',
@@ -146,7 +146,7 @@ it('очищает локальный email после успешной очис
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users/telegga-user-1' => Http::response([
+        "api.telegga.net/api/v1/users/{$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'email' => '',
@@ -176,7 +176,7 @@ it('сохраняет локальный email при обновлении то
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users/telegga-user-1' => Http::response([
+        "api.telegga.net/api/v1/users/{$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'display_name' => 'Иван Петров',
@@ -211,7 +211,7 @@ it('отклоняет невалидный тип email в ответе Telegga
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users/telegga-user-1' => Http::response([
+        "api.telegga.net/api/v1/users/{$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'email' => ['invalid'],
@@ -285,7 +285,7 @@ it('останавливает операцию при отсутствии user
         );
     } catch (ConnectionException $exception) {
         expect($exception->getMessage())
-            ->toBe('Telegga returned an invalid user lookup response: required string field "user_id" is missing or invalid.')
+            ->toBe('Telegga returned an invalid user response: required string field "user_id" is missing or invalid.')
             ->and($exception->connectionUuid)
             ->toBe($connection->uuid)
             ->and($exception->getPrevious())
@@ -310,7 +310,7 @@ it('выпускает новый код через bot id ожидающей п
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users/telegga-user-1/regenerate-code' => Http::response([
+        "api.telegga.net/api/v1/users/{$connection->uuid}/regenerate-code" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'link_status' => 'pending',
@@ -337,9 +337,9 @@ it('выпускает новый код через bot id ожидающей п
     expect($result->link_code)
         ->toBe('NEWCODE1');
 
-    Http::assertSent(function (Request $request): bool {
+    Http::assertSent(function (Request $request) use ($connection): bool {
         return $request->method() === 'POST'
-            && $request->url() === 'https://api.telegga.net/api/v1/users/telegga-user-1/regenerate-code'
+            && $request->url() === "https://api.telegga.net/api/v1/users/{$connection->uuid}/regenerate-code"
             && $request->data() === ['bot_id' => 'bot-pending'];
     });
 });
@@ -390,7 +390,7 @@ it('отвязывает пользователя и сбрасывает лок
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users/telegga-user-1/link*' => Http::response(
+        "api.telegga.net/api/v1/users/{$connection->uuid}/link*" => Http::response(
             body: null,
             status: 204,
         ),
@@ -414,9 +414,9 @@ it('отвязывает пользователя и сбрасывает лок
     expect($connection->refresh()->is_connected)
         ->toBeFalse();
 
-    Http::assertSent(function (Request $request): bool {
+    Http::assertSent(function (Request $request) use ($connection): bool {
         return $request->method() === 'DELETE'
-            && $request->url() === 'https://api.telegga.net/api/v1/users/telegga-user-1/link?bot_id=bot-active';
+            && $request->url() === "https://api.telegga.net/api/v1/users/{$connection->uuid}/link?bot_id=bot-active";
     });
 });
 
@@ -430,7 +430,7 @@ it('удаляет локальную запись только после уд�
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users/telegga-user-1' => Http::response(
+        "api.telegga.net/api/v1/users/{$connection->uuid}" => Http::response(
             body: null,
             status: 204,
         ),
@@ -451,9 +451,9 @@ it('удаляет локальную запись только после уд�
         ->and(TelegramConnectedUser::withTrashed()->find($connection->id)?->trashed())
         ->toBeTrue();
 
-    Http::assertSent(function (Request $request): bool {
+    Http::assertSent(function (Request $request) use ($connection): bool {
         return $request->method() === 'DELETE'
-            && $request->url() === 'https://api.telegga.net/api/v1/users/telegga-user-1';
+            && $request->url() === "https://api.telegga.net/api/v1/users/{$connection->uuid}";
     });
 });
 
@@ -467,7 +467,7 @@ it('сохраняет локальную запись при ошибке уд�
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users/telegga-user-1' => Http::response([
+        "api.telegga.net/api/v1/users/{$connection->uuid}" => Http::response([
             'error' => [
                 'code' => 'internal',
                 'message' => 'Internal error.',
@@ -517,7 +517,7 @@ it('сбрасывает состояние и пишет критический
     Log::spy();
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users/telegga-user-1' => Http::response(
+        "api.telegga.net/api/v1/users/{$connection->uuid}" => Http::response(
             body: null,
             status: 204,
         ),
@@ -574,7 +574,7 @@ it('завершает локальное удаление если повтор
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users/telegga-user-1' => Http::sequence()
+        "api.telegga.net/api/v1/users/{$connection->uuid}" => Http::sequence()
             ->push(['error' => ['code' => 'internal', 'message' => 'Temporary error.']], 503)
             ->push(['error' => ['code' => 'not_found', 'message' => 'User was not found.']], 404),
         'api.telegga.net/api/v1/users*' => Http::response([
@@ -588,7 +588,7 @@ it('завершает локальное удаление если повтор
     expect(TelegramConnectedUser::withTrashed()->find($connection->id)?->trashed())
         ->toBeTrue();
 
-    Http::assertSentCount(3);
+    Http::assertSentCount(2);
 });
 
 it('сбрасывает локальный статус если повтор подтвердил отсутствие привязки в api', function (): void {
@@ -601,7 +601,7 @@ it('сбрасывает локальный статус если повтор �
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users/telegga-user-1/link*' => Http::sequence()
+        "api.telegga.net/api/v1/users/{$connection->uuid}/link*" => Http::sequence()
             ->push(['error' => ['code' => 'internal', 'message' => 'Temporary error.']], 503)
             ->push(['error' => ['code' => 'user_not_linked', 'message' => 'User is not linked.']], 409),
         'api.telegga.net/api/v1/users*' => Http::response([

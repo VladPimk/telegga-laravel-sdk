@@ -383,3 +383,25 @@ it('скрывает ошибку базы данных при поиске ло
 
     test()->fail('Ожидалось исключение ConnectionException.');
 });
+
+it('скрывает ошибку базы данных при пакетном поиске подключений', function (): void {
+    $uuid = Str::uuid()->toString();
+
+    Schema::drop('telegram_connected_users');
+    Http::preventStrayRequests();
+
+    try {
+        app(ConnectionContextResolver::class)->resolveConnections(uuids: [$uuid]);
+    } catch (ConnectionException $exception) {
+        expect($exception->getMessage())
+            ->toBe('Local Telegga connections could not be loaded.')
+            ->and($exception->getPrevious())
+            ->toBeInstanceOf(QueryException::class);
+
+        Http::assertNothingSent();
+
+        return;
+    }
+
+    test()->fail('Ожидалось исключение ConnectionException.');
+});

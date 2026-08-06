@@ -22,6 +22,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Public API response contracts now use typed DTOs and typed collections instead of unstructured objects.
 - Group listing now supports cursor pagination through `GroupPageData`.
 - Bulk group membership results now expose documented `not_found` external identifiers.
+- User routes and message history now use local connection UUIDs directly as supported Telegga `external_id` values.
+- Bulk group membership now validates the explicitly supplied local UUIDs in one database query and sends them in one `external_ids` API request.
 
 ### Fixed
 

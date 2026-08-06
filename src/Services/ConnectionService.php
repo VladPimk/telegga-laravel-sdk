@@ -142,11 +142,10 @@ final class ConnectionService
      */
     public function get(string $uuid): UserData
     {
-        $context = $this->contexts->resolveUser(uuid: $uuid);
-        $userId = $context->user->user_id;
+        $connection = $this->contexts->resolveConnection(uuid: $uuid);
 
         try {
-            return $this->users->get(userId: $userId);
+            return $this->users->get(userId: $connection->uuid);
         } catch (TeleggaApiException $exception) {
             throw new ConnectionException(
                 message: $exception->getMessage(),
@@ -223,12 +222,11 @@ final class ConnectionService
             );
         }
 
-        $context = $this->contexts->resolveUser(uuid: $uuid);
-        $userId = $context->user->user_id;
+        $connection = $this->contexts->resolveConnection(uuid: $uuid);
 
         try {
             $response = $this->users->update(
-                userId: $userId,
+                userId: $connection->uuid,
                 data: $data,
             );
         } catch (TeleggaApiException $exception) {
@@ -240,7 +238,7 @@ final class ConnectionService
         }
 
         $this->synchronize(
-            connection: $context->connection,
+            connection: $connection,
             response: $response,
             data: $data,
         );
@@ -253,11 +251,10 @@ final class ConnectionService
      */
     public function delete(string $uuid): void
     {
-        $context = $this->contexts->resolveUser(uuid: $uuid);
-        $userId = $context->user->user_id;
+        $connection = $this->contexts->resolveConnection(uuid: $uuid);
 
         try {
-            $this->users->delete(userId: $userId);
+            $this->users->delete(userId: $connection->uuid);
         } catch (TeleggaApiException $exception) {
             if (! $exception->wasRetried() || $exception->apiCode !== 'not_found') {
                 throw new ConnectionException(
@@ -269,10 +266,10 @@ final class ConnectionService
         }
 
         try {
-            $context->connection->delete();
+            $connection->delete();
         } catch (Throwable $exception) {
             $this->handleLocalDeletionFailure(
-                connection: $context->connection,
+                connection: $connection,
                 deletionException: $exception,
             );
         }
@@ -284,11 +281,10 @@ final class ConnectionService
     public function regenerateCode(string $uuid): ConnectionData
     {
         $context = $this->contexts->resolveBot(uuid: $uuid);
-        $userId = $context->user->user_id;
 
         try {
             return $this->users->regenerateCode(
-                userId: $userId,
+                userId: $context->connection->uuid,
                 botId: $context->link->bot_id,
             );
         } catch (TeleggaApiException $exception) {
@@ -306,11 +302,10 @@ final class ConnectionService
     public function unlink(string $uuid): void
     {
         $context = $this->contexts->resolveBot(uuid: $uuid);
-        $userId = $context->user->user_id;
 
         try {
             $this->users->unlink(
-                userId: $userId,
+                userId: $context->connection->uuid,
                 botId: $context->link->bot_id,
             );
         } catch (TeleggaApiException $exception) {

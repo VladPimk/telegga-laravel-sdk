@@ -181,12 +181,11 @@ final class GroupService
     public function addConnection(string $uuid, string $groupId): UserGroupMembershipData
     {
         $this->validateGroupId(groupId: $groupId);
-        $context = $this->contexts->resolveUser(uuid: $uuid);
-        $userId = $context->user->user_id;
+        $connection = $this->contexts->resolveConnection(uuid: $uuid);
 
         try {
             return $this->users->addToGroup(
-                userId: $userId,
+                userId: $connection->uuid,
                 groupId: $groupId,
             );
         } catch (TeleggaApiException $exception) {
@@ -205,12 +204,11 @@ final class GroupService
     public function removeConnection(string $uuid, string $groupId): void
     {
         $this->validateGroupId(groupId: $groupId);
-        $context = $this->contexts->resolveUser(uuid: $uuid);
-        $userId = $context->user->user_id;
+        $connection = $this->contexts->resolveConnection(uuid: $uuid);
 
         try {
             $this->users->removeFromGroup(
-                userId: $userId,
+                userId: $connection->uuid,
                 groupId: $groupId,
             );
         } catch (TeleggaApiException $exception) {
@@ -232,20 +230,13 @@ final class GroupService
     {
         $this->validateGroupId(groupId: $groupId);
         $uuids = $this->normalizeUuids(uuids: $uuids, groupId: $groupId);
-        $userIds = [];
-
-        foreach ($uuids as $uuid) {
-            $context = $this->contexts->resolveUser(uuid: $uuid);
-            $userIds[] = $context->user->user_id;
-        }
-
-        $userIds = array_values(array_unique($userIds));
+        $this->contexts->resolveConnections(uuids: $uuids);
 
         try {
             return $this->mapper->fromAddMembers(
                 response: $this->client->post(
                     uri: 'groups/'.rawurlencode($groupId).'/members',
-                    data: ['user_ids' => $userIds],
+                    data: ['external_ids' => $uuids],
                     idempotent: true,
                 )->object(),
             );
@@ -264,12 +255,11 @@ final class GroupService
     public function removeMember(string $groupId, string $uuid): void
     {
         $this->validateGroupId(groupId: $groupId);
-        $context = $this->contexts->resolveUser(uuid: $uuid);
-        $userId = $context->user->user_id;
+        $connection = $this->contexts->resolveConnection(uuid: $uuid);
 
         try {
             $this->client->delete(
-                uri: 'groups/'.rawurlencode($groupId).'/members/'.rawurlencode($userId),
+                uri: 'groups/'.rawurlencode($groupId).'/members/'.rawurlencode($connection->uuid),
             );
         } catch (TeleggaApiException $exception) {
             throw new GroupException(

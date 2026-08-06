@@ -49,16 +49,6 @@ it('получает историю сообщений только для ук�
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users*' => Http::response([
-            'user_id' => 'telegga-user-1',
-            'external_id' => $connection->uuid,
-            'links' => [
-                [
-                    'bot_id' => 'bot-revoked',
-                    'status' => 'revoked',
-                ],
-            ],
-        ]),
         'api.telegga.net/api/v1/messages*' => Http::response([
             'data' => [
                 [
@@ -97,7 +87,7 @@ it('получает историю сообщений только для ук�
         ->and($page->raw()->new_page_field)
         ->toBe('new-value');
 
-    Http::assertSent(function (Request $request): bool {
+    Http::assertSent(function (Request $request) use ($connection): bool {
         if (
             $request->method() !== 'GET'
             || ! str_starts_with($request->url(), 'https://api.telegga.net/api/v1/messages?')
@@ -112,7 +102,7 @@ it('получает историю сообщений только для ук�
         );
 
         return $query === [
-            'user_id' => 'telegga-user-1',
+            'user_id' => $connection->uuid,
             'from' => '2026-07-01T10:00:00+03:00',
             'to' => '2026-07-30T18:30:00+03:00',
             'status' => 'sent',
@@ -120,7 +110,7 @@ it('получает историю сообщений только для ук�
         ];
     });
 
-    Http::assertSentCount(2);
+    Http::assertSentCount(1);
 });
 
 it('возвращает null вместо отсутствующего курсора следующей страницы', function (): void {
@@ -132,10 +122,6 @@ it('возвращает null вместо отсутствующего курс
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users*' => Http::response([
-            'user_id' => 'telegga-user-1',
-            'external_id' => $connection->uuid,
-        ]),
         'api.telegga.net/api/v1/messages*' => Http::response([
             'data' => [],
         ]),
@@ -154,7 +140,7 @@ it('возвращает null вместо отсутствующего курс
         ->and($page->next_cursor)
         ->toBeNull();
 
-    Http::assertSent(function (Request $request): bool {
+    Http::assertSent(function (Request $request) use ($connection): bool {
         if (
             $request->method() !== 'GET'
             || ! str_starts_with($request->url(), 'https://api.telegga.net/api/v1/messages?')
@@ -169,7 +155,7 @@ it('возвращает null вместо отсутствующего курс
         );
 
         return $query === [
-            'user_id' => 'telegga-user-1',
+            'user_id' => $connection->uuid,
             'from' => '2026-07-01T00:00:00+00:00',
             'to' => '2026-07-30T23:59:59+00:00',
         ];
@@ -226,19 +212,13 @@ it('не запрашивает историю с обратным диапаз�
     test()->fail('Ожидалось исключение MessageException.');
 });
 
-it('отклоняет пользователя Telegga без user_id', function (): void {
+it('не запрашивает историю для локального подключения, не созданного в Telegga', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
     Http::preventStrayRequests();
-    Http::fake([
-        'api.telegga.net/api/v1/users*' => Http::response([
-            'external_id' => $connection->uuid,
-        ]),
-    ]);
 
     try {
         app(TeleggaInterface::class)->getMessages(
@@ -248,15 +228,13 @@ it('отклоняет пользователя Telegga без user_id', functio
         );
     } catch (ConnectionException $exception) {
         expect($exception->getMessage())
-            ->toBe('Telegga returned an invalid user lookup response: required string field "user_id" is missing or invalid.')
+            ->toBe('Telegga connection is not created.')
             ->and($exception->connectionUuid)
             ->toBe($connection->uuid)
             ->and($exception->getPrevious())
-            ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
-            ->toBe('invalid_response');
+            ->toBeNull();
 
-        Http::assertSentCount(1);
+        Http::assertNothingSent();
 
         return;
     }
@@ -273,10 +251,6 @@ it('скрывает ошибку api при получении истории �
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users*' => Http::response([
-            'user_id' => 'telegga-user-1',
-            'external_id' => $connection->uuid,
-        ]),
         'api.telegga.net/api/v1/messages*' => Http::response([
             'error' => [
                 'code' => 'rate_limited',
@@ -316,10 +290,6 @@ it('отклоняет некорректную страницу истории 
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users*' => Http::response([
-            'user_id' => 'telegga-user-1',
-            'external_id' => $connection->uuid,
-        ]),
         'api.telegga.net/api/v1/messages*' => Http::response([
             'data' => 'not-an-array',
         ]),

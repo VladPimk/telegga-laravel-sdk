@@ -130,11 +130,10 @@ final class MessageService
             );
         }
 
-        $context = $this->connections->resolveUser(uuid: $uuid);
-        $userId = $context->user->user_id;
+        $connection = $this->connections->resolveConnection(uuid: $uuid);
 
         $query = [
-            'user_id' => $userId,
+            'user_id' => $connection->uuid,
             'from' => $from->format(DATE_RFC3339),
             'to' => $to->format(DATE_RFC3339),
         ];

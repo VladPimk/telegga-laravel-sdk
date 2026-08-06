@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Telegga\Laravel\Resolvers;
 
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Collection;
 use Telegga\Laravel\Dto\UserData;
 use Telegga\Laravel\Dto\UserLinkData;
 use Telegga\Laravel\Exceptions\ConnectionException;
@@ -32,7 +33,7 @@ final class ConnectionContextResolver
      */
     public function resolve(string $uuid): object
     {
-        $context = $this->resolveUser(uuid: $uuid);
+        $context = $this->resolveUser(uuid: $uuid, withBot: true);
         $botName = $this->getBotName(connection: $context->connection);
         $link = $this->findBotLink(
             user: $context->user,
@@ -62,16 +63,9 @@ final class ConnectionContextResolver
      *     user: UserData
      * }
      */
-    public function resolveUser(string $uuid): object
+    public function resolveUser(string $uuid, bool $withBot = false): object
     {
-        $connection = $this->findConnection(uuid: $uuid);
-
-        if (! $connection->is_created) {
-            throw new ConnectionException(
-                message: 'Telegga connection is not created.',
-                connectionUuid: $connection->uuid,
-            );
-        }
+        $connection = $this->resolveConnection(uuid: $uuid, withBot: $withBot);
 
         try {
             $user = $this->users->findByExternalId(externalId: $connection->uuid);
@@ -90,6 +84,64 @@ final class ConnectionContextResolver
     }
 
     /**
+     * Получить созданное локальное подключение без запроса к Telegga.
+     */
+    public function resolveConnection(string $uuid, bool $withBot = false): TelegramConnectedUser
+    {
+        $connection = $this->findConnection(uuid: $uuid, withBot: $withBot);
+
+        if (! $connection->is_created) {
+            throw new ConnectionException(
+                message: 'Telegga connection is not created.',
+                connectionUuid: $connection->uuid,
+            );
+        }
+
+        return $connection;
+    }
+
+    /**
+     * Получить созданные локальные подключения без запросов к Telegga.
+     *
+     * @param  array<int, string>  $uuids
+     * @return Collection<int, TelegramConnectedUser>
+     */
+    public function resolveConnections(array $uuids): Collection
+    {
+        try {
+            $connections = TelegramConnectedUser::query()
+                ->whereIn('uuid', $uuids)
+                ->get()
+                ->keyBy('uuid');
+        } catch (QueryException $exception) {
+            throw new ConnectionException(
+                message: 'Local Telegga connections could not be loaded.',
+                previous: $exception,
+            );
+        }
+
+        return collect($uuids)->map(function (string $uuid) use ($connections): TelegramConnectedUser {
+            $connection = $connections->get($uuid);
+
+            if (! $connection instanceof TelegramConnectedUser) {
+                throw new ConnectionException(
+                    message: 'Telegga connection was not found.',
+                    connectionUuid: $uuid,
+                );
+            }
+
+            if (! $connection->is_created) {
+                throw new ConnectionException(
+                    message: 'Telegga connection is not created.',
+                    connectionUuid: $uuid,
+                );
+            }
+
+            return $connection;
+        });
+    }
+
+    /**
      * Получить локальное подключение, пользователя Telegga и привязку к боту.
      *
      * @return object{
@@ -100,7 +152,7 @@ final class ConnectionContextResolver
      */
     public function resolveBot(string $uuid): object
     {
-        $context = $this->resolveUser(uuid: $uuid);
+        $context = $this->resolveUser(uuid: $uuid, withBot: true);
         $botName = $this->getBotName(connection: $context->connection);
         $link = $this->findBotLink(
             user: $context->user,
@@ -125,11 +177,16 @@ final class ConnectionContextResolver
     /**
      * Найти локальное подключение по UUID.
      */
-    private function findConnection(string $uuid): TelegramConnectedUser
+    private function findConnection(string $uuid, bool $withBot): TelegramConnectedUser
     {
         try {
-            $connection = TelegramConnectedUser::query()
-                ->with('telegramBot')
+            $query = TelegramConnectedUser::query();
+
+            if ($withBot) {
+                $query->with('telegramBot');
+            }
+
+            $connection = $query
                 ->where('uuid', $uuid)
                 ->first();
         } catch (QueryException $exception) {
