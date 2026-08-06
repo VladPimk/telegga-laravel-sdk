@@ -313,9 +313,12 @@ final class Telegga implements TeleggaInterface
     /**
      * Загрузить медиафайл.
      */
-    public function uploadMedia(string $path): object
+    public function uploadMedia(string $contents, string $filename): object
     {
-        return $this->media->upload(path: $path);
+        return $this->media->upload(
+            contents: $contents,
+            filename: $filename,
+        );
     }
 
     /**

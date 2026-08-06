@@ -14,7 +14,7 @@ final class MediaException extends TeleggaException
     public function __construct(
         string $message,
         public readonly ?string $mediaId = null,
-        public readonly ?string $filePath = null,
+        public readonly ?string $filename = null,
         ?Throwable $previous = null,
     ) {
         parent::__construct(message: $message, previous: $previous);

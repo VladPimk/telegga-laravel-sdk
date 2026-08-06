@@ -309,11 +309,12 @@ The `data` field is returned as a `Collection` of objects without a rigid DTO, k
 
 ## Media files
 
-Upload a file as multipart data from a readable local path:
+Upload a file by passing its binary contents and filename. The package sends the contents directly to Telegga as multipart data and never receives or resolves a project filesystem path:
 
 ```php
 $media = $telegga->uploadMedia(
-    path: storage_path('app/photo.jpg'),
+    contents: $uploadedFile->getContent(),
+    filename: $uploadedFile->getClientOriginalName(),
 );
 
 $mediaId = $media->media_id;
@@ -327,7 +328,7 @@ $metadata = $telegga->getMedia(
 );
 ```
 
-Both methods return the original API response objects without rigid DTOs. The package does not determine the MIME type or enforce size limits itself. File contents, supported types, and limits are validated by the Telegga API. Neither the file nor its `media_id` is stored locally.
+Both methods return the original API response objects without rigid DTOs. Empty contents, empty filenames, and payloads larger than the API-wide 50 MB limit are rejected before an HTTP request is sent. Telegga determines the media type from its contents and applies the type-specific limit, including the 10 MB photo limit. Neither the file, its path, nor its `media_id` is stored locally.
 
 ## Groups
 

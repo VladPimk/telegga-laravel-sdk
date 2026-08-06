@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace Telegga\Laravel\Services;
 
-use InvalidArgumentException;
 use Telegga\Laravel\Exceptions\MediaException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Http\TeleggaClient;
 
 final class MediaService
 {
+    private const int MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
+
     /**
      * Создать сервис медиафайлов.
      */
@@ -21,12 +22,26 @@ final class MediaService
     /**
      * Загрузить медиафайл.
      */
-    public function upload(string $path): object
+    public function upload(string $contents, string $filename): object
     {
-        if (trim($path) === '') {
+        if ($contents === '') {
             throw new MediaException(
-                message: 'Media file path cannot be empty.',
-                filePath: $path,
+                message: 'Media file contents cannot be empty.',
+                filename: $filename,
+            );
+        }
+
+        if (trim($filename) === '') {
+            throw new MediaException(
+                message: 'Media filename cannot be empty.',
+                filename: $filename,
+            );
+        }
+
+        if (strlen($contents) > self::MAX_FILE_SIZE_BYTES) {
+            throw new MediaException(
+                message: 'Media file exceeds the maximum size of 50 MB.',
+                filename: $filename,
             );
         }
 
@@ -34,13 +49,14 @@ final class MediaService
             return $this->ensureObject(
                 response: $this->client->upload(
                     uri: 'media',
-                    path: $path,
+                    contents: $contents,
+                    filename: $filename,
                 )->object(),
             );
-        } catch (InvalidArgumentException|TeleggaApiException $exception) {
+        } catch (TeleggaApiException $exception) {
             throw new MediaException(
                 message: $exception->getMessage(),
-                filePath: $path,
+                filename: $filename,
                 previous: $exception,
             );
         }

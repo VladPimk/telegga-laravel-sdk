@@ -179,7 +179,7 @@ interface TeleggaInterface
     /**
      * Загрузить медиафайл.
      */
-    public function uploadMedia(string $path): object;
+    public function uploadMedia(string $contents, string $filename): object;
 
     /**
      * Получить метаданные медиафайла.

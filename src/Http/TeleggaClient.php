@@ -119,33 +119,17 @@ final class TeleggaClient
     /**
      * Загрузить файл.
      */
-    public function upload(string $uri, string $path): Response
+    public function upload(string $uri, string $contents, string $filename): Response
     {
-        if (! is_file($path) || ! is_readable($path)) {
-            throw new InvalidArgumentException(message: 'Media file is not readable.');
-        }
-
-        $stream = fopen($path, 'rb');
-
-        if ($stream === false) {
-            throw new InvalidArgumentException(message: 'Media file cannot be opened.');
-        }
-
-        try {
-            $response = $this->execute(
-                request: fn (PendingRequest $request): Response => $request
-                    ->attach(
-                        name: 'file',
-                        contents: $stream,
-                        filename: basename($path),
-                    )
-                    ->post(url: $uri),
-            );
-        } finally {
-            fclose($stream);
-        }
-
-        return $response;
+        return $this->execute(
+            request: fn (PendingRequest $request): Response => $request
+                ->attach(
+                    name: 'file',
+                    contents: $contents,
+                    filename: $filename,
+                )
+                ->post(url: $uri),
+        );
     }
 
     /**
