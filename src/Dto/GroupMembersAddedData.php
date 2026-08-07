@@ -9,7 +9,7 @@ use Illuminate\Support\Collection;
 final readonly class GroupMembersAddedData extends ApiResponseData
 {
     /**
-     * Создать результат массового добавления участников.
+     * Create a bulk member addition result.
      *
      * @param  Collection<int, string>  $not_found
      */

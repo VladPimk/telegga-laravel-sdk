@@ -16,7 +16,7 @@ beforeEach(function (): void {
     $this->telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
 });
 
-it('получает пользователя Telegga по uuid локального подключения', function (): void {
+it('gets a Telegga user by local connection UUID', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -58,7 +58,7 @@ it('получает пользователя Telegga по uuid локально
     Http::assertSentCount(1);
 });
 
-it('обновляет пользователя Telegga и локальные имя и email', function (): void {
+it('updates a Telegga user and local name and email', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'email' => 'ivan@example.com',
@@ -114,7 +114,7 @@ it('обновляет пользователя Telegga и локальные и
     });
 });
 
-it('очищает локальный email после успешной очистки в Telegga', function (): void {
+it('clears the local email after successfully clearing it in Telegga', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'email' => 'ivan@example.com',
@@ -144,7 +144,7 @@ it('очищает локальный email после успешной очис
         ->toBeNull();
 });
 
-it('сохраняет локальный email при обновлении только имени', function (): void {
+it('preserves the local email when updating only the name', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'email' => 'ivan@example.com',
@@ -179,7 +179,7 @@ it('сохраняет локальный email при обновлении то
         ->toBe('ivan@example.com');
 });
 
-it('отклоняет невалидный тип email в ответе Telegga', function (): void {
+it('rejects an invalid email type in a Telegga response', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'email' => 'ivan@example.com',
@@ -221,7 +221,7 @@ it('отклоняет невалидный тип email в ответе Telegga
     test()->fail('Expected ConnectionException.');
 });
 
-it('не отправляет пустое обновление подключения', function (): void {
+it('does not send an empty connection update', function (): void {
     Http::preventStrayRequests();
 
     try {
@@ -240,10 +240,10 @@ it('не отправляет пустое обновление подключе
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('останавливает операцию при отсутствии user id в ответе Telegga', function (): void {
+it('stops the operation when user_id is missing from the Telegga response', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -276,10 +276,10 @@ it('останавливает операцию при отсутствии user
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('выпускает новый код через bot id ожидающей привязки', function (): void {
+it('generates a new code through the bot_id of a pending link', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -322,7 +322,7 @@ it('выпускает новый код через bot id ожидающей п
     });
 });
 
-it('не выпускает код без привязки пользователя к боту', function (): void {
+it('does not generate a code without a user-to-bot link', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -355,10 +355,10 @@ it('не выпускает код без привязки пользовате�
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('отвязывает пользователя и сбрасывает локальный статус подключения', function (): void {
+it('unlinks a user and resets the local connection status', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -398,7 +398,7 @@ it('отвязывает пользователя и сбрасывает лок
     });
 });
 
-it('удаляет локальную запись только после удаления пользователя Telegga', function (): void {
+it('deletes the local record only after deleting the Telegga user', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -435,7 +435,7 @@ it('удаляет локальную запись только после уд�
     });
 });
 
-it('сохраняет локальную запись при ошибке удаления в api', function (): void {
+it('preserves the local record when API deletion fails', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -476,10 +476,10 @@ it('сохраняет локальную запись при ошибке уд�
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('сбрасывает состояние и пишет критический лог при сбое локального удаления', function (): void {
+it('resets state and writes a critical log when local deletion fails', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -539,10 +539,10 @@ it('сбрасывает состояние и пишет критический
         TelegramConnectedUser::clearBootedModels();
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('завершает локальное удаление если повтор подтвердил отсутствие пользователя в api', function (): void {
+it('completes local deletion when a retry confirms the API user is absent', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -569,7 +569,7 @@ it('завершает локальное удаление если повтор
     Http::assertSentCount(2);
 });
 
-it('сбрасывает локальный статус если повтор подтвердил отсутствие привязки в api', function (): void {
+it('resets local status when a retry confirms the API link is absent', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,

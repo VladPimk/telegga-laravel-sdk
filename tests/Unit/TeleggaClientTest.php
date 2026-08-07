@@ -8,7 +8,7 @@ use Illuminate\Support\Sleep;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Http\TeleggaClient;
 
-it('подписывает запрос api ключом и возвращает json', function () {
+it('authorizes an API request with the key and returns JSON', function () {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
@@ -34,7 +34,7 @@ it('подписывает запрос api ключом и возвращает
     ));
 });
 
-it('преобразует ошибку api и сохраняет retry after', function () {
+it('maps an API error and preserves retry after', function () {
     Sleep::fake();
     Http::preventStrayRequests();
     Http::fake([
@@ -73,10 +73,10 @@ it('преобразует ошибку api и сохраняет retry after', 
         return;
     }
 
-    test()->fail('Ожидалось исключение TeleggaApiException.');
+    test()->fail('Expected a TeleggaApiException.');
 });
 
-it('скрывает ошибку транспорта', function () {
+it('wraps a transport error', function () {
     Sleep::fake();
     Http::preventStrayRequests();
     Http::fake([
@@ -107,10 +107,10 @@ it('скрывает ошибку транспорта', function () {
         return;
     }
 
-    test()->fail('Ожидалось исключение TeleggaApiException.');
+    test()->fail('Expected a TeleggaApiException.');
 });
 
-it('повторяет безопасный get после временных ошибок', function (): void {
+it('retries a safe GET request after temporary errors', function (): void {
     Sleep::fake();
     Http::preventStrayRequests();
     Http::fake([
@@ -139,7 +139,7 @@ it('повторяет безопасный get после временных о
     ]);
 });
 
-it('учитывает retry after при повторе идемпотентного post', function (): void {
+it('honors retry after when retrying an idempotent POST request', function (): void {
     Sleep::fake();
     Http::preventStrayRequests();
     Http::fake([
@@ -174,7 +174,7 @@ it('учитывает retry after при повторе идемпотентн�
     ]);
 });
 
-it('не повторяет неидемпотентный post', function (): void {
+it('does not retry a non-idempotent POST request', function (): void {
     Sleep::fake();
     Http::preventStrayRequests();
     Http::fake([
@@ -203,10 +203,10 @@ it('не повторяет неидемпотентный post', function (): v
         return;
     }
 
-    test()->fail('Ожидалось исключение TeleggaApiException.');
+    test()->fail('Expected a TeleggaApiException.');
 });
 
-it('возвращает последнюю ошибку после исчерпания попыток', function (): void {
+it('returns the final error after exhausting attempts', function (): void {
     Sleep::fake();
     Http::preventStrayRequests();
     Http::fake([
@@ -236,10 +236,10 @@ it('возвращает последнюю ошибку после исчерп
         return;
     }
 
-    test()->fail('Ожидалось исключение TeleggaApiException.');
+    test()->fail('Expected a TeleggaApiException.');
 });
 
-it('не повторяет постоянную ошибку идемпотентного запроса', function (): void {
+it('does not retry a permanent idempotent request error', function (): void {
     Sleep::fake();
     Http::preventStrayRequests();
     Http::fake([
@@ -269,10 +269,10 @@ it('не повторяет постоянную ошибку идемпотен
         return;
     }
 
-    test()->fail('Ожидалось исключение TeleggaApiException.');
+    test()->fail('Expected a TeleggaApiException.');
 });
 
-it('отклоняет запрос без api ключа', function () {
+it('rejects a request without an API key', function () {
     $client = new TeleggaClient(
         http: app(Factory::class),
         baseUrl: 'https://api.telegga.net/api/v1',
@@ -284,7 +284,7 @@ it('отклоняет запрос без api ключа', function () {
     $client->get(uri: 'bots');
 })->throws(TeleggaApiException::class, 'Telegga API key is not configured.');
 
-it('отклоняет незащищённый базовый адрес api', function (): void {
+it('rejects an insecure API base URL', function (): void {
     Http::preventStrayRequests();
 
     $client = new TeleggaClient(
@@ -307,5 +307,5 @@ it('отклоняет незащищённый базовый адрес api', 
         return;
     }
 
-    test()->fail('Ожидалось исключение TeleggaApiException.');
+    test()->fail('Expected a TeleggaApiException.');
 });

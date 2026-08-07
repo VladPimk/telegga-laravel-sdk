@@ -10,14 +10,14 @@ use Telegga\Laravel\Dto\BotData;
 final class BotResponseMapper
 {
     /**
-     * Создать mapper ответов ботов.
+     * Create the bot response mapper.
      */
     public function __construct(
         private readonly ResponseReader $reader,
     ) {}
 
     /**
-     * Преобразовать ответ списка ботов.
+     * Map a bot list response.
      *
      * @return Collection<int, BotData>
      */
@@ -39,7 +39,7 @@ final class BotResponseMapper
     }
 
     /**
-     * Преобразовать данные бота.
+     * Map bot data.
      */
     private function mapBot(mixed $response): BotData
     {

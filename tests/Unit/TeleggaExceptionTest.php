@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 
-it('предоставляет данные вложенной ошибки Telegga API', function (): void {
+it('exposes nested Telegga API error data', function (): void {
     $apiException = new TeleggaApiException(
         message: 'Rate limit exceeded.',
         status: 429,
@@ -38,7 +38,7 @@ it('предоставляет данные вложенной ошибки Tele
         ->toBeFalse();
 });
 
-it('предоставляет собственные данные прямой ошибки Telegga API', function (): void {
+it('exposes direct Telegga API error data', function (): void {
     $exception = new TeleggaApiException(
         message: 'Telegga API request failed.',
         status: 503,
@@ -55,7 +55,7 @@ it('предоставляет собственные данные прямой 
         ->toBeTrue();
 });
 
-it('возвращает пустые данные без вложенной ошибки Telegga API', function (): void {
+it('returns empty data without a nested Telegga API error', function (): void {
     $exception = new ConnectionException(
         message: 'Local connection failed.',
         connectionUuid: 'connection-uuid',
@@ -71,7 +71,7 @@ it('возвращает пустые данные без вложенной о�
         ->toBeFalse();
 });
 
-it('не считает клиентскую ошибку повторяемой', function (): void {
+it('does not treat a client error as retryable', function (): void {
     $apiException = new TeleggaApiException(
         message: 'User is not linked.',
         status: 409,
@@ -93,7 +93,7 @@ it('не считает клиентскую ошибку повторяемой
         ->toBeTrue();
 });
 
-it('предоставляет количество попыток из вложенной ошибки api', function (): void {
+it('exposes the attempt count from a nested API error', function (): void {
     $apiException = new TeleggaApiException(
         message: 'User is not linked.',
         status: 409,
@@ -114,7 +114,7 @@ it('предоставляет количество попыток из влож
         ->toBeTrue();
 });
 
-it('считает любой серверный статус повторяемым', function (): void {
+it('treats every server error status as retryable', function (): void {
     $exception = new TeleggaApiException(
         message: 'Not implemented.',
         status: 501,

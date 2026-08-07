@@ -7,7 +7,7 @@ namespace Telegga\Laravel\Webhooks;
 final readonly class WebhookProcessingResult
 {
     /**
-     * Создать результат обработки webhook.
+     * Create a webhook processing result.
      */
     public function __construct(
         public WebhookProcessingStatus $status,

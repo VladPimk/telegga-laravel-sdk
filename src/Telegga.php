@@ -32,7 +32,7 @@ use Telegga\Laravel\Services\MessageService;
 final class Telegga implements TeleggaInterface
 {
     /**
-     * Создать сервис Telegga.
+     * Create the Telegga service.
      */
     public function __construct(
         private readonly ConnectionService $connections,

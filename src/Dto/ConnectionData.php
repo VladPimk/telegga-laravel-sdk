@@ -7,7 +7,7 @@ namespace Telegga\Laravel\Dto;
 final readonly class ConnectionData extends ApiResponseData
 {
     /**
-     * Создать данные подключения пользователя.
+     * Create user connection data.
      */
     public function __construct(
         public string $user_id,

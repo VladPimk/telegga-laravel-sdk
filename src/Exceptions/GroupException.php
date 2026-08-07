@@ -9,7 +9,7 @@ use Throwable;
 final class GroupException extends TeleggaException
 {
     /**
-     * Создать исключение группы.
+     * Create a group exception.
      */
     public function __construct(
         string $message,

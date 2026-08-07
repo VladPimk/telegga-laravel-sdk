@@ -9,7 +9,7 @@ use Illuminate\Support\ServiceProvider;
 final class TestDatabaseServiceProvider extends ServiceProvider
 {
     /**
-     * Зарегистрировать миграции тестового приложения.
+     * Register test application migrations.
      */
     public function boot(): void
     {

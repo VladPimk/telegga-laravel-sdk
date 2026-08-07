@@ -9,14 +9,14 @@ use Telegga\Laravel\Dto\MediaData;
 final class MediaResponseMapper
 {
     /**
-     * Создать mapper ответов медиафайлов.
+     * Create the media response mapper.
      */
     public function __construct(
         private readonly ResponseReader $reader,
     ) {}
 
     /**
-     * Преобразовать ответ загрузки медиафайла.
+     * Map a media upload response.
      */
     public function fromUpload(mixed $response): MediaData
     {
@@ -24,7 +24,7 @@ final class MediaResponseMapper
     }
 
     /**
-     * Преобразовать ответ получения медиафайла.
+     * Map a media response.
      */
     public function fromGet(mixed $response): MediaData
     {
@@ -32,7 +32,7 @@ final class MediaResponseMapper
     }
 
     /**
-     * Преобразовать данные медиафайла.
+     * Map media file data.
      */
     private function mapMedia(mixed $response, string $context): MediaData
     {

@@ -18,7 +18,7 @@ beforeEach(function (): void {
     $this->telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
 });
 
-it('разрешает контекст подключения через активную привязку Telegga', function (): void {
+it('resolves a connection context through an active Telegga link', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -79,7 +79,7 @@ it('разрешает контекст подключения через акт
     });
 });
 
-it('сопоставляет имя бота без учёта регистра', function (): void {
+it('matches a bot name case-insensitively', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -111,7 +111,7 @@ it('сопоставляет имя бота без учёта регистра'
         ->toBe('MyBot');
 });
 
-it('разрешает пользователя Telegga без активной привязки к боту', function (): void {
+it('resolves a Telegga user without an active bot link', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -149,7 +149,7 @@ it('разрешает пользователя Telegga без активной 
         ->not->toHaveProperty('link');
 });
 
-it('отдаёт приоритет активной привязке при разрешении любой привязки к боту', function (): void {
+it('prioritizes an active link when resolving any bot link', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -184,7 +184,7 @@ it('отдаёт приоритет активной привязке при р�
         ->toBe('bot-active');
 });
 
-it('не обращается к api для неизвестного локального подключения', function (): void {
+it('does not call the API for an unknown local connection', function (): void {
     $uuid = Str::uuid()->toString();
 
     Http::preventStrayRequests();
@@ -202,10 +202,10 @@ it('не обращается к api для неизвестного локал�
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('не обращается к api для ещё не созданного подключения', function (): void {
+it('does not call the API for a connection that is not yet created', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'available_telegram_bot_id' => $this->telegramBot->id,
@@ -228,10 +228,10 @@ it('не обращается к api для ещё не созданного п�
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('скрывает ошибку api при поиске пользователя Telegga', function (): void {
+it('wraps an API error when looking up a Telegga user', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -263,10 +263,10 @@ it('скрывает ошибку api при поиске пользовател
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('отклоняет пользователя Telegga без активной привязки к боту', function (): void {
+it('rejects a Telegga user without an active bot link', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -301,10 +301,10 @@ it('отклоняет пользователя Telegga без активной 
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('не принимает привязку при неполном совпадении имени бота', function (): void {
+it('does not accept a link when the bot name only partially matches', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -337,10 +337,10 @@ it('не принимает привязку при неполном совпа�
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('скрывает ошибку базы данных при поиске локального подключения', function (): void {
+it('wraps a database error when looking up a local connection', function (): void {
     $uuid = Str::uuid()->toString();
 
     $this->dropConnectionTable();
@@ -359,10 +359,10 @@ it('скрывает ошибку базы данных при поиске ло
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('скрывает ошибку базы данных при пакетном поиске подключений', function (): void {
+it('wraps a database error during a bulk connection lookup', function (): void {
     $uuid = Str::uuid()->toString();
 
     $this->dropConnectionTable();
@@ -381,5 +381,5 @@ it('скрывает ошибку базы данных при пакетном 
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });

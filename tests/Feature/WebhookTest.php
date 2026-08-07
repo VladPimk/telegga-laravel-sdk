@@ -12,7 +12,7 @@ use Telegga\Laravel\Models\TeleggaWebhookEvent;
 use Telegga\Laravel\Models\TelegramConnectedUser;
 
 /**
- * Создать полный payload события подключения пользователя.
+ * Create a complete user connection event payload.
  *
  * @param  array<string, mixed>  $overrides
  * @param  array<int, string>  $except
@@ -40,7 +40,7 @@ beforeEach(function (): void {
     $this->eventId = 'd5b7d0e1-0000-4000-8000-000000000001';
 });
 
-it('регистрирует маршрут webhook по ожидаемому адресу', function (): void {
+it('registers the webhook route at the expected URI', function (): void {
     $route = Route::getRoutes()->getByName('telegga.webhooks.connect-account');
 
     expect($route)
@@ -56,7 +56,7 @@ it('регистрирует маршрут webhook по ожидаемому а
         ]);
 });
 
-it('принимает событие подключения и идемпотентно возвращает результат', function (): void {
+it('accepts a connection event and returns the result idempotently', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -140,7 +140,7 @@ it('принимает событие подключения и идемпоте
         ->toBeEmpty();
 });
 
-it('регистрирует новый event id для уже подключённого пользователя', function (): void {
+it('records a new event_id for an already connected user', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -174,7 +174,7 @@ it('регистрирует новый event id для уже подключё�
         ->toBeTrue();
 });
 
-it('отклоняет event id, уже связанный с другим подключением', function (): void {
+it('rejects an event_id already assigned to another connection', function (): void {
     Log::spy();
     $firstConnection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
@@ -233,7 +233,7 @@ it('отклоняет event id, уже связанный с другим по�
         );
 });
 
-it('завершает ранее зарегистрированное необработанное событие', function (): void {
+it('completes a previously recorded unprocessed event', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -262,7 +262,7 @@ it('завершает ранее зарегистрированное необ�
         ->not->toBeNull();
 });
 
-it('принимает тестовое событие и возвращает результат без изменения подключений', function (): void {
+it('accepts a test event without changing connections', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -289,7 +289,7 @@ it('принимает тестовое событие и возвращает �
         ->toBeTrue();
 });
 
-it('возвращает ошибку для неизвестного external id', function (): void {
+it('returns an error for an unknown external_id', function (): void {
     Log::spy();
     DB::flushQueryLog();
     DB::enableQueryLog();
@@ -339,7 +339,7 @@ it('возвращает ошибку для неизвестного external i
         );
 });
 
-it('возвращает отдельную ошибку для удалённого подключения', function (): void {
+it('returns a distinct error for a deleted connection', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -373,7 +373,7 @@ it('возвращает отдельную ошибку для удалённо
         ->toBeTrue();
 });
 
-it('восстанавливает локальное состояние по авторизованному user linked', function (): void {
+it('restores local state from an authorized user linked event', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'available_telegram_bot_id' => $this->telegramBot->id,
@@ -410,7 +410,7 @@ it('восстанавливает локальное состояние по а
         ->not->toBeNull();
 });
 
-it('возвращает отдельную ошибку для удалённого связанного бота', function (): void {
+it('returns a distinct error for a deleted related bot', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -445,7 +445,7 @@ it('возвращает отдельную ошибку для удалённо
         ->toBeTrue();
 });
 
-it('возвращает отдельную ошибку для отсутствующего связанного бота', function (): void {
+it('returns a distinct error for a missing related bot', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -482,7 +482,7 @@ it('возвращает отдельную ошибку для отсутств
         ->toBeTrue();
 });
 
-it('сравнивает имя бота без учёта регистра', function (): void {
+it('compares a bot name case-insensitively', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -502,7 +502,7 @@ it('сравнивает имя бота без учёта регистра', fu
         ->toBeTrue();
 });
 
-it('возвращает ошибку при несовпадении имени бота', function (): void {
+it('returns an error when the bot name does not match', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -537,7 +537,7 @@ it('возвращает ошибку при несовпадении имени
         ->toBeTrue();
 });
 
-it('отклоняет неизвестное событие', function (): void {
+it('rejects an unknown event', function (): void {
     $this
         ->withToken('webhook-secret')
         ->postJson('/webhooks/v1/telegram/connect-account', [
@@ -554,7 +554,7 @@ it('отклоняет неизвестное событие', function (): void
         ]);
 });
 
-it('отклоняет webhook без bearer токена', function (): void {
+it('rejects a webhook without a bearer token', function (): void {
     $this
         ->postJson('/webhooks/v1/telegram/connect-account', [
             'event' => 'test',
@@ -569,7 +569,7 @@ it('отклоняет webhook без bearer токена', function (): void {
         ]);
 });
 
-it('отклоняет webhook с неверным bearer токеном', function (): void {
+it('rejects a webhook with an invalid bearer token', function (): void {
     Log::spy();
 
     $this
@@ -595,7 +595,7 @@ it('отклоняет webhook с неверным bearer токеном', funct
         );
 });
 
-it('ограничивает частоту запросов webhook до проверки bearer токена', function (): void {
+it('rate-limits webhook requests before bearer token validation', function (): void {
     Log::spy();
 
     for ($attempt = 1; $attempt <= 60; $attempt++) {
@@ -625,7 +625,7 @@ it('ограничивает частоту запросов webhook до про
         );
 });
 
-it('отклоняет webhook при пустом токене в конфигурации', function (): void {
+it('rejects a webhook when the configured token is empty', function (): void {
     config()->set('telegga.webhook_token', '');
 
     $this
@@ -643,7 +643,7 @@ it('отклоняет webhook при пустом токене в конфиг�
         ]);
 });
 
-it('отклоняет payload без названия события', function (): void {
+it('rejects a payload without an event name', function (): void {
     Log::spy();
 
     $this
@@ -666,7 +666,7 @@ it('отклоняет payload без названия события', function
         );
 });
 
-it('отклоняет событие подключения без event id', function (): void {
+it('rejects a connection event without an event_id', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -697,7 +697,7 @@ it('отклоняет событие подключения без event id', f
         ->toBeTrue();
 });
 
-it('требует документированные поля события подключения', function (
+it('requires documented connection event fields', function (
     string $field,
     string $message,
 ): void {
@@ -724,7 +724,7 @@ it('требует документированные поля события п
     'linked at' => ['linked_at', 'Webhook linked_at is required.'],
 ]);
 
-it('требует документированные поля тестового события', function (
+it('requires documented test event fields', function (
     string $field,
     string $message,
 ): void {
@@ -751,7 +751,7 @@ it('требует документированные поля тестовог�
     'sent at' => ['sent_at', 'Webhook sent_at is required.'],
 ]);
 
-it('отклоняет некорректное название события', function (mixed $event): void {
+it('rejects an invalid event name', function (mixed $event): void {
     $this
         ->withToken('webhook-secret')
         ->postJson('/webhooks/v1/telegram/connect-account', [
@@ -766,13 +766,13 @@ it('отклоняет некорректное название события'
             ],
         ]);
 })->with([
-    'пустая строка' => '',
-    'строка из пробелов' => '   ',
-    'число' => 1,
-    'массив' => [[]],
+    'empty string' => '',
+    'whitespace-only string' => '   ',
+    'number' => 1,
+    'array' => [[]],
 ]);
 
-it('отклоняет некорректное поле события подключения', function (
+it('rejects an invalid connection event field', function (
     string $field,
     mixed $value,
     string $message,
@@ -800,17 +800,17 @@ it('отклоняет некорректное поле события подк
         ->assertBadRequest()
         ->assertExactJson($expected);
 })->with([
-    'пустой event id' => ['event_id', '', 'Webhook event_id must be a non-empty string.'],
-    'event id из пробелов' => ['event_id', '   ', 'Webhook event_id must be a non-empty string.'],
-    'null вместо event id' => ['event_id', null, 'Webhook event_id must be a non-empty string.'],
-    'числовой event id' => ['event_id', 1, 'Webhook event_id must be a non-empty string.'],
-    'external id из пробелов' => ['external_id', '   ', 'Webhook external_id is required.'],
-    'числовой external id' => ['external_id', 1, 'Webhook external_id is required.'],
-    'имя бота из пробелов' => ['bot_username', '   ', 'Webhook bot_username is required.'],
-    'числовое имя бота' => ['bot_username', 1, 'Webhook bot_username is required.'],
+    'empty event_id' => ['event_id', '', 'Webhook event_id must be a non-empty string.'],
+    'whitespace-only event_id' => ['event_id', '   ', 'Webhook event_id must be a non-empty string.'],
+    'null event_id' => ['event_id', null, 'Webhook event_id must be a non-empty string.'],
+    'numeric event_id' => ['event_id', 1, 'Webhook event_id must be a non-empty string.'],
+    'whitespace-only external_id' => ['external_id', '   ', 'Webhook external_id is required.'],
+    'numeric external_id' => ['external_id', 1, 'Webhook external_id is required.'],
+    'whitespace-only bot name' => ['bot_username', '   ', 'Webhook bot_username is required.'],
+    'numeric bot name' => ['bot_username', 1, 'Webhook bot_username is required.'],
 ]);
 
-it('отклоняет событие подключения без external id', function (): void {
+it('rejects a connection event without an external_id', function (): void {
     $this
         ->withToken('webhook-secret')
         ->postJson('/webhooks/v1/telegram/connect-account', userLinkedWebhookPayload(
@@ -828,7 +828,7 @@ it('отклоняет событие подключения без external id'
         ]);
 });
 
-it('отклоняет событие подключения без имени бота', function (): void {
+it('rejects a connection event without a bot name', function (): void {
     $this
         ->withToken('webhook-secret')
         ->postJson('/webhooks/v1/telegram/connect-account', userLinkedWebhookPayload(
@@ -846,7 +846,7 @@ it('отклоняет событие подключения без имени �
         ]);
 });
 
-it('возвращает json с серверной ошибкой при недоступной локальной таблице', function (): void {
+it('returns server error JSON when the local table is unavailable', function (): void {
     Schema::disableForeignKeyConstraints();
 
     try {

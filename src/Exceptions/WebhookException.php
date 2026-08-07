@@ -9,7 +9,7 @@ use Throwable;
 final class WebhookException extends TeleggaException
 {
     /**
-     * Создать исключение webhook.
+     * Create a webhook exception.
      */
     public function __construct(
         string $message,

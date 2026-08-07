@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Создать таблицу событий webhook Telegga.
+     * Create the Telegga webhook events table.
      */
     public function up(): void
     {
@@ -31,7 +31,7 @@ return new class extends Migration
     }
 
     /**
-     * Удалить таблицу событий webhook Telegga.
+     * Drop the Telegga webhook events table.
      */
     public function down(): void
     {

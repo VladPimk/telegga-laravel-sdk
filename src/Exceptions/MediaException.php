@@ -9,7 +9,7 @@ use Throwable;
 final class MediaException extends TeleggaException
 {
     /**
-     * Создать исключение медиафайла.
+     * Create a media file exception.
      */
     public function __construct(
         string $message,

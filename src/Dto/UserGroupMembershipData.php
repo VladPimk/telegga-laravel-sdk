@@ -7,7 +7,7 @@ namespace Telegga\Laravel\Dto;
 final readonly class UserGroupMembershipData extends ApiResponseData
 {
     /**
-     * Создать результат добавления пользователя в группу.
+     * Create a user group membership result.
      */
     public function __construct(
         public string $group_id,

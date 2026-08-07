@@ -26,7 +26,7 @@ use Telegga\Laravel\Models\AvailableTelegramBot;
 interface TeleggaInterface
 {
     /**
-     * Создать подключение пользователя.
+     * Create a user connection.
      *
      * @param  array<string, mixed>  $meta
      */
@@ -40,7 +40,7 @@ interface TeleggaInterface
     ): ConnectionData;
 
     /**
-     * Повторно отправить существующее подключение.
+     * Resend an existing connection.
      *
      * @param  array<string, mixed>  $meta
      */
@@ -51,12 +51,12 @@ interface TeleggaInterface
     ): ConnectionData;
 
     /**
-     * Получить подключённого пользователя.
+     * Get a connected user.
      */
     public function getConnection(string $uuid): UserData;
 
     /**
-     * Получить список подключений Telegga.
+     * Get a list of Telegga connections.
      */
     public function getConnections(
         ?string $email = null,
@@ -66,29 +66,29 @@ interface TeleggaInterface
     ): UserPageData;
 
     /**
-     * Обновить подключённого пользователя.
+     * Update a connected user.
      *
      * @param  array<string, mixed>  $data
      */
     public function updateConnection(string $uuid, array $data): UserData;
 
     /**
-     * Удалить подключённого пользователя.
+     * Delete a connected user.
      */
     public function deleteConnection(string $uuid): void;
 
     /**
-     * Выпустить новый код подключения.
+     * Generate a new connection code.
      */
     public function regenerateConnectionCode(string $uuid): ConnectionData;
 
     /**
-     * Отвязать подключённого пользователя от бота.
+     * Unlink a connected user from the bot.
      */
     public function unlinkConnection(string $uuid): void;
 
     /**
-     * Создать группу для бота подключения.
+     * Create a group for the connection bot.
      */
     public function createGroup(
         string $uuid,
@@ -97,51 +97,51 @@ interface TeleggaInterface
     ): GroupData;
 
     /**
-     * Получить группы бота подключения.
+     * Get groups for the connection bot.
      */
     public function getGroups(string $uuid, ?string $cursor = null): GroupPageData;
 
     /**
-     * Получить группу.
+     * Get a group.
      */
     public function getGroup(string $groupId): GroupData;
 
     /**
-     * Обновить группу.
+     * Update a group.
      *
      * @param  array<string, mixed>  $data
      */
     public function updateGroup(string $groupId, array $data): GroupData;
 
     /**
-     * Удалить группу.
+     * Delete a group.
      */
     public function deleteGroup(string $groupId): void;
 
     /**
-     * Добавить подключение в группу через маршрут пользователя.
+     * Add a connection to a group through the user endpoint.
      */
     public function addConnectionToGroup(string $uuid, string $groupId): UserGroupMembershipData;
 
     /**
-     * Удалить подключение из группы через маршрут пользователя.
+     * Remove a connection from a group through the user endpoint.
      */
     public function removeConnectionFromGroup(string $uuid, string $groupId): void;
 
     /**
-     * Добавить подключения в группу через групповой маршрут.
+     * Add connections to a group through the group endpoint.
      *
      * @param  array<int, string>  $uuids
      */
     public function addGroupMembers(string $groupId, array $uuids): GroupMembersAddedData;
 
     /**
-     * Удалить подключение из группы через групповой маршрут.
+     * Remove a connection from a group through the group endpoint.
      */
     public function removeGroupMember(string $groupId, string $uuid): void;
 
     /**
-     * Запустить рассылку.
+     * Start a broadcast.
      *
      * @param  array<string, mixed>  $data
      */
@@ -153,17 +153,17 @@ interface TeleggaInterface
     ): BroadcastCreatedData;
 
     /**
-     * Получить прогресс рассылки.
+     * Get broadcast progress.
      */
     public function getBroadcast(string $broadcastId): BroadcastData;
 
     /**
-     * Отменить рассылку.
+     * Cancel a broadcast.
      */
     public function cancelBroadcast(string $broadcastId): BroadcastCancellationData;
 
     /**
-     * Отправить сообщение.
+     * Send a message.
      *
      * @param  array<string, mixed>  $data
      */
@@ -174,12 +174,12 @@ interface TeleggaInterface
     ): QueuedMessageData;
 
     /**
-     * Получить сообщение по идентификатору.
+     * Get a message by its identifier.
      */
     public function getMessage(string $messageId): MessageData;
 
     /**
-     * Получить историю сообщений пользователя.
+     * Get user message history.
      */
     public function getMessages(
         string $uuid,
@@ -190,36 +190,36 @@ interface TeleggaInterface
     ): MessagePageData;
 
     /**
-     * Загрузить медиафайл.
+     * Upload a media file.
      */
     public function uploadMedia(string $contents, string $filename): MediaData;
 
     /**
-     * Получить метаданные медиафайла.
+     * Get media file metadata.
      */
     public function getMedia(string $mediaId): MediaData;
 
     /**
-     * Получить список доступных ботов.
+     * Get a list of available bots.
      *
      * @return Collection<int, BotData>
      */
     public function getBots(): Collection;
 
     /**
-     * Добавить доступного Telegram-бота.
+     * Add an available Telegram bot.
      */
     public function addTelegramBot(string $botName): AvailableTelegramBot;
 
     /**
-     * Получить локально доступных Telegram-ботов.
+     * Get locally available Telegram bots.
      *
      * @return Collection<int, AvailableTelegramBot>
      */
     public function getAvailableBots(): Collection;
 
     /**
-     * Удалить локально доступного Telegram-бота.
+     * Delete a locally available Telegram bot.
      */
     public function deleteTelegramBot(string $uuid): void;
 }

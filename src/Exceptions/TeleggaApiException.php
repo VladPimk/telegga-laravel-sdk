@@ -10,7 +10,7 @@ use Throwable;
 final class TeleggaApiException extends TeleggaException
 {
     /**
-     * Создать исключение Telegga API.
+     * Create a Telegga API exception.
      *
      * @param  array<string, mixed>  $response
      */
@@ -27,7 +27,7 @@ final class TeleggaApiException extends TeleggaException
     }
 
     /**
-     * Создать исключение из HTTP-ответа.
+     * Create an exception from an HTTP response.
      */
     public static function fromResponse(Response $response, int $attempts = 1): self
     {

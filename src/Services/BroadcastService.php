@@ -16,7 +16,7 @@ use Telegga\Laravel\Resolvers\ConnectionContextResolver;
 final class BroadcastService
 {
     /**
-     * Создать сервис рассылок.
+     * Create the broadcast service.
      */
     public function __construct(
         private readonly TeleggaClient $client,
@@ -25,7 +25,7 @@ final class BroadcastService
     ) {}
 
     /**
-     * Запустить рассылку.
+     * Start a broadcast.
      *
      * @param  array<string, mixed>  $data
      */
@@ -89,7 +89,7 @@ final class BroadcastService
     }
 
     /**
-     * Получить прогресс рассылки.
+     * Get broadcast progress.
      */
     public function get(string $broadcastId): BroadcastData
     {
@@ -111,7 +111,7 @@ final class BroadcastService
     }
 
     /**
-     * Отменить рассылку.
+     * Cancel a broadcast.
      */
     public function cancel(string $broadcastId): BroadcastCancellationData
     {
@@ -133,7 +133,7 @@ final class BroadcastService
     }
 
     /**
-     * Проверить идентификатор рассылки.
+     * Validate a broadcast identifier.
      */
     private function validateBroadcastId(string $broadcastId): void
     {

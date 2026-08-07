@@ -9,7 +9,7 @@ use RuntimeException;
 abstract class TeleggaException extends RuntimeException
 {
     /**
-     * Получить HTTP-статус ответа Telegga API.
+     * Get the Telegga API response HTTP status.
      */
     public function apiStatus(): ?int
     {
@@ -17,7 +17,7 @@ abstract class TeleggaException extends RuntimeException
     }
 
     /**
-     * Получить код ошибки Telegga API.
+     * Get the Telegga API error code.
      */
     public function apiCode(): ?string
     {
@@ -25,7 +25,7 @@ abstract class TeleggaException extends RuntimeException
     }
 
     /**
-     * Получить задержку перед повторным запросом.
+     * Get the delay before a retry.
      */
     public function retryAfter(): ?int
     {
@@ -33,7 +33,7 @@ abstract class TeleggaException extends RuntimeException
     }
 
     /**
-     * Определить, допускает ли ошибка повторный запрос.
+     * Determine whether the error allows a retry.
      */
     public function isRetryable(): bool
     {
@@ -45,7 +45,7 @@ abstract class TeleggaException extends RuntimeException
     }
 
     /**
-     * Получить количество выполненных HTTP-попыток.
+     * Get the number of HTTP attempts made.
      */
     public function attempts(): int
     {
@@ -55,7 +55,7 @@ abstract class TeleggaException extends RuntimeException
     }
 
     /**
-     * Определить, выполнялся ли повторный HTTP-запрос.
+     * Determine whether an HTTP request was retried.
      */
     public function wasRetried(): bool
     {
@@ -63,7 +63,7 @@ abstract class TeleggaException extends RuntimeException
     }
 
     /**
-     * Определить, сообщает ли API об уже достигнутом состоянии.
+     * Determine whether the API reports an already achieved state.
      */
     public function isAlreadyInDesiredState(): bool
     {
@@ -75,7 +75,7 @@ abstract class TeleggaException extends RuntimeException
     }
 
     /**
-     * Найти ошибку Telegga API в цепочке исключений.
+     * Find a Telegga API error in the exception chain.
      */
     private function apiException(): ?TeleggaApiException
     {

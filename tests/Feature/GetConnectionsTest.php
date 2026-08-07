@@ -13,7 +13,7 @@ use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Models\AvailableTelegramBot;
 
-it('получает страницу подключений по email статусу и курсору', function (): void {
+it('gets a connection page by email status and cursor', function (): void {
     $response = $this->apiFixture(path: 'users/list-by-email');
     $response['data'][0]['new_api_field'] = 'new-value';
 
@@ -46,7 +46,7 @@ it('получает страницу подключений по email стат
     });
 });
 
-it('преобразует локальный uuid бота в bot_id для списка подключений', function (): void {
+it('resolves a local bot UUID to bot_id for the connection list', function (): void {
     $telegramBot = AvailableTelegramBot::query()->create([
         'bot_name' => 'mybot',
     ]);
@@ -90,7 +90,7 @@ it('преобразует локальный uuid бота в bot_id для с�
     Http::assertSentCount(2);
 });
 
-it('не выполняет запрос для неизвестного локального бота', function (): void {
+it('does not send a request for an unknown local bot', function (): void {
     $telegramBotUuid = Str::uuid()->toString();
     Http::preventStrayRequests();
 
@@ -107,10 +107,10 @@ it('не выполняет запрос для неизвестного лок�
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('скрывает некорректный ответ списка подключений', function (): void {
+it('wraps an invalid connection list response', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/users' => Http::response([
@@ -127,5 +127,5 @@ it('скрывает некорректный ответ списка подкл
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });

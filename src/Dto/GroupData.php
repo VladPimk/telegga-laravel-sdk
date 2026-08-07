@@ -7,7 +7,7 @@ namespace Telegga\Laravel\Dto;
 final readonly class GroupData extends ApiResponseData
 {
     /**
-     * Создать данные группы.
+     * Create group data.
      */
     public function __construct(
         public string $group_id,

@@ -7,7 +7,7 @@ namespace Telegga\Laravel\Dto;
 final readonly class DeliveryAttemptData extends ApiResponseData
 {
     /**
-     * Создать данные попытки доставки сообщения.
+     * Create message delivery attempt data.
      */
     public function __construct(
         public string $at,

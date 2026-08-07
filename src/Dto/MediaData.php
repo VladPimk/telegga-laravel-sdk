@@ -7,7 +7,7 @@ namespace Telegga\Laravel\Dto;
 final readonly class MediaData extends ApiResponseData
 {
     /**
-     * Создать данные медиафайла.
+     * Create media file data.
      */
     public function __construct(
         public string $media_id,

@@ -9,7 +9,7 @@ use Illuminate\Support\Collection;
 final readonly class UserData extends ApiResponseData
 {
     /**
-     * Создать данные пользователя Telegga.
+     * Create Telegga user data.
      *
      * @param  Collection<int, UserLinkData>  $links
      * @param  Collection<int, UserGroupData>  $groups

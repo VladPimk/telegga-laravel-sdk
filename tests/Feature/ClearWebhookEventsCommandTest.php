@@ -12,7 +12,7 @@ use Telegga\Laravel\Models\TeleggaWebhookEvent;
 use Telegga\Laravel\Models\TelegramConnectedUser;
 
 /**
- * Создать запись события с заданными временными метками.
+ * Create an event record with the specified timestamps.
  */
 function createWebhookEventForCleanup(
     int $connectionId,
@@ -47,7 +47,7 @@ afterEach(function (): void {
     Carbon::setTestNow();
 });
 
-it('по умолчанию удаляет только события старше девяноста дней', function (): void {
+it('deletes only events older than ninety days by default', function (): void {
     Log::spy();
     createWebhookEventForCleanup(
         connectionId: $this->connection->id,
@@ -91,7 +91,7 @@ it('по умолчанию удаляет только события стар�
         );
 });
 
-it('использует переданное количество дней', function (): void {
+it('uses the provided number of days', function (): void {
     createWebhookEventForCleanup(
         connectionId: $this->connection->id,
         eventId: 'old-event',
@@ -115,7 +115,7 @@ it('использует переданное количество дней', fu
         ->toBe(['recent-event']);
 });
 
-it('удаляет большой журнал чанками по тысяче записей', function (): void {
+it('deletes a large event log in chunks of one thousand records', function (): void {
     collect(range(1, 1001))
         ->chunk(500)
         ->each(function ($numbers): void {
@@ -152,7 +152,7 @@ it('удаляет большой журнал чанками по тысяче 
         ->toHaveCount(2);
 });
 
-it('отклоняет некорректное количество дней без удаления событий', function (string $days): void {
+it('rejects an invalid day count without deleting events', function (string $days): void {
     Log::spy();
     createWebhookEventForCleanup(
         connectionId: $this->connection->id,
@@ -180,13 +180,13 @@ it('отклоняет некорректное количество дней б
                 && $context['error_code'] === 'invalid_days',
         );
 })->with([
-    'ноль' => '0',
-    'отрицательное число' => '-1',
-    'нечисловое значение' => 'invalid',
-    'дробное число' => '1.5',
+    'zero' => '0',
+    'negative number' => '-1',
+    'non-numeric value' => 'invalid',
+    'fractional number' => '1.5',
 ]);
 
-it('логирует ошибку базы данных и возвращает неуспешный код', function (): void {
+it('logs a database error and returns a failure code', function (): void {
     Schema::drop('telegga_webhook_events');
     Log::spy();
 

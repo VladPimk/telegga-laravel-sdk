@@ -15,7 +15,7 @@ use Telegga\Laravel\Webhooks\WebhookProcessingStatus;
 final class WebhookService
 {
     /**
-     * Обработать событие подключения пользователя.
+     * Process a user connection event.
      */
     public function markConnected(
         string $eventId,
@@ -90,7 +90,7 @@ final class WebhookService
     }
 
     /**
-     * Найти локальное подключение по внешнему идентификатору.
+     * Find a local connection by external identifier.
      */
     private function findConnection(string $externalId): ?TelegramConnectedUser
     {
@@ -108,7 +108,7 @@ final class WebhookService
     }
 
     /**
-     * Найти ранее принятое событие.
+     * Find a previously accepted event.
      */
     private function findEvent(string $eventId): ?TeleggaWebhookEvent
     {
@@ -125,7 +125,7 @@ final class WebhookService
     }
 
     /**
-     * Обработать повторно принятое событие.
+     * Handle a repeatedly received event.
      */
     private function handleExistingEvent(
         TeleggaWebhookEvent $webhookEvent,
@@ -163,7 +163,7 @@ final class WebhookService
     }
 
     /**
-     * Проверить назначенного подключению Telegram-бота.
+     * Validate the Telegram bot assigned to the connection.
      */
     private function validateBot(
         TelegramConnectedUser $connection,
@@ -208,7 +208,7 @@ final class WebhookService
     }
 
     /**
-     * Зарегистрировать первое получение события.
+     * Record the first delivery of an event.
      */
     private function registerEvent(
         string $eventId,
@@ -237,7 +237,7 @@ final class WebhookService
     }
 
     /**
-     * Выполнить эффект события и отметить его обработанным.
+     * Apply the event effect and mark it as processed.
      */
     private function processEvent(
         TeleggaWebhookEvent $webhookEvent,

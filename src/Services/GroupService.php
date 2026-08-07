@@ -17,7 +17,7 @@ use Telegga\Laravel\Resolvers\ConnectionContextResolver;
 final class GroupService
 {
     /**
-     * Создать сервис групп.
+     * Create the group service.
      */
     public function __construct(
         private readonly TeleggaClient $client,
@@ -27,7 +27,7 @@ final class GroupService
     ) {}
 
     /**
-     * Создать группу для бота подключения.
+     * Create a group for the connection bot.
      */
     public function create(
         string $uuid,
@@ -68,7 +68,7 @@ final class GroupService
     }
 
     /**
-     * Получить группы бота подключения.
+     * Get groups for the connection bot.
      */
     public function getAll(string $uuid, ?string $cursor = null): GroupPageData
     {
@@ -96,7 +96,7 @@ final class GroupService
     }
 
     /**
-     * Получить группу.
+     * Get a group.
      */
     public function get(string $groupId): GroupData
     {
@@ -118,7 +118,7 @@ final class GroupService
     }
 
     /**
-     * Обновить группу.
+     * Update a group.
      *
      * @param  array<string, mixed>  $data
      */
@@ -151,7 +151,7 @@ final class GroupService
     }
 
     /**
-     * Удалить группу.
+     * Delete a group.
      */
     public function delete(string $groupId): void
     {
@@ -176,7 +176,7 @@ final class GroupService
     }
 
     /**
-     * Добавить подключение в группу через маршрут пользователя.
+     * Add a connection to a group through the user endpoint.
      */
     public function addConnection(string $uuid, string $groupId): UserGroupMembershipData
     {
@@ -199,7 +199,7 @@ final class GroupService
     }
 
     /**
-     * Удалить подключение из группы через маршрут пользователя.
+     * Remove a connection from a group through the user endpoint.
      */
     public function removeConnection(string $uuid, string $groupId): void
     {
@@ -222,7 +222,7 @@ final class GroupService
     }
 
     /**
-     * Добавить подключения в группу через групповой маршрут.
+     * Add connections to a group through the group endpoint.
      *
      * @param  array<int, string>  $uuids
      */
@@ -250,7 +250,7 @@ final class GroupService
     }
 
     /**
-     * Удалить подключение из группы через групповой маршрут.
+     * Remove a connection from a group through the group endpoint.
      */
     public function removeMember(string $groupId, string $uuid): void
     {
@@ -272,7 +272,7 @@ final class GroupService
     }
 
     /**
-     * Проверить идентификатор группы.
+     * Validate a group identifier.
      */
     private function validateGroupId(string $groupId): void
     {
@@ -285,7 +285,7 @@ final class GroupService
     }
 
     /**
-     * Нормализовать UUID подключений.
+     * Normalize connection UUIDs.
      *
      * @param  array<int, mixed>  $uuids
      * @return array<int, string>

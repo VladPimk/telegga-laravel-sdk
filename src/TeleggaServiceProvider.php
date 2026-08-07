@@ -22,7 +22,7 @@ use Telegga\Laravel\Services\WebhookService;
 final class TeleggaServiceProvider extends ServiceProvider
 {
     /**
-     * Зарегистрировать сервисы пакета.
+     * Register package services.
      */
     public function register(): void
     {
@@ -56,7 +56,7 @@ final class TeleggaServiceProvider extends ServiceProvider
     }
 
     /**
-     * Загрузить ресурсы пакета.
+     * Load package resources.
      */
     public function boot(): void
     {

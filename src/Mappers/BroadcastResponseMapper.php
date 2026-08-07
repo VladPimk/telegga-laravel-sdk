@@ -11,14 +11,14 @@ use Telegga\Laravel\Dto\BroadcastData;
 final class BroadcastResponseMapper
 {
     /**
-     * Создать mapper ответов рассылок.
+     * Create the broadcast response mapper.
      */
     public function __construct(
         private readonly ResponseReader $reader,
     ) {}
 
     /**
-     * Преобразовать ответ запуска рассылки.
+     * Map a broadcast start response.
      */
     public function fromStart(mixed $response): BroadcastCreatedData
     {
@@ -33,7 +33,7 @@ final class BroadcastResponseMapper
     }
 
     /**
-     * Преобразовать ответ получения рассылки.
+     * Map a broadcast response.
      */
     public function fromGet(mixed $response): BroadcastData
     {
@@ -52,7 +52,7 @@ final class BroadcastResponseMapper
     }
 
     /**
-     * Преобразовать ответ отмены рассылки.
+     * Map a broadcast cancellation response.
      */
     public function fromCancel(mixed $response): BroadcastCancellationData
     {

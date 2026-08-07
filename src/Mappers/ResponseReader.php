@@ -9,7 +9,7 @@ use Telegga\Laravel\Exceptions\TeleggaApiException;
 final class ResponseReader
 {
     /**
-     * Получить объект ответа.
+     * Get a response object.
      */
     public function object(mixed $response, string $context): object
     {
@@ -24,7 +24,7 @@ final class ResponseReader
     }
 
     /**
-     * Получить обязательное строковое поле.
+     * Get a required string field.
      */
     public function requiredString(object $response, string $field, string $context): string
     {
@@ -41,7 +41,7 @@ final class ResponseReader
     }
 
     /**
-     * Получить необязательное строковое поле.
+     * Get an optional string field.
      */
     public function nullableString(object $response, string $field, string $context): ?string
     {
@@ -60,7 +60,7 @@ final class ResponseReader
     }
 
     /**
-     * Получить обязательное целочисленное поле.
+     * Get a required integer field.
      */
     public function requiredInteger(object $response, string $field, string $context): int
     {
@@ -77,7 +77,7 @@ final class ResponseReader
     }
 
     /**
-     * Получить необязательное целочисленное поле.
+     * Get an optional integer field.
      */
     public function nullableInteger(object $response, string $field, string $context): ?int
     {
@@ -96,7 +96,7 @@ final class ResponseReader
     }
 
     /**
-     * Получить обязательное логическое поле.
+     * Get a required boolean field.
      */
     public function requiredBoolean(object $response, string $field, string $context): bool
     {
@@ -113,7 +113,7 @@ final class ResponseReader
     }
 
     /**
-     * Получить обязательный массив.
+     * Get a required array.
      *
      * @return array<int, mixed>
      */
@@ -132,7 +132,7 @@ final class ResponseReader
     }
 
     /**
-     * Получить обязательный массив строк.
+     * Get a required string array.
      *
      * @return array<int, string>
      */
@@ -157,7 +157,7 @@ final class ResponseReader
     }
 
     /**
-     * Получить необязательный массив.
+     * Get an optional array.
      *
      * @return array<int, mixed>
      */
@@ -178,7 +178,7 @@ final class ResponseReader
     }
 
     /**
-     * Выбросить ошибку некорректного ответа API.
+     * Throw an invalid API response exception.
      */
     private function invalid(string $context, string $message): never
     {

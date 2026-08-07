@@ -25,7 +25,7 @@ enum WebhookResponseCode: string
     case Internal = 'internal';
 
     /**
-     * Создать код HTTP-ответа из результата обработки webhook.
+     * Create an HTTP response code from a webhook processing result.
      */
     public static function fromProcessingStatus(WebhookProcessingStatus $status): self
     {
@@ -43,7 +43,7 @@ enum WebhookResponseCode: string
     }
 
     /**
-     * Проверить успешность HTTP-ответа.
+     * Determine whether the HTTP response is successful.
      */
     public function successful(): bool
     {
@@ -56,7 +56,7 @@ enum WebhookResponseCode: string
     }
 
     /**
-     * Получить HTTP-статус ответа.
+     * Get the response HTTP status.
      */
     public function httpStatus(): int
     {
@@ -79,7 +79,7 @@ enum WebhookResponseCode: string
     }
 
     /**
-     * Получить сообщение ответа.
+     * Get the response message.
      */
     public function message(): string
     {

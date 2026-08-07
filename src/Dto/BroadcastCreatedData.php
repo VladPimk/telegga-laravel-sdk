@@ -7,7 +7,7 @@ namespace Telegga\Laravel\Dto;
 final readonly class BroadcastCreatedData extends ApiResponseData
 {
     /**
-     * Создать данные запущенной рассылки.
+     * Create started broadcast data.
      */
     public function __construct(
         public string $broadcast_id,

@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Создать таблицу подключений Telegga.
+     * Create the Telegga connections table.
      */
     public function up(): void
     {
@@ -42,7 +42,7 @@ return new class extends Migration
     }
 
     /**
-     * Удалить таблицу подключений Telegga.
+     * Drop the Telegga connections table.
      */
     public function down(): void
     {

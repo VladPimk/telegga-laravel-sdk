@@ -15,7 +15,7 @@ use Telegga\Laravel\Mappers\UserResponseMapper;
 final class UserService
 {
     /**
-     * Создать сервис пользователей.
+     * Create the user service.
      */
     public function __construct(
         private readonly TeleggaClient $client,
@@ -23,7 +23,7 @@ final class UserService
     ) {}
 
     /**
-     * Создать или обновить пользователя Telegga.
+     * Create or update a Telegga user.
      *
      * @param  array<string, mixed>  $meta
      */
@@ -63,7 +63,7 @@ final class UserService
     }
 
     /**
-     * Получить пользователя Telegga по внешнему идентификатору.
+     * Get a Telegga user by external identifier.
      */
     public function findByExternalId(string $externalId): UserData
     {
@@ -76,9 +76,9 @@ final class UserService
     }
 
     /**
-     * Получить список пользователей Telegga.
+     * Get a list of Telegga users.
      *
-     * Поиск по external_id возвращает одиночный объект и выполняется через findByExternalId().
+     * An external_id lookup returns a single object and is performed through findByExternalId().
      *
      * @param  array<string, string>  $query
      */
@@ -99,7 +99,7 @@ final class UserService
     }
 
     /**
-     * Получить пользователя Telegga по идентификатору.
+     * Get a Telegga user by identifier.
      */
     public function get(string $userId): UserData
     {
@@ -111,7 +111,7 @@ final class UserService
     }
 
     /**
-     * Обновить пользователя Telegga.
+     * Update a Telegga user.
      *
      * @param  array<string, mixed>  $data
      */
@@ -127,7 +127,7 @@ final class UserService
     }
 
     /**
-     * Удалить пользователя Telegga.
+     * Delete a Telegga user.
      */
     public function delete(string $userId): void
     {
@@ -138,7 +138,7 @@ final class UserService
     }
 
     /**
-     * Выпустить новый код подключения пользователя.
+     * Generate a new user connection code.
      */
     public function regenerateCode(string $userId, string $botId): ConnectionData
     {
@@ -151,7 +151,7 @@ final class UserService
     }
 
     /**
-     * Отвязать пользователя от бота.
+     * Unlink a user from the bot.
      */
     public function unlink(string $userId, string $botId): void
     {
@@ -163,7 +163,7 @@ final class UserService
     }
 
     /**
-     * Добавить пользователя Telegga в группу.
+     * Add a Telegga user to a group.
      */
     public function addToGroup(string $userId, string $groupId): UserGroupMembershipData
     {
@@ -177,7 +177,7 @@ final class UserService
     }
 
     /**
-     * Удалить пользователя Telegga из группы.
+     * Remove a Telegga user from a group.
      */
     public function removeFromGroup(string $userId, string $groupId): void
     {

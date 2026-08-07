@@ -9,7 +9,7 @@ use Telegga\Laravel\Dto\MediaData;
 use Telegga\Laravel\Exceptions\MediaException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 
-it('загружает медиафайл multipart запросом без потери полей ответа', function (): void {
+it('uploads a media file with a multipart request without losing response fields', function (): void {
     $contents = 'file-content';
     $filename = 'photo.jpg';
 
@@ -50,7 +50,7 @@ it('загружает медиафайл multipart запросом без по
     });
 });
 
-it('получает метаданные медиафайла без потери новых полей ответа', function (): void {
+it('gets media metadata without losing new response fields', function (): void {
     $mediaId = 'e97d00ad-0000-4000-8000-000000000000';
 
     Http::preventStrayRequests();
@@ -83,7 +83,7 @@ it('получает метаданные медиафайла без потер
     });
 });
 
-it('не отправляет запрос с пустым телом медиафайла', function (): void {
+it('does not send a request with empty media contents', function (): void {
     Http::preventStrayRequests();
 
     try {
@@ -106,10 +106,10 @@ it('не отправляет запрос с пустым телом медиа
         return;
     }
 
-    test()->fail('Ожидалось исключение MediaException.');
+    test()->fail('Expected a MediaException.');
 });
 
-it('не отправляет запрос без имени медиафайла', function (): void {
+it('does not send a request without a media filename', function (): void {
     Http::preventStrayRequests();
 
     try {
@@ -132,10 +132,10 @@ it('не отправляет запрос без имени медиафайл�
         return;
     }
 
-    test()->fail('Ожидалось исключение MediaException.');
+    test()->fail('Expected a MediaException.');
 });
 
-it('не отправляет медиафайл больше пятидесяти мегабайт', function (): void {
+it('does not send a media file larger than fifty megabytes', function (): void {
     Http::preventStrayRequests();
 
     try {
@@ -158,10 +158,10 @@ it('не отправляет медиафайл больше пятидесят
         return;
     }
 
-    test()->fail('Ожидалось исключение MediaException.');
+    test()->fail('Expected a MediaException.');
 });
 
-it('скрывает ошибку api при загрузке медиафайла', function (): void {
+it('wraps an API error when uploading a media file', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/media' => Http::response([
@@ -192,10 +192,10 @@ it('скрывает ошибку api при загрузке медиафайл
         return;
     }
 
-    test()->fail('Ожидалось исключение MediaException.');
+    test()->fail('Expected a MediaException.');
 });
 
-it('не отправляет запрос с пустым идентификатором медиафайла', function (): void {
+it('does not send a request with an empty media identifier', function (): void {
     Http::preventStrayRequests();
 
     try {
@@ -215,10 +215,10 @@ it('не отправляет запрос с пустым идентифика�
         return;
     }
 
-    test()->fail('Ожидалось исключение MediaException.');
+    test()->fail('Expected a MediaException.');
 });
 
-it('скрывает ошибку api при получении метаданных медиафайла', function (): void {
+it('wraps an API error when getting media metadata', function (): void {
     $mediaId = 'e97d00ad-0000-4000-8000-000000000000';
 
     Http::preventStrayRequests();
@@ -250,10 +250,10 @@ it('скрывает ошибку api при получении метаданн
         return;
     }
 
-    test()->fail('Ожидалось исключение MediaException.');
+    test()->fail('Expected a MediaException.');
 });
 
-it('отклоняет успешный ответ медиа с некорректным json', function (): void {
+it('rejects a successful media response with invalid JSON', function (): void {
     $mediaId = 'e97d00ad-0000-4000-8000-000000000000';
 
     Http::preventStrayRequests();
@@ -279,5 +279,5 @@ it('отклоняет успешный ответ медиа с некорре�
         return;
     }
 
-    test()->fail('Ожидалось исключение MediaException.');
+    test()->fail('Expected a MediaException.');
 });

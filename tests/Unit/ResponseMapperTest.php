@@ -15,7 +15,7 @@ use Telegga\Laravel\Mappers\GroupResponseMapper;
 use Telegga\Laravel\Mappers\MessageResponseMapper;
 use Telegga\Laravel\Mappers\UserResponseMapper;
 
-it('сохраняет неизвестные поля ответа в исходном объекте DTO', function (): void {
+it('preserves unknown response fields in the raw DTO object', function (): void {
     $response = (object) [
         'data' => [
             (object) [
@@ -37,7 +37,7 @@ it('сохраняет неизвестные поля ответа в исхо�
         ->and($bots->first()?->raw()->new_api_field)->toBe('new-value');
 });
 
-it('создаёт null для отсутствующих необязательных полей подключения', function (): void {
+it('maps missing optional connection fields to null', function (): void {
     $response = (object) [
         'user_id' => 'telegga-user-1',
         'external_id' => 'connection-uuid',
@@ -54,7 +54,7 @@ it('создаёт null для отсутствующих необязатель
         ->and($connection->raw())->toBe($response);
 });
 
-it('преобразует вложенные привязки и группы пользователя в DTO', function (): void {
+it('maps nested user links and groups to DTOs', function (): void {
     $response = (object) [
         'user_id' => 'telegga-user-1',
         'external_id' => 'connection-uuid',
@@ -87,7 +87,7 @@ it('преобразует вложенные привязки и группы �
         ->and($user->groups->first()?->name)->toBe('VIP');
 });
 
-it('преобразует попытки доставки сообщения во вложенные DTO', function (): void {
+it('maps message delivery attempts to nested DTOs', function (): void {
     $response = (object) [
         'message_id' => 'message-1',
         'status' => 'sent',
@@ -109,7 +109,7 @@ it('преобразует попытки доставки сообщения в
         ->and($message->delivery_attempts->first()?->latency_ms)->toBe(42);
 });
 
-it('нормализует пустой курсор страницы групп в null', function (): void {
+it('normalizes an empty group page cursor to null', function (): void {
     $response = (object) [
         'data' => [],
         'next_cursor' => '',
@@ -125,7 +125,7 @@ it('нормализует пустой курсор страницы групп
         ->and($page->raw())->toBe($response);
 });
 
-it('отклоняет некорректный курсор страницы групп', function (): void {
+it('rejects an invalid group page cursor', function (): void {
     expect(fn () => app(GroupResponseMapper::class)->fromList(response: (object) [
         'data' => [],
         'next_cursor' => ['invalid'],
@@ -135,7 +135,7 @@ it('отклоняет некорректный курсор страницы г
     );
 });
 
-it('отклоняет нестроковый external id в результате добавления участников группы', function (): void {
+it('rejects a non-string external id in a group member result', function (): void {
     expect(fn () => app(GroupResponseMapper::class)->fromAddMembers(response: (object) [
         'added' => 1,
         'not_found' => [123],
@@ -145,7 +145,7 @@ it('отклоняет нестроковый external id в результат�
     );
 });
 
-it('отклоняет ответ без обязательного поля', function (): void {
+it('rejects a response without a required field', function (): void {
     try {
         app(MessageResponseMapper::class)->fromSend(response: (object) [
             'status' => 'queued',
@@ -159,10 +159,10 @@ it('отклоняет ответ без обязательного поля', f
         return;
     }
 
-    test()->fail('Ожидалось исключение TeleggaApiException.');
+    test()->fail('Expected a TeleggaApiException.');
 });
 
-it('отклоняет неверный тип необязательного поля', function (): void {
+it('rejects an invalid optional field type', function (): void {
     expect(fn () => app(UserResponseMapper::class)->fromGet(response: (object) [
         'user_id' => 'telegga-user-1',
         'external_id' => 'connection-uuid',

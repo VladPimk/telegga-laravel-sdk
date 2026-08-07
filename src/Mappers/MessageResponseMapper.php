@@ -12,14 +12,14 @@ use Telegga\Laravel\Dto\QueuedMessageData;
 final class MessageResponseMapper
 {
     /**
-     * Создать mapper ответов сообщений.
+     * Create the message response mapper.
      */
     public function __construct(
         private readonly ResponseReader $reader,
     ) {}
 
     /**
-     * Преобразовать ответ отправки сообщения.
+     * Map a message send response.
      */
     public function fromSend(mixed $response): QueuedMessageData
     {
@@ -35,7 +35,7 @@ final class MessageResponseMapper
     }
 
     /**
-     * Преобразовать ответ получения сообщения.
+     * Map a message response.
      */
     public function fromGet(mixed $response): MessageData
     {
@@ -43,7 +43,7 @@ final class MessageResponseMapper
     }
 
     /**
-     * Преобразовать ответ истории сообщений.
+     * Map a message history response.
      */
     public function fromList(mixed $response): MessagePageData
     {
@@ -64,7 +64,7 @@ final class MessageResponseMapper
     }
 
     /**
-     * Преобразовать данные сообщения.
+     * Map message data.
      */
     private function mapMessage(mixed $response, string $context): MessageData
     {
@@ -89,7 +89,7 @@ final class MessageResponseMapper
     }
 
     /**
-     * Преобразовать данные попытки доставки.
+     * Map delivery attempt data.
      */
     private function mapDeliveryAttempt(mixed $response): DeliveryAttemptData
     {

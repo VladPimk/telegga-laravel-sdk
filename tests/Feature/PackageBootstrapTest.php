@@ -21,12 +21,12 @@ use Telegga\Laravel\Services\WebhookService;
 use Telegga\Laravel\Telegga;
 use Telegga\Laravel\TeleggaServiceProvider;
 
-it('загружает сервис провайдер пакета', function () {
+it('loads the package service provider', function () {
     expect($this->app->getProvider(TeleggaServiceProvider::class))
         ->toBeInstanceOf(TeleggaServiceProvider::class);
 });
 
-it('регистрирует публичный контракт и конфигурацию', function () {
+it('registers the public contract and configuration', function () {
     expect(app(TeleggaInterface::class))
         ->toBeInstanceOf(Telegga::class)
         ->and(config('telegga.base_url'))
@@ -41,7 +41,7 @@ it('регистрирует публичный контракт и конфиг
         ->toBe('users');
 });
 
-it('создаёт новый экземпляр для каждого разрешения сервисов пакета', function (): void {
+it('creates a new instance for each package service resolution', function (): void {
     $abstracts = [
         TeleggaClient::class,
         BotService::class,
@@ -61,7 +61,7 @@ it('создаёт новый экземпляр для каждого разр�
     }
 });
 
-it('использует актуальный api ключ при повторном разрешении клиента', function (): void {
+it('uses the current API key when resolving the client again', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response(['data' => []]),
@@ -83,7 +83,7 @@ it('использует актуальный api ключ при повторн
         ->toBeTrue();
 });
 
-it('использует безопасные настройки повторов если секция retry отсутствует', function (): void {
+it('uses safe retry defaults when the retry section is missing', function (): void {
     config(['telegga.retry' => []]);
     Sleep::fake();
     Http::preventStrayRequests();
@@ -105,10 +105,10 @@ it('использует безопасные настройки повторо�
         return;
     }
 
-    test()->fail('Ожидалось исключение TeleggaApiException.');
+    test()->fail('Expected a TeleggaApiException.');
 });
 
-it('загружает миграции пакета через сервис провайдер', function (): void {
+it('loads package migrations through the service provider', function (): void {
     expect(Schema::hasTable('users'))
         ->toBeTrue()
         ->and(Schema::hasTable('available_telegram_bots'))

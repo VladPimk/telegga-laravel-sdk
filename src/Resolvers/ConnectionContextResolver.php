@@ -16,14 +16,14 @@ use Telegga\Laravel\Services\UserService;
 final class ConnectionContextResolver
 {
     /**
-     * Создать резолвер контекста подключения.
+     * Create the connection context resolver.
      */
     public function __construct(
         private readonly UserService $users,
     ) {}
 
     /**
-     * Получить локальное подключение, пользователя Telegga и активную привязку.
+     * Get a local connection, Telegga user, and active link.
      *
      * @return object{
      *     connection: TelegramConnectedUser,
@@ -56,7 +56,7 @@ final class ConnectionContextResolver
     }
 
     /**
-     * Получить локальное подключение и пользователя Telegga.
+     * Get a local connection and Telegga user.
      *
      * @return object{
      *     connection: TelegramConnectedUser,
@@ -84,7 +84,7 @@ final class ConnectionContextResolver
     }
 
     /**
-     * Получить созданное локальное подключение без запроса к Telegga.
+     * Get a created local connection without querying Telegga.
      */
     public function resolveConnection(string $uuid, bool $withBot = false): TelegramConnectedUser
     {
@@ -101,7 +101,7 @@ final class ConnectionContextResolver
     }
 
     /**
-     * Получить созданные локальные подключения без запросов к Telegga.
+     * Get created local connections without querying Telegga.
      *
      * @param  array<int, string>  $uuids
      * @return Collection<int, TelegramConnectedUser>
@@ -142,7 +142,7 @@ final class ConnectionContextResolver
     }
 
     /**
-     * Получить локальное подключение, пользователя Telegga и привязку к боту.
+     * Get a local connection, Telegga user, and bot link.
      *
      * @return object{
      *     connection: TelegramConnectedUser,
@@ -175,7 +175,7 @@ final class ConnectionContextResolver
     }
 
     /**
-     * Найти локальное подключение по UUID.
+     * Find a local connection by UUID.
      */
     private function findConnection(string $uuid, bool $withBot): TelegramConnectedUser
     {
@@ -208,7 +208,7 @@ final class ConnectionContextResolver
     }
 
     /**
-     * Найти доступную привязку пользователя к боту.
+     * Find an available user-to-bot link.
      */
     private function findBotLink(UserData $user, string $botName, bool $activeOnly): ?UserLinkData
     {
@@ -233,7 +233,7 @@ final class ConnectionContextResolver
     }
 
     /**
-     * Получить имя выбранного Telegram-бота.
+     * Get the selected Telegram bot name.
      */
     private function getBotName(TelegramConnectedUser $connection): string
     {
@@ -250,7 +250,7 @@ final class ConnectionContextResolver
     }
 
     /**
-     * Проверить принадлежность привязки выбранному Telegram-боту.
+     * Determine whether a link belongs to the selected Telegram bot.
      */
     private function linkMatchesBot(UserLinkData $link, string $botName): bool
     {

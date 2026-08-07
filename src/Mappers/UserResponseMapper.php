@@ -14,14 +14,14 @@ use Telegga\Laravel\Dto\UserPageData;
 final class UserResponseMapper
 {
     /**
-     * Создать mapper ответов пользователей.
+     * Create the user response mapper.
      */
     public function __construct(
         private readonly ResponseReader $reader,
     ) {}
 
     /**
-     * Преобразовать ответ создания пользователя.
+     * Map a user creation response.
      */
     public function fromCreate(mixed $response): ConnectionData
     {
@@ -29,7 +29,7 @@ final class UserResponseMapper
     }
 
     /**
-     * Преобразовать ответ повторного выпуска кода.
+     * Map a regenerated connection code response.
      */
     public function fromRegenerateCode(mixed $response): ConnectionData
     {
@@ -37,7 +37,7 @@ final class UserResponseMapper
     }
 
     /**
-     * Преобразовать ответ точного поиска пользователя.
+     * Map an exact user lookup response.
      */
     public function fromExternalIdLookup(mixed $response): UserData
     {
@@ -45,7 +45,7 @@ final class UserResponseMapper
     }
 
     /**
-     * Преобразовать ответ получения пользователя.
+     * Map a user response.
      */
     public function fromGet(mixed $response): UserData
     {
@@ -53,7 +53,7 @@ final class UserResponseMapper
     }
 
     /**
-     * Преобразовать ответ обновления пользователя.
+     * Map a user update response.
      */
     public function fromUpdate(mixed $response): UserData
     {
@@ -61,7 +61,7 @@ final class UserResponseMapper
     }
 
     /**
-     * Преобразовать ответ списка пользователей.
+     * Map a user list response.
      */
     public function fromList(mixed $response): UserPageData
     {
@@ -92,7 +92,7 @@ final class UserResponseMapper
     }
 
     /**
-     * Преобразовать ответ добавления пользователя в группу.
+     * Map a user group membership response.
      */
     public function fromAddToGroup(mixed $response): UserGroupMembershipData
     {
@@ -122,7 +122,7 @@ final class UserResponseMapper
     }
 
     /**
-     * Преобразовать ответ подключения пользователя.
+     * Map a user connection response.
      */
     private function mapConnection(mixed $response, string $context): ConnectionData
     {
@@ -141,7 +141,7 @@ final class UserResponseMapper
     }
 
     /**
-     * Преобразовать ответ пользователя.
+     * Map user data.
      */
     private function mapUser(mixed $response, string $context): UserData
     {
@@ -168,7 +168,7 @@ final class UserResponseMapper
     }
 
     /**
-     * Преобразовать привязку пользователя.
+     * Map a user link.
      */
     private function mapLink(mixed $response): UserLinkData
     {
@@ -185,7 +185,7 @@ final class UserResponseMapper
     }
 
     /**
-     * Преобразовать группу пользователя.
+     * Map a user group.
      */
     private function mapUserGroup(mixed $response): UserGroupData
     {

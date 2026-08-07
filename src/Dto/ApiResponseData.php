@@ -7,14 +7,14 @@ namespace Telegga\Laravel\Dto;
 abstract readonly class ApiResponseData
 {
     /**
-     * Создать данные ответа API.
+     * Create API response data.
      */
     public function __construct(
         private object $rawResponse,
     ) {}
 
     /**
-     * Получить исходный объект ответа API.
+     * Get the raw API response object.
      */
     public function raw(): object
     {

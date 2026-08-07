@@ -20,7 +20,7 @@ use Throwable;
 final class ConnectionService
 {
     /**
-     * Создать сервис подключений.
+     * Create the connection service.
      */
     public function __construct(
         private readonly BotService $bots,
@@ -29,7 +29,7 @@ final class ConnectionService
     ) {}
 
     /**
-     * Создать локальное подключение и отправить его в Telegga.
+     * Create a local connection and send it to Telegga.
      *
      * @param  array<string, mixed>  $meta
      */
@@ -79,7 +79,7 @@ final class ConnectionService
     }
 
     /**
-     * Повторно отправить существующее подключение в Telegga.
+     * Resend an existing connection to Telegga.
      *
      * @param  array<string, mixed>  $meta
      */
@@ -138,7 +138,7 @@ final class ConnectionService
     }
 
     /**
-     * Получить подключённого пользователя Telegga.
+     * Get a connected Telegga user.
      */
     public function get(string $uuid): UserData
     {
@@ -156,7 +156,7 @@ final class ConnectionService
     }
 
     /**
-     * Получить список подключений Telegga.
+     * Get a list of Telegga connections.
      */
     public function getAll(
         ?string $email = null,
@@ -209,7 +209,7 @@ final class ConnectionService
     }
 
     /**
-     * Обновить подключённого пользователя Telegga.
+     * Update a connected Telegga user.
      *
      * @param  array<string, mixed>  $data
      */
@@ -247,7 +247,7 @@ final class ConnectionService
     }
 
     /**
-     * Удалить подключённого пользователя Telegga и локальную запись.
+     * Delete a connected Telegga user and the local record.
      */
     public function delete(string $uuid): void
     {
@@ -276,7 +276,7 @@ final class ConnectionService
     }
 
     /**
-     * Выпустить новый код подключения пользователя.
+     * Generate a new user connection code.
      */
     public function regenerateCode(string $uuid): ConnectionData
     {
@@ -297,7 +297,7 @@ final class ConnectionService
     }
 
     /**
-     * Отвязать подключённого пользователя от бота.
+     * Unlink a connected user from the bot.
      */
     public function unlink(string $uuid): void
     {
@@ -332,7 +332,7 @@ final class ConnectionService
     }
 
     /**
-     * Отправить локальное подключение в Telegga.
+     * Send a local connection to Telegga.
      *
      * @param  array<string, mixed>  $meta
      */
@@ -386,7 +386,7 @@ final class ConnectionService
     }
 
     /**
-     * Нормализовать идентификатор группы.
+     * Normalize a group identifier.
      */
     private function normalizeGroupId(
         ?string $groupId,
@@ -409,7 +409,7 @@ final class ConnectionService
     }
 
     /**
-     * Обработать сбой локального удаления после удаления пользователя в Telegga.
+     * Handle a local deletion failure after deleting the Telegga user.
      */
     private function handleLocalDeletionFailure(
         TelegramConnectedUser $connection,
@@ -453,7 +453,7 @@ final class ConnectionService
     }
 
     /**
-     * Синхронизировать локальные данные подключения.
+     * Synchronize local connection data.
      *
      * @param  array<string, mixed>  $data
      */

@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Создать таблицу доступных Telegram-ботов.
+     * Create the available Telegram bots table.
      */
     public function up(): void
     {
@@ -23,7 +23,7 @@ return new class extends Migration
     }
 
     /**
-     * Удалить таблицу доступных Telegram-ботов.
+     * Drop the available Telegram bots table.
      */
     public function down(): void
     {

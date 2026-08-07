@@ -26,7 +26,7 @@ afterEach(function (): void {
     Model::preventLazyLoading(false);
 });
 
-it('создаёт независимое подключение через выбранного активного бота', function (): void {
+it('creates an independent connection through the selected active bot', function (): void {
     $selectedBot = AvailableTelegramBot::query()->create(['bot_name' => 'second_bot']);
 
     Http::preventStrayRequests();
@@ -106,7 +106,7 @@ it('создаёт независимое подключение через вы
     });
 });
 
-it('сохраняет необязательный идентификатор пользователя проекта', function (): void {
+it('stores an optional application user identifier', function (): void {
     $userId = Schema::getConnection()
         ->table('users')
         ->insertGetId([
@@ -145,7 +145,7 @@ it('сохраняет необязательный идентификатор �
     });
 });
 
-it('повторяет создание пользователя после временной ошибки api', function (): void {
+it('retries user creation after a temporary API error', function (): void {
     $userRequestAttempt = 0;
 
     Http::preventStrayRequests();
@@ -202,7 +202,7 @@ it('повторяет создание пользователя после вр
     Http::assertSentCount(3);
 });
 
-it('оставляет локальную запись несозданной при ошибке api', function (): void {
+it('leaves the local record uncreated after an API error', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
@@ -239,10 +239,10 @@ it('оставляет локальную запись несозданной п
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('повторно отправляет существующее подключение с тем же uuid', function (): void {
+it('resends an existing connection with the same UUID', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'email' => 'ivan@example.com',
@@ -288,7 +288,7 @@ it('повторно отправляет существующее подклю�
     });
 });
 
-it('отклоняет пустой идентификатор группы до создания локальной записи', function (): void {
+it('rejects an empty group identifier before creating a local record', function (): void {
     Http::preventStrayRequests();
 
     try {
@@ -308,10 +308,10 @@ it('отклоняет пустой идентификатор группы до
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('не повторяет уже созданное подключение', function (): void {
+it('does not retry an already created connection', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -335,10 +335,10 @@ it('не повторяет уже созданное подключение', f
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('сохраняет uuid в исключении при отсутствии выбранного активного бота', function (): void {
+it('preserves the UUID in an exception when the selected active bot is missing', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
@@ -377,10 +377,10 @@ it('сохраняет uuid в исключении при отсутствии 
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('не создаёт подключение при неполном совпадении имени активного бота', function (): void {
+it('does not create a connection when the active bot name only partially matches', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
@@ -412,10 +412,10 @@ it('не создаёт подключение при неполном совп�
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('не создаёт локальную запись с пустым именем', function (): void {
+it('does not create a local record with an empty name', function (): void {
     try {
         app(TeleggaInterface::class)->createConnection(
             name: '   ',
@@ -430,10 +430,10 @@ it('не создаёт локальную запись с пустым имен
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('не создаёт подключение для неизвестного локального бота', function (): void {
+it('does not create a connection for an unknown local bot', function (): void {
     $botUuid = Str::uuid()->toString();
     Http::preventStrayRequests();
 
@@ -455,10 +455,10 @@ it('не создаёт подключение для неизвестного �
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('скрывает ошибку базы данных при создании локальной записи', function (): void {
+it('wraps a database error when creating a local record', function (): void {
     Http::preventStrayRequests();
 
     try {
@@ -480,10 +480,10 @@ it('скрывает ошибку базы данных при создании 
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('скрывает ошибку базы данных при поиске подключения', function (): void {
+it('wraps a database error when looking up a connection', function (): void {
     $uuid = (string) Str::uuid();
 
     $this->dropConnectionTable();
@@ -502,10 +502,10 @@ it('скрывает ошибку базы данных при поиске по
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('отклоняет retry для неизвестного uuid', function (): void {
+it('rejects a retry for an unknown UUID', function (): void {
     $uuid = (string) Str::uuid();
 
     Http::preventStrayRequests();
@@ -523,10 +523,10 @@ it('отклоняет retry для неизвестного uuid', function ():
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('отклоняет успешный ответ api с некорректным json', function (): void {
+it('rejects a successful API response with invalid JSON', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
@@ -560,5 +560,5 @@ it('отклоняет успешный ответ api с некорректны
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });

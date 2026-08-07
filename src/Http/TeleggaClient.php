@@ -17,7 +17,7 @@ use Throwable;
 final class TeleggaClient
 {
     /**
-     * Создать HTTP-клиент Telegga.
+     * Create the Telegga HTTP client.
      */
     public function __construct(
         private readonly Factory $http,
@@ -38,7 +38,7 @@ final class TeleggaClient
     }
 
     /**
-     * Выполнить GET-запрос.
+     * Perform a GET request.
      *
      * @param  array<string, mixed>  $query
      */
@@ -54,7 +54,7 @@ final class TeleggaClient
     }
 
     /**
-     * Выполнить POST-запрос.
+     * Perform a POST request.
      *
      * @param  array<string, mixed>  $data
      */
@@ -70,7 +70,7 @@ final class TeleggaClient
     }
 
     /**
-     * Выполнить PUT-запрос.
+     * Perform a PUT request.
      *
      * @param  array<string, mixed>  $data
      */
@@ -86,7 +86,7 @@ final class TeleggaClient
     }
 
     /**
-     * Выполнить PATCH-запрос.
+     * Perform a PATCH request.
      *
      * @param  array<string, mixed>  $data
      */
@@ -102,7 +102,7 @@ final class TeleggaClient
     }
 
     /**
-     * Выполнить DELETE-запрос.
+     * Perform a DELETE request.
      *
      * @param  array<string, mixed>  $query
      */
@@ -117,7 +117,7 @@ final class TeleggaClient
     }
 
     /**
-     * Загрузить файл.
+     * Upload a file.
      */
     public function upload(string $uri, string $contents, string $filename): Response
     {
@@ -133,7 +133,7 @@ final class TeleggaClient
     }
 
     /**
-     * Создать настроенный HTTP-запрос.
+     * Create a configured HTTP request.
      */
     private function request(bool $idempotent): PendingRequest
     {
@@ -176,7 +176,7 @@ final class TeleggaClient
     }
 
     /**
-     * Выполнить HTTP-запрос.
+     * Execute an HTTP request.
      */
     private function execute(Closure $request, bool $idempotent = false): Response
     {
@@ -205,7 +205,7 @@ final class TeleggaClient
     }
 
     /**
-     * Проверить HTTP-ответ.
+     * Validate an HTTP response.
      */
     private function ensureSuccessful(Response $response, int $attempts): Response
     {
@@ -220,7 +220,7 @@ final class TeleggaClient
     }
 
     /**
-     * Определить, допускает ли ошибка автоматический повтор.
+     * Determine whether an error allows an automatic retry.
      */
     private function shouldRetry(Throwable $exception): bool
     {
@@ -238,7 +238,7 @@ final class TeleggaClient
     }
 
     /**
-     * Рассчитать задержку перед следующей HTTP-попыткой.
+     * Calculate the delay before the next HTTP attempt.
      */
     private function retryDelay(int $attempt, Throwable $exception): int
     {

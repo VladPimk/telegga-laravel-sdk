@@ -42,7 +42,7 @@ final class TelegramConnectedUser extends Model
     ];
 
     /**
-     * Получить поля с автоматически генерируемыми UUID.
+     * Get fields with automatically generated UUIDs.
      *
      * @return array<int, string>
      */
@@ -52,7 +52,7 @@ final class TelegramConnectedUser extends Model
     }
 
     /**
-     * Получить преобразования атрибутов модели.
+     * Get model attribute casts.
      *
      * @return array<string, string>
      */
@@ -65,7 +65,7 @@ final class TelegramConnectedUser extends Model
     }
 
     /**
-     * Получить пользователя проекта.
+     * Get the application user.
      *
      * @return BelongsTo<Model, $this>
      */
@@ -78,7 +78,7 @@ final class TelegramConnectedUser extends Model
     }
 
     /**
-     * Получить выбранного Telegram-бота.
+     * Get the selected Telegram bot.
      *
      * @return BelongsTo<AvailableTelegramBot, $this>
      */
@@ -91,7 +91,7 @@ final class TelegramConnectedUser extends Model
     }
 
     /**
-     * Получить принятые события webhook.
+     * Get accepted webhook events.
      *
      * @return HasMany<TeleggaWebhookEvent, $this>
      */
@@ -104,7 +104,7 @@ final class TelegramConnectedUser extends Model
     }
 
     /**
-     * Получить настроенный класс модели пользователя проекта.
+     * Get the configured application user model class.
      *
      * @return class-string<Model>
      */

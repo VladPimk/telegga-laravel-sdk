@@ -17,7 +17,7 @@ beforeEach(function (): void {
     ]);
 });
 
-it('создаёт таблицу событий webhook с ожидаемыми колонками', function (): void {
+it('creates the webhook events table with expected columns', function (): void {
     expect(Schema::hasColumns('telegga_webhook_events', [
         'id',
         'uuid',
@@ -32,7 +32,7 @@ it('создаёт таблицу событий webhook с ожидаемыми
     ]))->toBeTrue();
 });
 
-it('создаёт индексы и внешний ключ таблицы событий webhook', function (): void {
+it('creates webhook event table indexes and a foreign key', function (): void {
     $indexes = collect(Schema::getIndexes('telegga_webhook_events'));
     $foreignKeys = collect(Schema::getForeignKeys('telegga_webhook_events'));
 
@@ -60,7 +60,7 @@ it('создаёт индексы и внешний ключ таблицы со
         ))->toBeTrue();
 });
 
-it('генерирует uuid и связывает событие с подключением', function (): void {
+it('generates a UUID and relates an event to a connection', function (): void {
     $event = TeleggaWebhookEvent::query()->create([
         'telegram_connected_user_id' => $this->connection->id,
         'event_id' => 'd5b7d0e1-0000-4000-8000-000000000001',
@@ -87,7 +87,7 @@ it('генерирует uuid и связывает событие с подкл
         ->toBeTrue();
 });
 
-it('сохраняет журнал при мягком удалении подключения и удаляет при физическом', function (): void {
+it('preserves the log after a soft deletion and removes it after a force deletion', function (): void {
     $event = TeleggaWebhookEvent::query()->create([
         'telegram_connected_user_id' => $this->connection->id,
         'event_id' => 'd5b7d0e1-0000-4000-8000-000000000001',

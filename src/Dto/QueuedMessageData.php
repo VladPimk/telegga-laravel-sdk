@@ -7,7 +7,7 @@ namespace Telegga\Laravel\Dto;
 final readonly class QueuedMessageData extends ApiResponseData
 {
     /**
-     * Создать данные поставленного в очередь сообщения.
+     * Create queued message data.
      */
     public function __construct(
         public string $message_id,

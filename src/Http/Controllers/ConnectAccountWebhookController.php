@@ -16,14 +16,14 @@ use Telegga\Laravel\Webhooks\WebhookProcessingResult;
 final class ConnectAccountWebhookController
 {
     /**
-     * Создать обработчик webhook подключения.
+     * Create the connection webhook handler.
      */
     public function __construct(
         private readonly WebhookService $webhooks,
     ) {}
 
     /**
-     * Обработать webhook подключения.
+     * Handle a connection webhook.
      */
     public function __invoke(Request $request): WebhookResponse
     {
@@ -54,7 +54,7 @@ final class ConnectAccountWebhookController
     }
 
     /**
-     * Обработать проверочное событие.
+     * Handle a test event.
      */
     private function handleTest(Request $request): WebhookResponse
     {
@@ -86,7 +86,7 @@ final class ConnectAccountWebhookController
     }
 
     /**
-     * Обработать событие подключения пользователя.
+     * Handle a user connection event.
      */
     private function handleUserLinked(Request $request, string $event): WebhookResponse
     {
@@ -181,7 +181,7 @@ final class ConnectAccountWebhookController
     }
 
     /**
-     * Создать ответ для неподдерживаемого события.
+     * Create a response for an unsupported event.
      */
     private function unsupportedEvent(string $event): WebhookResponse
     {
@@ -197,7 +197,7 @@ final class ConnectAccountWebhookController
     }
 
     /**
-     * Создать успешный ответ обработки webhook.
+     * Create a successful webhook processing response.
      */
     private function successResponse(
         WebhookProcessingResult $result,
@@ -219,7 +219,7 @@ final class ConnectAccountWebhookController
     }
 
     /**
-     * Создать ответ о некорректном webhook.
+     * Create an invalid webhook response.
      */
     private function invalidRequest(
         string $message,
@@ -242,7 +242,7 @@ final class ConnectAccountWebhookController
     }
 
     /**
-     * Создать ответ об ошибке обработки webhook.
+     * Create a webhook processing error response.
      */
     private function processingError(
         WebhookProcessingResult $result,

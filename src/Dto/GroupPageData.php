@@ -9,7 +9,7 @@ use Illuminate\Support\Collection;
 final readonly class GroupPageData extends ApiResponseData
 {
     /**
-     * Создать страницу групп.
+     * Create a group page.
      *
      * @param  Collection<int, GroupData>  $data
      */

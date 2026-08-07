@@ -16,7 +16,7 @@ beforeEach(function (): void {
     $this->telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
 });
 
-it('передаёт тип и данные сообщения в единый маршрут api', function (
+it('passes message type and data to the unified API endpoint', function (
     string $type,
     array $data,
 ): void {
@@ -144,7 +144,7 @@ it('передаёт тип и данные сообщения в единый �
     ],
 ]);
 
-it('не позволяет переопределить служебные поля сообщения', function (): void {
+it('does not allow reserved message fields to be overridden', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -195,7 +195,7 @@ it('не позволяет переопределить служебные по
     });
 });
 
-it('не отправляет сообщение с пустым uuid подключения', function (): void {
+it('does not send a message with an empty connection UUID', function (): void {
     Http::preventStrayRequests();
 
     try {
@@ -215,10 +215,10 @@ it('не отправляет сообщение с пустым uuid подкл
         return;
     }
 
-    test()->fail('Ожидалось исключение MessageException.');
+    test()->fail('Expected a MessageException.');
 });
 
-it('не отправляет сообщение с пустым типом', function (): void {
+it('does not send a message with an empty type', function (): void {
     Http::preventStrayRequests();
 
     try {
@@ -237,10 +237,10 @@ it('не отправляет сообщение с пустым типом', fu
         return;
     }
 
-    test()->fail('Ожидалось исключение MessageException.');
+    test()->fail('Expected a MessageException.');
 });
 
-it('не отправляет сообщение без активной привязки', function (): void {
+it('does not send a message without an active link', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -277,10 +277,10 @@ it('не отправляет сообщение без активной при�
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('скрывает ошибку api при отправке сообщения', function (): void {
+it('wraps an API error when sending a message', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -327,10 +327,10 @@ it('скрывает ошибку api при отправке сообщения
         return;
     }
 
-    test()->fail('Ожидалось исключение MessageException.');
+    test()->fail('Expected a MessageException.');
 });
 
-it('отклоняет успешный ответ сообщения с некорректным json', function (): void {
+it('rejects a successful message response with invalid JSON', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -373,5 +373,5 @@ it('отклоняет успешный ответ сообщения с нек�
         return;
     }
 
-    test()->fail('Ожидалось исключение MessageException.');
+    test()->fail('Expected a MessageException.');
 });

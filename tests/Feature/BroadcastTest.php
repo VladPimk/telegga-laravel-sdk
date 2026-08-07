@@ -17,7 +17,7 @@ beforeEach(function (): void {
     $this->telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
 });
 
-it('запускает рассылку всем пользователям бота подключения', function (): void {
+it('starts a broadcast to all users of the connection bot', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -84,7 +84,7 @@ it('запускает рассылку всем пользователям бо
     Http::assertSentCount(2);
 });
 
-it('запускает медиа рассылку участникам указанной группы', function (): void {
+it('starts a media broadcast to members of the specified group', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -134,7 +134,7 @@ it('запускает медиа рассылку участникам указ
     });
 });
 
-it('получает прогресс рассылки без потери новых полей', function (): void {
+it('gets broadcast progress without losing new fields', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/broadcasts/broadcast-1' => Http::response([
@@ -168,7 +168,7 @@ it('получает прогресс рассылки без потери но�
     });
 });
 
-it('отменяет рассылку и возвращает результат api', function (): void {
+it('cancels a broadcast and returns the API result', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/broadcasts/broadcast-1/cancel' => Http::response([
@@ -198,7 +198,7 @@ it('отменяет рассылку и возвращает результат
     });
 });
 
-it('отклоняет некорректные параметры рассылки до api запроса', function (
+it('rejects invalid broadcast parameters before an API request', function (
     Closure $action,
     string $message,
 ): void {
@@ -215,23 +215,23 @@ it('отклоняет некорректные параметры рассыл�
         return;
     }
 
-    test()->fail('Ожидалось исключение BroadcastException.');
+    test()->fail('Expected a BroadcastException.');
 })->with([
-    'пустой uuid' => [
+    'empty UUID' => [
         fn (TeleggaInterface $telegga) => $telegga->startBroadcast(
             uuid: '   ',
             type: 'text',
         ),
         'Connection UUID cannot be empty.',
     ],
-    'пустой тип' => [
+    'empty type' => [
         fn (TeleggaInterface $telegga) => $telegga->startBroadcast(
             uuid: 'connection-uuid',
             type: '   ',
         ),
         'Broadcast type cannot be empty.',
     ],
-    'пустая группа' => [
+    'empty group' => [
         fn (TeleggaInterface $telegga) => $telegga->startBroadcast(
             uuid: 'connection-uuid',
             type: 'text',
@@ -239,13 +239,13 @@ it('отклоняет некорректные параметры рассыл�
         ),
         'Group identifier cannot be empty.',
     ],
-    'пустой идентификатор прогресса' => [
+    'empty progress identifier' => [
         fn (TeleggaInterface $telegga) => $telegga->getBroadcast(
             broadcastId: '   ',
         ),
         'Broadcast identifier cannot be empty.',
     ],
-    'пустой идентификатор отмены' => [
+    'empty cancellation identifier' => [
         fn (TeleggaInterface $telegga) => $telegga->cancelBroadcast(
             broadcastId: '   ',
         ),
@@ -253,7 +253,7 @@ it('отклоняет некорректные параметры рассыл�
     ],
 ]);
 
-it('скрывает ошибку api при получении рассылки', function (): void {
+it('wraps an API error when getting a broadcast', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/broadcasts/broadcast-1' => Http::response([
@@ -283,10 +283,10 @@ it('скрывает ошибку api при получении рассылки
         return;
     }
 
-    test()->fail('Ожидалось исключение BroadcastException.');
+    test()->fail('Expected a BroadcastException.');
 });
 
-it('отклоняет успешный ответ рассылки с некорректным json', function (): void {
+it('rejects a successful broadcast response with invalid JSON', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/broadcasts/broadcast-1' => Http::response(
@@ -310,5 +310,5 @@ it('отклоняет успешный ответ рассылки с неко�
         return;
     }
 
-    test()->fail('Ожидалось исключение BroadcastException.');
+    test()->fail('Expected a BroadcastException.');
 });

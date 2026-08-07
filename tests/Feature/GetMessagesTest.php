@@ -18,7 +18,7 @@ beforeEach(function (): void {
     $this->telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
 });
 
-it('получает историю сообщений только для указанного подключения', function (): void {
+it('gets message history only for the specified connection', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -91,7 +91,7 @@ it('получает историю сообщений только для ук�
     Http::assertSentCount(1);
 });
 
-it('возвращает null вместо отсутствующего курсора следующей страницы', function (): void {
+it('returns null for a missing next page cursor', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -140,7 +140,7 @@ it('возвращает null вместо отсутствующего курс
     });
 });
 
-it('не запрашивает историю с пустым uuid подключения', function (): void {
+it('does not request history with an empty connection UUID', function (): void {
     Http::preventStrayRequests();
 
     try {
@@ -162,10 +162,10 @@ it('не запрашивает историю с пустым uuid подклю
         return;
     }
 
-    test()->fail('Ожидалось исключение MessageException.');
+    test()->fail('Expected a MessageException.');
 });
 
-it('не запрашивает историю с обратным диапазоном дат', function (): void {
+it('does not request history with a reversed date range', function (): void {
     Http::preventStrayRequests();
 
     try {
@@ -187,10 +187,10 @@ it('не запрашивает историю с обратным диапаз�
         return;
     }
 
-    test()->fail('Ожидалось исключение MessageException.');
+    test()->fail('Expected a MessageException.');
 });
 
-it('не запрашивает историю для локального подключения, не созданного в Telegga', function (): void {
+it('does not request history for a local connection not created in Telegga', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'available_telegram_bot_id' => $this->telegramBot->id,
@@ -217,10 +217,10 @@ it('не запрашивает историю для локального по�
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('скрывает ошибку api при получении истории сообщений', function (): void {
+it('wraps an API error when getting message history', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -256,10 +256,10 @@ it('скрывает ошибку api при получении истории �
         return;
     }
 
-    test()->fail('Ожидалось исключение MessageException.');
+    test()->fail('Expected a MessageException.');
 });
 
-it('отклоняет некорректную страницу истории сообщений', function (): void {
+it('rejects an invalid message history page', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -290,5 +290,5 @@ it('отклоняет некорректную страницу истории 
         return;
     }
 
-    test()->fail('Ожидалось исключение MessageException.');
+    test()->fail('Expected a MessageException.');
 });

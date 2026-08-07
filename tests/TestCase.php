@@ -14,7 +14,7 @@ use Telegga\Laravel\TeleggaServiceProvider;
 abstract class TestCase extends Orchestra
 {
     /**
-     * Загрузить JSON-фикстуру ответа Telegga API.
+     * Load a Telegga API response JSON fixture.
      *
      * @return array<string, mixed>
      */
@@ -37,7 +37,7 @@ abstract class TestCase extends Orchestra
     }
 
     /**
-     * Удалить таблицу подключений для проверки ошибок недоступной схемы.
+     * Drop the connections table to test unavailable schema errors.
      */
     protected function dropConnectionTable(): void
     {
@@ -51,7 +51,7 @@ abstract class TestCase extends Orchestra
     }
 
     /**
-     * Получить сервис-провайдеры пакета.
+     * Get package service providers.
      *
      * @param  Application  $app
      * @return array<int, class-string>
@@ -65,7 +65,7 @@ abstract class TestCase extends Orchestra
     }
 
     /**
-     * Настроить тестовое приложение.
+     * Configure the test application.
      *
      * @param  Application  $app
      */
@@ -84,7 +84,7 @@ abstract class TestCase extends Orchestra
     }
 
     /**
-     * Включить проверку внешних ключей после обновления тестовой схемы.
+     * Enable foreign key checks after refreshing the test schema.
      */
     protected function defineDatabaseMigrationsAfterDatabaseRefreshed()
     {

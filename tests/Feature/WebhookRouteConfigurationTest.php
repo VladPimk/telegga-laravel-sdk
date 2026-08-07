@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Route;
 use Telegga\Laravel\Http\Middleware\VerifyWebhookToken;
 use Telegga\Laravel\TeleggaServiceProvider;
 
-it('не регистрирует маршрут webhook при отключении в конфигурации', function (): void {
+it('does not register the webhook route when disabled in configuration', function (): void {
     $originalRoutes = Route::getRoutes();
 
     try {
@@ -27,7 +27,7 @@ it('не регистрирует маршрут webhook при отключен
     }
 });
 
-it('регистрирует webhook с настроенными prefix и middleware', function (): void {
+it('registers the webhook with configured prefix and middleware', function (): void {
     $originalRoutes = Route::getRoutes();
 
     try {

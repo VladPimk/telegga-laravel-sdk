@@ -17,7 +17,7 @@ enum WebhookProcessingStatus: string
     case BotMismatch = 'bot_mismatch';
 
     /**
-     * Проверить успешность обработки webhook.
+     * Determine whether webhook processing succeeded.
      */
     public function successful(): bool
     {

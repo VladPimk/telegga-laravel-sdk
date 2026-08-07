@@ -37,7 +37,7 @@ final class TeleggaWebhookEvent extends Model
     ];
 
     /**
-     * Получить поля с автоматически генерируемыми UUID.
+     * Get fields with automatically generated UUIDs.
      *
      * @return array<int, string>
      */
@@ -47,7 +47,7 @@ final class TeleggaWebhookEvent extends Model
     }
 
     /**
-     * Получить преобразования атрибутов модели.
+     * Get model attribute casts.
      *
      * @return array<string, string>
      */
@@ -61,7 +61,7 @@ final class TeleggaWebhookEvent extends Model
     }
 
     /**
-     * Получить подключение, для которого принято событие.
+     * Get the connection for which the event was accepted.
      *
      * @return BelongsTo<TelegramConnectedUser, $this>
      */

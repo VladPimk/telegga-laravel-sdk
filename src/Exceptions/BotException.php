@@ -9,7 +9,7 @@ use Throwable;
 final class BotException extends TeleggaException
 {
     /**
-     * Создать исключение Telegram-бота.
+     * Create a Telegram bot exception.
      */
     public function __construct(
         string $message,

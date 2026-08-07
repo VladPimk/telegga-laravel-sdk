@@ -7,7 +7,7 @@ namespace Telegga\Laravel\Dto;
 final readonly class BroadcastCancellationData extends ApiResponseData
 {
     /**
-     * Создать результат отмены рассылки.
+     * Create a broadcast cancellation result.
      */
     public function __construct(
         public string $status,

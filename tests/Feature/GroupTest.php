@@ -20,7 +20,7 @@ beforeEach(function (): void {
     $this->telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
 });
 
-it('создаёт группу для бота локального подключения', function (): void {
+it('creates a group for the local connection bot', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -73,7 +73,7 @@ it('создаёт группу для бота локального подкл�
     });
 });
 
-it('возвращает страницу групп бота локального подключения', function (): void {
+it('returns a group page for the local connection bot', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -132,7 +132,7 @@ it('возвращает страницу групп бота локальног
     });
 });
 
-it('получает обновляет и удаляет группу', function (): void {
+it('gets updates and deletes a group', function (): void {
     Http::preventStrayRequests();
     Http::fake(function (Request $request) {
         if ($request->method() === 'GET') {
@@ -191,7 +191,7 @@ it('получает обновляет и удаляет группу', functio
     Http::assertSentCount(3);
 });
 
-it('управляет членством через маршруты пользователя', function (): void {
+it('manages membership through user endpoints', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -249,7 +249,7 @@ it('управляет членством через маршруты польз
     Http::assertSentCount(2);
 });
 
-it('передаёт локальные uuid как external_ids одним запросом при массовом добавлении участников', function (): void {
+it('sends local UUIDs as external_ids in one bulk member request', function (): void {
     $first = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -308,7 +308,7 @@ it('передаёт локальные uuid как external_ids одним за
     Http::assertSentCount(1);
 });
 
-it('не добавляет участников если локальное подключение не найдено', function (): void {
+it('does not add members when a local connection is missing', function (): void {
     $uuid = str()->uuid()->toString();
 
     Http::preventStrayRequests();
@@ -329,10 +329,10 @@ it('не добавляет участников если локальное п�
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('не добавляет участников если локальное подключение не создано в Telegga', function (): void {
+it('does not add members when a local connection is not created in Telegga', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'available_telegram_bot_id' => $this->telegramBot->id,
@@ -356,10 +356,10 @@ it('не добавляет участников если локальное п�
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    test()->fail('Expected a ConnectionException.');
 });
 
-it('удаляет участника через групповой маршрут', function (): void {
+it('removes a member through the group endpoint', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -387,7 +387,7 @@ it('удаляет участника через групповой маршру
     Http::assertSentCount(1);
 });
 
-it('отклоняет некорректные параметры группы до api запроса', function (
+it('rejects invalid group parameters before an API request', function (
     Closure $action,
     string $message,
 ): void {
@@ -404,34 +404,34 @@ it('отклоняет некорректные параметры группы 
         return;
     }
 
-    test()->fail('Ожидалось исключение GroupException.');
+    test()->fail('Expected a GroupException.');
 })->with([
-    'пустое имя' => [
+    'empty name' => [
         fn (TeleggaInterface $telegga) => $telegga->createGroup(
             uuid: 'connection-uuid',
             name: '   ',
         ),
         'Group name cannot be empty.',
     ],
-    'пустой идентификатор' => [
+    'empty identifier' => [
         fn (TeleggaInterface $telegga) => $telegga->getGroup(groupId: '   '),
         'Group identifier cannot be empty.',
     ],
-    'пустое обновление' => [
+    'empty update' => [
         fn (TeleggaInterface $telegga) => $telegga->updateGroup(
             groupId: 'group-1',
             data: [],
         ),
         'Group update data cannot be empty.',
     ],
-    'пустой список участников' => [
+    'empty member list' => [
         fn (TeleggaInterface $telegga) => $telegga->addGroupMembers(
             groupId: 'group-1',
             uuids: [],
         ),
         'Group members cannot be empty.',
     ],
-    'превышен лимит участников' => [
+    'member limit exceeded' => [
         fn (TeleggaInterface $telegga) => $telegga->addGroupMembers(
             groupId: 'group-1',
             uuids: array_map(
@@ -443,7 +443,7 @@ it('отклоняет некорректные параметры группы 
     ],
 ]);
 
-it('скрывает ошибку api в исключении группы', function (): void {
+it('wraps an API error in a group exception', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/groups/group-1' => Http::response([
@@ -469,10 +469,10 @@ it('скрывает ошибку api в исключении группы', fun
         return;
     }
 
-    test()->fail('Ожидалось исключение GroupException.');
+    test()->fail('Expected a GroupException.');
 });
 
-it('отклоняет некорректный ответ списка групп', function (): void {
+it('rejects an invalid group list response', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -512,10 +512,10 @@ it('отклоняет некорректный ответ списка груп
         return;
     }
 
-    test()->fail('Ожидалось исключение GroupException.');
+    test()->fail('Expected a GroupException.');
 });
 
-it('считает группу удаленной если повтор подтвердил ее отсутствие в api', function (): void {
+it('treats a group as deleted when a retry confirms it is absent from the API', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/groups/group-1' => Http::sequence()
@@ -528,7 +528,7 @@ it('считает группу удаленной если повтор под�
     Http::assertSentCount(2);
 });
 
-it('не скрывает отсутствие группы в первом ответе api', function (): void {
+it('does not hide a missing group in the first API response', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/groups/group-1' => Http::response([
@@ -551,5 +551,5 @@ it('не скрывает отсутствие группы в первом от
         return;
     }
 
-    test()->fail('Ожидалось исключение GroupException.');
+    test()->fail('Expected a GroupException.');
 });

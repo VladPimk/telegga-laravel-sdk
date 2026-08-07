@@ -7,7 +7,7 @@ namespace Telegga\Laravel\Dto;
 final readonly class BotData extends ApiResponseData
 {
     /**
-     * Создать данные Telegram-бота.
+     * Create Telegram bot data.
      */
     public function __construct(
         public string $bot_id,

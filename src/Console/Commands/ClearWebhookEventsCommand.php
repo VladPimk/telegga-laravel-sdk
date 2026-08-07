@@ -20,7 +20,7 @@ final class ClearWebhookEventsCommand extends Command
     protected $description = 'Delete old Telegga webhook event records';
 
     /**
-     * Удалить старые записи событий webhook.
+     * Delete old webhook event records.
      */
     public function handle(): int
     {

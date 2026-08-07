@@ -22,7 +22,7 @@ final class BotService
     private readonly string $cacheKey;
 
     /**
-     * Создать сервис ботов.
+     * Create the bot service.
      */
     public function __construct(
         private readonly TeleggaClient $client,
@@ -38,7 +38,7 @@ final class BotService
     }
 
     /**
-     * Получить список доступных ботов.
+     * Get a list of available bots.
      *
      * @return Collection<int, BotData>
      */
@@ -52,7 +52,7 @@ final class BotService
     }
 
     /**
-     * Получить актуальный список доступных ботов из API.
+     * Fetch the current list of available bots from the API.
      *
      * @return Collection<int, BotData>
      */
@@ -64,7 +64,7 @@ final class BotService
     }
 
     /**
-     * Добавить доступного Telegram-бота.
+     * Add an available Telegram bot.
      */
     public function add(string $botName): AvailableTelegramBot
     {
@@ -103,7 +103,7 @@ final class BotService
     }
 
     /**
-     * Получить локально доступных Telegram-ботов.
+     * Get locally available Telegram bots.
      *
      * @return Collection<int, AvailableTelegramBot>
      */
@@ -122,7 +122,7 @@ final class BotService
     }
 
     /**
-     * Получить локального Telegram-бота по UUID.
+     * Get a local Telegram bot by UUID.
      */
     public function getAvailableByUuid(string $uuid): AvailableTelegramBot
     {
@@ -156,7 +156,7 @@ final class BotService
     }
 
     /**
-     * Найти Telegram-бота в API по имени и статусу.
+     * Find a Telegram bot in the API by name and status.
      */
     public function find(string $botName, ?string $status = null): BotData
     {
@@ -188,7 +188,7 @@ final class BotService
     }
 
     /**
-     * Удалить локально доступного Telegram-бота.
+     * Delete a locally available Telegram bot.
      */
     public function delete(string $uuid): void
     {
@@ -217,7 +217,7 @@ final class BotService
     }
 
     /**
-     * Проверить имя Telegram-бота.
+     * Validate a Telegram bot name.
      */
     private function validateName(string $botName): string
     {

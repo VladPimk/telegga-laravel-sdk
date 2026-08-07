@@ -24,7 +24,7 @@ afterEach(function (): void {
     }
 });
 
-it('создаёт таблицу подключений с ожидаемыми колонками', function (): void {
+it('creates the connections table with expected columns', function (): void {
     expect(Schema::hasColumns('telegram_connected_users', [
         'id',
         'uuid',
@@ -40,7 +40,7 @@ it('создаёт таблицу подключений с ожидаемыми
     ]))->toBeTrue();
 });
 
-it('создаёт ожидаемые индексы таблицы подключений', function (): void {
+it('creates the expected connection table indexes', function (): void {
     $indexes = collect(Schema::getIndexes('telegram_connected_users'));
 
     expect($indexes->contains(
@@ -57,7 +57,7 @@ it('создаёт ожидаемые индексы таблицы подклю
         ))->toBeTrue();
 });
 
-it('генерирует uuid и устанавливает начальные статусы', function (): void {
+it('generates a UUID and sets initial statuses', function (): void {
     $providedUuid = Str::uuid()->toString();
     $connection = TelegramConnectedUser::query()->create([
         'uuid' => $providedUuid,
@@ -87,7 +87,7 @@ it('генерирует uuid и устанавливает начальные �
         ->toBeNull();
 });
 
-it('связывает подключение с пользователем проекта', function (): void {
+it('relates a connection to an application user', function (): void {
     $user = User::query()->create([
         'name' => 'Иван',
     ]);
@@ -104,7 +104,7 @@ it('связывает подключение с пользователем пр
         ->toBeTrue();
 });
 
-it('использует настроенные модель и таблицу пользователя проекта', function (): void {
+it('uses the configured application user model and table', function (): void {
     $this->dropConnectionTable();
     Schema::create('custom_users', function (Blueprint $table): void {
         $table->id();
@@ -148,21 +148,21 @@ it('использует настроенные модель и таблицу �
         ->toBeNull();
 });
 
-it('отклоняет некорректный класс модели пользователя проекта', function (): void {
+it('rejects an invalid application user model class', function (): void {
     config()->set('telegga.user_model', stdClass::class);
 
     expect(fn () => (new TelegramConnectedUser)->user())
         ->toThrow(LogicException::class, 'Telegga user_model must be an Eloquent model class.');
 });
 
-it('отклоняет несовпадающие модель и таблицу пользователя проекта', function (): void {
+it('rejects mismatched application user model and table', function (): void {
     config()->set('telegga.user_model', CustomUser::class);
 
     expect(fn () => (new TelegramConnectedUser)->user())
         ->toThrow(LogicException::class, 'Telegga user_model must use the configured users_table.');
 });
 
-it('отклоняет пустое имя таблицы пользователей проекта', function (): void {
+it('rejects an empty application users table name', function (): void {
     $this->dropConnectionTable();
     config()->set('telegga.users_table', '');
     $connectionMigration = require __DIR__.'/../../database/migrations/2026_07_31_000002_create_telegram_connected_users_table.php';
@@ -171,7 +171,7 @@ it('отклоняет пустое имя таблицы пользовател
         ->toThrow(LogicException::class, 'Telegga users_table must be a non-empty table name.');
 });
 
-it('позволяет пользователю проекта иметь несколько подключений', function (): void {
+it('allows an application user to have multiple connections', function (): void {
     $user = User::query()->create([
         'name' => 'Иван',
     ]);
@@ -193,7 +193,7 @@ it('позволяет пользователю проекта иметь нес
         ->toBe(2);
 });
 
-it('сохраняет подключение после удаления связанного пользователя', function (): void {
+it('preserves a connection after deleting the related user', function (): void {
     $user = User::query()->create([
         'name' => 'Иван',
     ]);

@@ -11,14 +11,14 @@ use Telegga\Laravel\Dto\GroupPageData;
 final class GroupResponseMapper
 {
     /**
-     * Создать mapper ответов групп.
+     * Create the group response mapper.
      */
     public function __construct(
         private readonly ResponseReader $reader,
     ) {}
 
     /**
-     * Преобразовать ответ создания группы.
+     * Map a group creation response.
      */
     public function fromCreate(mixed $response): GroupData
     {
@@ -26,7 +26,7 @@ final class GroupResponseMapper
     }
 
     /**
-     * Преобразовать ответ списка групп.
+     * Map a group list response.
      */
     public function fromList(mixed $response): GroupPageData
     {
@@ -52,7 +52,7 @@ final class GroupResponseMapper
     }
 
     /**
-     * Преобразовать ответ получения группы.
+     * Map a group response.
      */
     public function fromGet(mixed $response): GroupData
     {
@@ -60,7 +60,7 @@ final class GroupResponseMapper
     }
 
     /**
-     * Преобразовать ответ обновления группы.
+     * Map a group update response.
      */
     public function fromUpdate(mixed $response): GroupData
     {
@@ -68,7 +68,7 @@ final class GroupResponseMapper
     }
 
     /**
-     * Преобразовать ответ массового добавления участников.
+     * Map a bulk member addition response.
      */
     public function fromAddMembers(mixed $response): GroupMembersAddedData
     {
@@ -87,7 +87,7 @@ final class GroupResponseMapper
     }
 
     /**
-     * Преобразовать данные группы.
+     * Map group data.
      */
     private function mapGroup(mixed $response, string $context): GroupData
     {

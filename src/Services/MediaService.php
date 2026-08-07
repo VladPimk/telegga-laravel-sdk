@@ -15,7 +15,7 @@ final class MediaService
     private const int MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 
     /**
-     * Создать сервис медиафайлов.
+     * Create the media service.
      */
     public function __construct(
         private readonly TeleggaClient $client,
@@ -23,7 +23,7 @@ final class MediaService
     ) {}
 
     /**
-     * Загрузить медиафайл.
+     * Upload a media file.
      */
     public function upload(string $contents, string $filename): MediaData
     {
@@ -66,7 +66,7 @@ final class MediaService
     }
 
     /**
-     * Получить метаданные медиафайла.
+     * Get media file metadata.
      */
     public function get(string $mediaId): MediaData
     {

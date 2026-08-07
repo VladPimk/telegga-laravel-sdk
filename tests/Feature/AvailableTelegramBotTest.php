@@ -12,7 +12,7 @@ use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Models\TelegramConnectedUser;
 
-it('создаёт таблицу доступных ботов и генерирует локальный uuid', function (): void {
+it('creates the available bots table and generates a local UUID', function (): void {
     $providedUuid = Str::uuid()->toString();
     $bot = AvailableTelegramBot::query()->create([
         'uuid' => $providedUuid,
@@ -49,7 +49,7 @@ it('создаёт таблицу доступных ботов и генери�
     ))->toBeTrue();
 });
 
-it('добавляет локального бота после проверки списка api', function (): void {
+it('adds a local bot after validating the API list', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
@@ -77,7 +77,7 @@ it('добавляет локального бота после проверки
     Http::assertSentCount(1);
 });
 
-it('повторно возвращает существующего локального бота', function (): void {
+it('returns an existing local bot on repeated addition', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
@@ -100,7 +100,7 @@ it('повторно возвращает существующего локал�
         ->toBe(1);
 });
 
-it('отклоняет username из api с лишним символом', function (string $apiUsername): void {
+it('rejects an API username with an extra character', function (string $apiUsername): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
@@ -125,12 +125,12 @@ it('отклоняет username из api с лишним символом', func
         return;
     }
 
-    test()->fail('Ожидалось исключение BotException.');
+    test()->fail('Expected a BotException.');
 })->with([
-    'username с лишним символом @' => '@mybot',
+    'username with an extra at sign' => '@mybot',
 ]);
 
-it('сопоставляет и сохраняет имя бота в нижнем регистре', function (): void {
+it('matches and stores a bot name in lowercase', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
@@ -152,7 +152,7 @@ it('сопоставляет и сохраняет имя бота в нижне
         ->toBe('mybot');
 });
 
-it('отклоняет некорректное имя бота', function (string $botName): void {
+it('rejects an invalid bot name', function (string $botName): void {
     Http::preventStrayRequests();
 
     try {
@@ -166,15 +166,15 @@ it('отклоняет некорректное имя бота', function (stri
         return;
     }
 
-    test()->fail('Ожидалось исключение BotException.');
+    test()->fail('Expected a BotException.');
 })->with([
-    'пустая строка' => '',
-    'с символом @' => '@mybot',
-    'только символ @' => '@',
-    'с недопустимым символом' => 'my-bot',
+    'empty string' => '',
+    'with an at sign' => '@mybot',
+    'only an at sign' => '@',
+    'with a forbidden character' => 'my-bot',
 ]);
 
-it('не создаёт локальную запись для отсутствующего в api бота', function (): void {
+it('does not create a local record for a bot missing from the API', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
@@ -193,10 +193,10 @@ it('не создаёт локальную запись для отсутств�
         return;
     }
 
-    test()->fail('Ожидалось исключение BotException.');
+    test()->fail('Expected a BotException.');
 });
 
-it('скрывает некорректный ответ api при добавлении бота', function (): void {
+it('wraps an invalid API response when adding a bot', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response('not-json'),
@@ -213,10 +213,10 @@ it('скрывает некорректный ответ api при добавл
         return;
     }
 
-    test()->fail('Ожидалось исключение BotException.');
+    test()->fail('Expected a BotException.');
 });
 
-it('получает локально доступных ботов без запроса api', function (): void {
+it('gets locally available bots without an API request', function (): void {
     $bot = AvailableTelegramBot::query()->create([
         'bot_name' => 'mybot',
     ]);
@@ -234,7 +234,7 @@ it('получает локально доступных ботов без за�
     Http::assertNothingSent();
 });
 
-it('связывает доступного бота с подключениями', function (): void {
+it('relates an available bot to connections', function (): void {
     $bot = AvailableTelegramBot::query()->create([
         'bot_name' => 'mybot',
     ]);
@@ -249,7 +249,7 @@ it('связывает доступного бота с подключениям
         ->toBeTrue();
 });
 
-it('удаляет неиспользуемого локального бота', function (): void {
+it('deletes an unused local bot', function (): void {
     $bot = AvailableTelegramBot::query()->create([
         'bot_name' => 'mybot',
     ]);
@@ -262,7 +262,7 @@ it('удаляет неиспользуемого локального бота'
         ->toBeTrue();
 });
 
-it('создаёт нового локального бота после мягкого удаления бота с таким же именем', function (): void {
+it('creates a new local bot after soft-deleting a bot with the same name', function (): void {
     $bot = AvailableTelegramBot::query()->create([
         'bot_name' => 'mybot',
     ]);
@@ -293,7 +293,7 @@ it('создаёт нового локального бота после мяг�
         ->toBe(2);
 });
 
-it('отклоняет удаление неизвестного локального бота', function (): void {
+it('rejects deletion of an unknown local bot', function (): void {
     $botUuid = Str::uuid()->toString();
 
     try {
@@ -307,10 +307,10 @@ it('отклоняет удаление неизвестного локальн�
         return;
     }
 
-    test()->fail('Ожидалось исключение BotException.');
+    test()->fail('Expected a BotException.');
 });
 
-it('не удаляет бота используемого подключением', function (): void {
+it('does not delete a bot used by a connection', function (): void {
     $bot = AvailableTelegramBot::query()->create([
         'bot_name' => 'mybot',
     ]);
@@ -330,5 +330,5 @@ it('не удаляет бота используемого подключени
         return;
     }
 
-    test()->fail('Ожидалось исключение BotException.');
+    test()->fail('Expected a BotException.');
 });

@@ -17,7 +17,7 @@ use Telegga\Laravel\Resolvers\ConnectionContextResolver;
 final class MessageService
 {
     /**
-     * Создать сервис сообщений.
+     * Create the message service.
      */
     public function __construct(
         private readonly TeleggaClient $client,
@@ -26,7 +26,7 @@ final class MessageService
     ) {}
 
     /**
-     * Отправить сообщение.
+     * Send a message.
      *
      * @param  array<string, mixed>  $data
      */
@@ -80,7 +80,7 @@ final class MessageService
     }
 
     /**
-     * Получить сообщение по идентификатору.
+     * Get a message by its identifier.
      */
     public function get(string $messageId): MessageData
     {
@@ -107,7 +107,7 @@ final class MessageService
     }
 
     /**
-     * Получить историю сообщений пользователя.
+     * Get user message history.
      */
     public function getHistory(
         string $uuid,

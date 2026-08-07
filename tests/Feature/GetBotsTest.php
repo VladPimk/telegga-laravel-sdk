@@ -9,7 +9,7 @@ use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Dto\BotData;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 
-it('получает доступных ботов через публичный интерфейс', function () {
+it('gets available bots through the public interface', function () {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
@@ -43,7 +43,7 @@ it('получает доступных ботов через публичный
     });
 });
 
-it('кеширует список доступных ботов на десять минут', function (): void {
+it('caches the available bot list for ten minutes', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::sequence()
@@ -90,7 +90,7 @@ it('кеширует список доступных ботов на десят�
     Http::assertSentCount(2);
 });
 
-it('не кеширует некорректный ответ списка ботов', function (): void {
+it('does not cache an invalid bot list response', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::sequence()
@@ -109,7 +109,7 @@ it('не кеширует некорректный ответ списка бо�
     try {
         app(TeleggaInterface::class)->getBots();
 
-        test()->fail('Ожидалось исключение TeleggaApiException.');
+        test()->fail('Expected a TeleggaApiException.');
     } catch (TeleggaApiException $exception) {
         expect($exception->apiCode)
             ->toBe('invalid_response');
@@ -123,7 +123,7 @@ it('не кеширует некорректный ответ списка бо�
     Http::assertSentCount(2);
 });
 
-it('разделяет кеш списков ботов для разных api ключей', function (): void {
+it('separates bot list caches for different API keys', function (): void {
     Http::preventStrayRequests();
     Http::fake(function (Request $request) {
         $botId = $request->hasHeader('Authorization', 'Bearer tg_live_first')

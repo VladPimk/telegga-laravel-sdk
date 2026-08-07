@@ -9,7 +9,7 @@ use Illuminate\Support\Collection;
 final readonly class MessagePageData extends ApiResponseData
 {
     /**
-     * Создать страницу сообщений.
+     * Create a message page.
      *
      * @param  Collection<int, MessageData>  $data
      */

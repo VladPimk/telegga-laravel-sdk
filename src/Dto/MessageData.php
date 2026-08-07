@@ -9,7 +9,7 @@ use Illuminate\Support\Collection;
 final readonly class MessageData extends ApiResponseData
 {
     /**
-     * Создать данные сообщения.
+     * Create message data.
      *
      * @param  Collection<int, DeliveryAttemptData>  $delivery_attempts
      */

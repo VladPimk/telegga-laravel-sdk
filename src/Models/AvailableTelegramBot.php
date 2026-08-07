@@ -25,7 +25,7 @@ final class AvailableTelegramBot extends Model
     ];
 
     /**
-     * Получить поля с автоматически генерируемыми UUID.
+     * Get fields with automatically generated UUIDs.
      *
      * @return array<int, string>
      */
@@ -35,7 +35,7 @@ final class AvailableTelegramBot extends Model
     }
 
     /**
-     * Привести имя Telegram-бота к нижнему регистру.
+     * Convert the Telegram bot name to lowercase.
      *
      * @return Attribute<string, string>
      */
@@ -47,7 +47,7 @@ final class AvailableTelegramBot extends Model
     }
 
     /**
-     * Получить подключения бота.
+     * Get bot connections.
      *
      * @return HasMany<TelegramConnectedUser, $this>
      */

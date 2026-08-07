@@ -7,7 +7,7 @@ namespace Telegga\Laravel\Dto;
 final readonly class UserLinkData extends ApiResponseData
 {
     /**
-     * Создать данные привязки пользователя к боту.
+     * Create user-to-bot link data.
      */
     public function __construct(
         public string $bot_id,

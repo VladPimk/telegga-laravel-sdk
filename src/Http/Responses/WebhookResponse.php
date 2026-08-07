@@ -12,7 +12,7 @@ use LogicException;
 final readonly class WebhookResponse implements Responsable
 {
     /**
-     * Создать HTTP-ответ webhook.
+     * Create a webhook HTTP response.
      *
      * @param  array<string, mixed>  $data
      * @param  array<string, string>  $details
@@ -27,7 +27,7 @@ final readonly class WebhookResponse implements Responsable
     ) {}
 
     /**
-     * Создать успешный ответ webhook.
+     * Create a successful webhook response.
      *
      * @param  array<string, mixed>  $data
      */
@@ -52,7 +52,7 @@ final readonly class WebhookResponse implements Responsable
     }
 
     /**
-     * Создать ответ webhook с ошибкой.
+     * Create a webhook error response.
      *
      * @param  array<string, string>  $details
      */
@@ -78,7 +78,7 @@ final readonly class WebhookResponse implements Responsable
     }
 
     /**
-     * Преобразовать webhook-ответ в JSON.
+     * Convert a webhook response to JSON.
      *
      * @param  Request  $request
      */

@@ -14,7 +14,7 @@ use Telegga\Laravel\Http\Responses\WebhookResponseCode;
 final class VerifyWebhookToken
 {
     /**
-     * Проверить bearer-токен webhook.
+     * Validate the webhook bearer token.
      */
     public function handle(Request $request, Closure $next): Response
     {

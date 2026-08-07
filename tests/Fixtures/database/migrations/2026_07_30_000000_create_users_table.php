@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Создать таблицу пользователей тестового приложения.
+     * Create the test application users table.
      */
     public function up(): void
     {
@@ -21,7 +21,7 @@ return new class extends Migration
     }
 
     /**
-     * Удалить таблицу пользователей тестового приложения.
+     * Drop the test application users table.
      */
     public function down(): void
     {
