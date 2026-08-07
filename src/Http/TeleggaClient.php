@@ -16,6 +16,8 @@ use Throwable;
 
 final class TeleggaClient
 {
+    private const int MAX_RETRY_AFTER_SECONDS = 5;
+
     /**
      * Create the Telegga HTTP client.
      */
@@ -234,7 +236,22 @@ final class TeleggaClient
 
         $status = $exception->response->status();
 
+        if ($status === 429 && $this->retryAfterExceedsLimit(exception: $exception)) {
+            return false;
+        }
+
         return $status === 408 || $status === 429 || $exception->response->serverError();
+    }
+
+    /**
+     * Determine whether the server retry delay exceeds the synchronous wait limit.
+     */
+    private function retryAfterExceedsLimit(RequestException $exception): bool
+    {
+        $retryAfter = $exception->response->header('Retry-After');
+
+        return is_numeric($retryAfter)
+            && (float) $retryAfter > self::MAX_RETRY_AFTER_SECONDS;
     }
 
     /**

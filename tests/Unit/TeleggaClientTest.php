@@ -174,6 +174,48 @@ it('honors retry after when retrying an idempotent POST request', function (): v
     ]);
 });
 
+it('does not retry when retry after exceeds the synchronous wait limit', function (): void {
+    Sleep::fake();
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/users' => Http::sequence()
+            ->push(
+                body: ['error' => ['code' => 'rate_limited', 'message' => 'Too many requests.']],
+                status: 429,
+                headers: ['Retry-After' => '6'],
+            )
+            ->push(['user_id' => 'user-1'], 201),
+    ]);
+
+    $client = new TeleggaClient(
+        http: app(Factory::class),
+        baseUrl: 'https://api.telegga.net/api/v1',
+        apiKey: 'tg_live_test',
+        timeout: 15,
+        connectTimeout: 5,
+    );
+
+    try {
+        $client->post(
+            uri: 'users',
+            data: ['external_id' => 'external-1'],
+            idempotent: true,
+        );
+    } catch (TeleggaApiException $exception) {
+        expect($exception->status)->toBe(429)
+            ->and($exception->apiCode)->toBe('rate_limited')
+            ->and($exception->retryAfter)->toBe(6)
+            ->and($exception->attempts)->toBe(1);
+
+        Http::assertSentCount(1);
+        Sleep::assertNeverSlept();
+
+        return;
+    }
+
+    test()->fail('Expected a TeleggaApiException.');
+});
+
 it('does not retry a non-idempotent POST request', function (): void {
     Sleep::fake();
     Http::preventStrayRequests();

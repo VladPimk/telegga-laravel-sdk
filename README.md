@@ -149,9 +149,9 @@ The `meta` and `groupId` parameters are optional. The package sends them as `met
 
 ## Automatic HTTP retries
 
-The package automatically retries transport failures and HTTP `408`, `429`, and `5xx` responses only for operations that are safe to repeat. By default, a request is attempted up to three times with delays of 200 ms and 400 ms. A numeric `Retry-After` header on a `429` response takes precedence when it requires a longer delay.
+The package automatically retries transport failures and HTTP `408`, `429`, and `5xx` responses only for operations that are safe to repeat. By default, a request is attempted up to three times with delays of 200 ms and 400 ms. A numeric `Retry-After` header of up to five seconds on a `429` response takes precedence when it requires a longer delay.
 
-Retry delays are synchronous: the current PHP process waits before sending the next attempt. The package does not add jitter or cap a numeric `Retry-After` value, so a large value returned by the API can extend the request duration. A non-numeric `Retry-After` value is ignored and the configured linear delay is used.
+Retry delays are synchronous: the current PHP process waits before sending the next attempt. If a numeric `Retry-After` value exceeds five seconds, the package does not wait or retry and throws the mapped `TeleggaApiException` with the original `retryAfter` value. A non-numeric `Retry-After` value is ignored and the configured linear delay is used. The package does not add jitter.
 
 All `GET` requests are retried. The following modifying operations are explicitly marked as idempotent and are also retried:
 
