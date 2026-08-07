@@ -215,10 +215,7 @@ final class ConnectionContextResolver
         $fallback = null;
 
         foreach ($user->links as $link) {
-            if (
-                $this->linkMatchesBot(link: $link, botName: $botName)
-                && $link->bot_id !== ''
-            ) {
+            if ($this->linkMatchesBot(link: $link, botName: $botName)) {
                 if ($link->status === 'active') {
                     return $link;
                 }
