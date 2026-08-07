@@ -15,6 +15,7 @@ enum WebhookProcessingStatus: string
     case BotNotFound = 'bot_not_found';
     case BotDeleted = 'bot_deleted';
     case BotMismatch = 'bot_mismatch';
+    case RetryWindowExpired = 'retry_window_expired';
 
     /**
      * Determine whether webhook processing succeeded.

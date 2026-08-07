@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Telegga\Laravel\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Telegga\Laravel\Exceptions\WebhookException;
@@ -12,6 +13,7 @@ use Telegga\Laravel\Http\Responses\WebhookResponse;
 use Telegga\Laravel\Http\Responses\WebhookResponseCode;
 use Telegga\Laravel\Services\WebhookService;
 use Telegga\Laravel\Webhooks\WebhookProcessingResult;
+use Telegga\Laravel\Webhooks\WebhookProcessingStatus;
 
 final class ConnectAccountWebhookController
 {
@@ -136,6 +138,7 @@ final class ConnectAccountWebhookController
         $eventId = (string) $validated['event_id'];
         $externalId = (string) $validated['external_id'];
         $botName = str()->lower((string) $validated['bot_username']);
+        $linkedAt = Carbon::parse((string) $validated['linked_at']);
 
         try {
             $result = $this->webhooks->markConnected(
@@ -143,6 +146,7 @@ final class ConnectAccountWebhookController
                 event: $event,
                 externalId: $externalId,
                 botName: $botName,
+                linkedAt: $linkedAt,
             );
         } catch (WebhookException $exception) {
             Log::error('Telegga webhook could not be processed.', [
@@ -264,7 +268,11 @@ final class ConnectAccountWebhookController
             $details['expected_event'] = $result->expectedEvent;
         }
 
-        Log::warning('Telegga webhook request was rejected.', [
+        if ($result->failureStatus !== null) {
+            $details['failure_code'] = $result->failureStatus->value;
+        }
+
+        $logContext = [
             'event' => $event,
             'event_id' => $eventId,
             'external_id' => $externalId,
@@ -272,7 +280,14 @@ final class ConnectAccountWebhookController
             'expected_bot_username' => $result->expectedBotName,
             'expected_event' => $result->expectedEvent,
             'error_code' => $result->status->value,
-        ]);
+            'failure_code' => $result->failureStatus?->value,
+        ];
+
+        if ($result->status === WebhookProcessingStatus::RetryWindowExpired) {
+            Log::error('Telegga webhook retry window expired.', $logContext);
+        } else {
+            Log::warning('Telegga webhook request was rejected.', $logContext);
+        }
 
         return WebhookResponse::error(
             code: WebhookResponseCode::fromProcessingStatus(status: $result->status),

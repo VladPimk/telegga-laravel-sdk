@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Telegga\Laravel\Services;
 
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Telegga\Laravel\Exceptions\WebhookException;
 use Telegga\Laravel\Models\TeleggaWebhookEvent;
@@ -14,6 +15,8 @@ use Telegga\Laravel\Webhooks\WebhookProcessingStatus;
 
 final class WebhookService
 {
+    private const int BOT_VALIDATION_RETRY_WINDOW_HOURS = 6;
+
     /**
      * Process a user connection event.
      */
@@ -22,6 +25,7 @@ final class WebhookService
         string $event,
         string $externalId,
         string $botName,
+        Carbon $linkedAt,
     ): WebhookProcessingResult {
         $connection = $this->findConnection(externalId: $externalId);
 
@@ -51,16 +55,6 @@ final class WebhookService
             }
         }
 
-        $botValidation = $this->validateBot(
-            connection: $connection,
-            botName: $botName,
-            externalId: $externalId,
-        );
-
-        if ($botValidation instanceof WebhookProcessingResult) {
-            return $botValidation;
-        }
-
         if ($webhookEvent === null) {
             $webhookEvent = $this->registerEvent(
                 eventId: $eventId,
@@ -81,11 +75,42 @@ final class WebhookService
             }
         }
 
+        $botValidation = $this->validateBot(
+            connection: $connection,
+            botName: $botName,
+            externalId: $externalId,
+        );
+
+        if ($botValidation instanceof WebhookProcessingResult) {
+            return $this->resolveBotValidationFailure(
+                result: $botValidation,
+                linkedAt: $linkedAt,
+            );
+        }
+
         return $this->processEvent(
             webhookEvent: $webhookEvent,
             connection: $connection,
             expectedBotName: $botValidation,
             externalId: $externalId,
+        );
+    }
+
+    /**
+     * Resolve a retryable bot validation failure.
+     */
+    private function resolveBotValidationFailure(
+        WebhookProcessingResult $result,
+        Carbon $linkedAt,
+    ): WebhookProcessingResult {
+        if ($linkedAt->isAfter(now()->subHours(self::BOT_VALIDATION_RETRY_WINDOW_HOURS))) {
+            return $result;
+        }
+
+        return new WebhookProcessingResult(
+            status: WebhookProcessingStatus::RetryWindowExpired,
+            expectedBotName: $result->expectedBotName,
+            failureStatus: $result->status,
         );
     }
 

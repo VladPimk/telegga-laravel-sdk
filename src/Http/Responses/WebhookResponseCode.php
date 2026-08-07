@@ -19,6 +19,7 @@ enum WebhookResponseCode: string
     case BotNotFound = 'bot_not_found';
     case BotDeleted = 'bot_deleted';
     case BotMismatch = 'bot_mismatch';
+    case RetryWindowExpired = 'retry_window_expired';
     case Unauthorized = 'unauthorized';
     case InvalidRequest = 'invalid_request';
     case UnsupportedEvent = 'unsupported_event';
@@ -39,6 +40,7 @@ enum WebhookResponseCode: string
             WebhookProcessingStatus::BotNotFound => self::BotNotFound,
             WebhookProcessingStatus::BotDeleted => self::BotDeleted,
             WebhookProcessingStatus::BotMismatch => self::BotMismatch,
+            WebhookProcessingStatus::RetryWindowExpired => self::RetryWindowExpired,
         };
     }
 
@@ -64,14 +66,15 @@ enum WebhookResponseCode: string
             self::Accepted,
             self::Connected,
             self::AlreadyConnected,
-            self::Duplicate => Response::HTTP_OK,
+            self::Duplicate,
+            self::RetryWindowExpired => Response::HTTP_OK,
             self::Unauthorized => Response::HTTP_UNAUTHORIZED,
             self::ConnectionNotFound,
-            self::ConnectionDeleted,
+            self::ConnectionDeleted => Response::HTTP_NOT_FOUND,
+            self::EventIdConflict => Response::HTTP_CONFLICT,
             self::BotNotFound,
-            self::BotDeleted => Response::HTTP_NOT_FOUND,
-            self::EventIdConflict,
-            self::BotMismatch => Response::HTTP_CONFLICT,
+            self::BotDeleted,
+            self::BotMismatch => Response::HTTP_SERVICE_UNAVAILABLE,
             self::InvalidRequest,
             self::UnsupportedEvent => Response::HTTP_BAD_REQUEST,
             self::Internal => Response::HTTP_INTERNAL_SERVER_ERROR,
@@ -94,6 +97,7 @@ enum WebhookResponseCode: string
             self::BotNotFound => 'Telegram bot assigned to the connection was not found.',
             self::BotDeleted => 'Telegram bot assigned to the connection has been deleted.',
             self::BotMismatch => 'Telegram connection is assigned to a different bot.',
+            self::RetryWindowExpired => 'Webhook retry window expired before the event could be processed.',
             self::Unauthorized => 'Invalid webhook token.',
             self::InvalidRequest => 'Webhook request is invalid.',
             self::UnsupportedEvent => 'Webhook event is not supported.',

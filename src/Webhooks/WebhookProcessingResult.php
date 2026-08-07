@@ -13,5 +13,6 @@ final readonly class WebhookProcessingResult
         public WebhookProcessingStatus $status,
         public ?string $expectedBotName = null,
         public ?string $expectedEvent = null,
+        public ?WebhookProcessingStatus $failureStatus = null,
     ) {}
 }

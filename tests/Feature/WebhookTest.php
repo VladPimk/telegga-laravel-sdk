@@ -410,7 +410,7 @@ it('restores local state from an authorized user linked event', function (): voi
         ->not->toBeNull();
 });
 
-it('returns a distinct error for a deleted related bot', function (): void {
+it('requests another delivery when the related bot was deleted', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -422,8 +422,9 @@ it('returns a distinct error for a deleted related bot', function (): void {
         ->withToken('webhook-secret')
         ->postJson('/webhooks/v1/telegram/connect-account', userLinkedWebhookPayload(overrides: [
             'external_id' => $connection->uuid,
+            'linked_at' => now()->toRfc3339String(),
         ]))
-        ->assertNotFound()
+        ->assertServiceUnavailable()
         ->assertExactJson([
             'success' => false,
             'event' => 'user.linked',
@@ -439,13 +440,17 @@ it('returns a distinct error for a deleted related bot', function (): void {
             ],
         ]);
 
+    $webhookEvent = TeleggaWebhookEvent::query()->sole();
+
     expect($connection->refresh()->is_connected)
         ->toBeFalse()
-        ->and(TeleggaWebhookEvent::query()->doesntExist())
-        ->toBeTrue();
+        ->and($webhookEvent->attempts)
+        ->toBe(1)
+        ->and($webhookEvent->processed_at)
+        ->toBeNull();
 });
 
-it('returns a distinct error for a missing related bot', function (): void {
+it('requests another delivery when the related bot is missing', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -460,8 +465,9 @@ it('returns a distinct error for a missing related bot', function (): void {
         ->withToken('webhook-secret')
         ->postJson('/webhooks/v1/telegram/connect-account', userLinkedWebhookPayload(overrides: [
             'external_id' => $connection->uuid,
+            'linked_at' => now()->toRfc3339String(),
         ]))
-        ->assertNotFound()
+        ->assertServiceUnavailable()
         ->assertExactJson([
             'success' => false,
             'event' => 'user.linked',
@@ -476,10 +482,14 @@ it('returns a distinct error for a missing related bot', function (): void {
             ],
         ]);
 
+    $webhookEvent = TeleggaWebhookEvent::query()->sole();
+
     expect($connection->refresh()->is_connected)
         ->toBeFalse()
-        ->and(TeleggaWebhookEvent::query()->doesntExist())
-        ->toBeTrue();
+        ->and($webhookEvent->attempts)
+        ->toBe(1)
+        ->and($webhookEvent->processed_at)
+        ->toBeNull();
 });
 
 it('compares a bot name case-insensitively', function (): void {
@@ -502,7 +512,7 @@ it('compares a bot name case-insensitively', function (): void {
         ->toBeTrue();
 });
 
-it('returns an error when the bot name does not match', function (): void {
+it('requests another delivery when the bot name does not match', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -514,8 +524,9 @@ it('returns an error when the bot name does not match', function (): void {
         ->postJson('/webhooks/v1/telegram/connect-account', userLinkedWebhookPayload(overrides: [
             'external_id' => $connection->uuid,
             'bot_username' => '@mybot',
+            'linked_at' => now()->toRfc3339String(),
         ]))
-        ->assertConflict()
+        ->assertServiceUnavailable()
         ->assertExactJson([
             'success' => false,
             'event' => 'user.linked',
@@ -531,10 +542,74 @@ it('returns an error when the bot name does not match', function (): void {
             ],
         ]);
 
+    $webhookEvent = TeleggaWebhookEvent::query()->sole();
+
     expect($connection->refresh()->is_connected)
         ->toBeFalse()
-        ->and(TeleggaWebhookEvent::query()->doesntExist())
-        ->toBeTrue();
+        ->and($webhookEvent->attempts)
+        ->toBe(1)
+        ->and($webhookEvent->processed_at)
+        ->toBeNull();
+});
+
+it('acknowledges an unresolved bot failure after the retry window expires', function (): void {
+    Log::spy();
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+    $payload = userLinkedWebhookPayload(overrides: [
+        'external_id' => $connection->uuid,
+        'bot_username' => '@mybot',
+        'linked_at' => now()->toRfc3339String(),
+    ]);
+
+    $this
+        ->withToken('webhook-secret')
+        ->postJson('/webhooks/v1/telegram/connect-account', $payload)
+        ->assertServiceUnavailable();
+
+    $this->travel(7)->hours();
+
+    $this
+        ->withToken('webhook-secret')
+        ->postJson('/webhooks/v1/telegram/connect-account', $payload)
+        ->assertOk()
+        ->assertExactJson([
+            'success' => false,
+            'event' => 'user.linked',
+            'event_id' => $this->eventId,
+            'error' => [
+                'code' => 'retry_window_expired',
+                'message' => 'Webhook retry window expired before the event could be processed.',
+                'details' => [
+                    'external_id' => $connection->uuid,
+                    'received_bot_username' => '@mybot',
+                    'expected_bot_username' => 'mybot',
+                    'failure_code' => 'bot_mismatch',
+                ],
+            ],
+        ]);
+
+    $webhookEvent = TeleggaWebhookEvent::query()->sole();
+
+    expect($connection->refresh()->is_connected)
+        ->toBeFalse()
+        ->and($webhookEvent->attempts)
+        ->toBe(2)
+        ->and($webhookEvent->processed_at)
+        ->toBeNull();
+
+    Log::shouldHaveReceived('error')
+        ->once()
+        ->withArgs(
+            fn (string $message, array $context): bool => $message === 'Telegga webhook retry window expired.'
+                && $context['event_id'] === $this->eventId
+                && $context['external_id'] === $connection->uuid
+                && $context['error_code'] === 'retry_window_expired'
+                && $context['failure_code'] === 'bot_mismatch',
+        );
 });
 
 it('rejects an unknown event', function (): void {
