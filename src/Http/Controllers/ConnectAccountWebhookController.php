@@ -31,7 +31,7 @@ final class ConnectAccountWebhookController
     public function __invoke(Request $request): WebhookResponse
     {
         $eventValidation = Validator::make(
-            data: $request->all(),
+            data: $request->json()->all(),
             rules: [
                 'event' => ['required', 'string'],
             ],
@@ -62,7 +62,7 @@ final class ConnectAccountWebhookController
     private function handleTest(Request $request): WebhookResponse
     {
         $validation = Validator::make(
-            data: $request->all(),
+            data: $request->json()->all(),
             rules: [
                 'service_id' => ['required', 'string'],
                 'sent_at' => ['required', 'date'],
@@ -94,7 +94,7 @@ final class ConnectAccountWebhookController
     private function handleUserLinked(Request $request, string $event): WebhookResponse
     {
         $payloadValidation = Validator::make(
-            data: $request->all(),
+            data: $request->json()->all(),
             rules: [
                 'event_id' => ['required', 'string'],
                 'external_id' => ['required', 'string'],

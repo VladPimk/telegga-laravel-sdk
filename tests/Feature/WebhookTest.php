@@ -776,6 +776,57 @@ it('rejects a payload without an event name', function (): void {
         );
 });
 
+it('does not accept an event from the query string', function (): void {
+    $this
+        ->withToken('webhook-secret')
+        ->postJson('/webhooks/v1/telegram/connect-account?event=test')
+        ->assertBadRequest()
+        ->assertExactJson([
+            'success' => false,
+            'error' => [
+                'code' => 'invalid_request',
+                'message' => 'Webhook event is required.',
+            ],
+        ]);
+});
+
+it('does not accept test event fields from the query string', function (): void {
+    $this
+        ->withToken('webhook-secret')
+        ->postJson(
+            '/webhooks/v1/telegram/connect-account?service_id=service-1&sent_at=2026-07-22T10%3A15%3A00Z',
+            ['event' => 'test'],
+        )
+        ->assertBadRequest()
+        ->assertExactJson([
+            'success' => false,
+            'event' => 'test',
+            'error' => [
+                'code' => 'invalid_request',
+                'message' => 'Webhook service_id is required.',
+            ],
+        ]);
+});
+
+it('does not accept connection event fields from the query string', function (): void {
+    $this
+        ->withToken('webhook-secret')
+        ->postJson(
+            '/webhooks/v1/telegram/connect-account?bot_username=mybot',
+            userLinkedWebhookPayload(except: ['bot_username']),
+        )
+        ->assertBadRequest()
+        ->assertExactJson([
+            'success' => false,
+            'event' => 'user.linked',
+            'event_id' => $this->eventId,
+            'error' => [
+                'code' => 'invalid_request',
+                'message' => 'Webhook bot_username is required.',
+            ],
+        ]);
+});
+
 it('rejects a connection event without an event_id', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
