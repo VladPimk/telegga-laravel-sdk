@@ -19,6 +19,7 @@ return new class extends Migration
             $table->string('bot_name')->index();
             $table->timestamps();
             $table->softDeletes();
+            $table->unique(['bot_name', 'deleted_at']);
         });
     }
 

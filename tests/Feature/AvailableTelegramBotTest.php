@@ -46,7 +46,11 @@ it('creates the available bots table and generates a local UUID', function (): v
     expect($indexes->contains(
         fn (array $index): bool => $index['columns'] === ['uuid']
             && $index['unique'] === false,
-    ))->toBeTrue();
+    ))->toBeTrue()
+        ->and($indexes->contains(
+            fn (array $index): bool => $index['columns'] === ['bot_name', 'deleted_at']
+                && $index['unique'] === true,
+        ))->toBeTrue();
 });
 
 it('adds a local bot after validating the API list', function (): void {
