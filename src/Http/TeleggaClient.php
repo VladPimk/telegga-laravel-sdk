@@ -240,7 +240,7 @@ final class TeleggaClient
             return false;
         }
 
-        return $status === 408 || $status === 429 || $exception->response->serverError();
+        return RetryPolicy::isRetryableStatus(status: $status);
     }
 
     /**

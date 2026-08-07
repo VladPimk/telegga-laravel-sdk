@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Telegga\Laravel\Exceptions;
 
 use RuntimeException;
+use Telegga\Laravel\Http\RetryPolicy;
 
 abstract class TeleggaException extends RuntimeException
 {
@@ -37,11 +38,7 @@ abstract class TeleggaException extends RuntimeException
      */
     public function isRetryable(): bool
     {
-        $status = $this->apiStatus();
-
-        return $status === 408
-            || $status === 429
-            || ($status !== null && $status >= 500 && $status <= 599);
+        return RetryPolicy::isRetryableStatus(status: $this->apiStatus());
     }
 
     /**
