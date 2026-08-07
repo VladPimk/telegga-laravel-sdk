@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Telegga\Laravel\Services;
 
+use Telegga\Laravel\BroadcastAudience;
 use Telegga\Laravel\Dto\BroadcastCancellationData;
 use Telegga\Laravel\Dto\BroadcastCreatedData;
 use Telegga\Laravel\Dto\BroadcastData;
@@ -25,38 +26,38 @@ final class BroadcastService
     ) {}
 
     /**
-     * Start a broadcast.
+     * Start a broadcast for an explicit audience using the connection only to resolve the bot.
      *
      * @param  array<string, mixed>  $data
      */
     public function start(
-        string $uuid,
+        string $viaConnectionUuid,
         string $type,
+        ?BroadcastAudience $audience = null,
         array $data = [],
-        ?string $groupId = null,
     ): BroadcastCreatedData {
-        if (trim($uuid) === '') {
+        if (trim($viaConnectionUuid) === '') {
             throw new BroadcastException(
                 message: 'Connection UUID cannot be empty.',
-                connectionUuid: $uuid,
+                connectionUuid: $viaConnectionUuid,
             );
         }
 
         if (trim($type) === '') {
             throw new BroadcastException(
                 message: 'Broadcast type cannot be empty.',
-                connectionUuid: $uuid,
+                connectionUuid: $viaConnectionUuid,
             );
         }
 
-        if ($groupId !== null && trim($groupId) === '') {
+        if ($audience === null) {
             throw new BroadcastException(
-                message: 'Group identifier cannot be empty.',
-                connectionUuid: $uuid,
+                message: 'Broadcast audience must be specified.',
+                connectionUuid: $viaConnectionUuid,
             );
         }
 
-        $context = $this->contexts->resolveBot(uuid: $uuid);
+        $context = $this->contexts->resolveBot(uuid: $viaConnectionUuid);
         unset(
             $data['external_id'],
             $data['user_id'],
@@ -66,8 +67,8 @@ final class BroadcastService
         );
         $data['bot_id'] = $context->link->bot_id;
 
-        if ($groupId !== null) {
-            $data['group_id'] = trim($groupId);
+        if ($audience->groupId !== null) {
+            $data['group_id'] = $audience->groupId;
         }
 
         $data['type'] = trim($type);
@@ -82,7 +83,7 @@ final class BroadcastService
         } catch (TeleggaApiException $exception) {
             throw new BroadcastException(
                 message: $exception->getMessage(),
-                connectionUuid: $uuid,
+                connectionUuid: $viaConnectionUuid,
                 previous: $exception,
             );
         }

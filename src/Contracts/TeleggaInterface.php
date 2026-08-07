@@ -6,6 +6,7 @@ namespace Telegga\Laravel\Contracts;
 
 use DateTimeInterface;
 use Illuminate\Support\Collection;
+use Telegga\Laravel\BroadcastAudience;
 use Telegga\Laravel\Dto\BotData;
 use Telegga\Laravel\Dto\BroadcastCancellationData;
 use Telegga\Laravel\Dto\BroadcastCreatedData;
@@ -141,15 +142,15 @@ interface TeleggaInterface
     public function removeGroupMember(string $groupId, string $uuid): void;
 
     /**
-     * Start a broadcast.
+     * Start a broadcast for an explicit audience using the connection only to resolve the bot.
      *
      * @param  array<string, mixed>  $data
      */
     public function startBroadcast(
-        string $uuid,
+        string $viaConnectionUuid,
         string $type,
+        ?BroadcastAudience $audience = null,
         array $data = [],
-        ?string $groupId = null,
     ): BroadcastCreatedData;
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Telegga\Laravel\BroadcastAudience;
 use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Dto\BroadcastCancellationData;
 use Telegga\Laravel\Dto\BroadcastCreatedData;
@@ -45,8 +46,9 @@ it('starts a broadcast to all users of the connection bot', function (): void {
     ]);
 
     $broadcast = app(TeleggaInterface::class)->startBroadcast(
-        uuid: $connection->uuid,
+        viaConnectionUuid: $connection->uuid,
         type: 'text',
+        audience: BroadcastAudience::allLinkedUsers(),
         data: [
             'text' => 'Акция!',
             'bot_id' => 'foreign-bot',
@@ -111,14 +113,14 @@ it('starts a media broadcast to members of the specified group', function (): vo
     ]);
 
     app(TeleggaInterface::class)->startBroadcast(
-        uuid: $connection->uuid,
+        viaConnectionUuid: $connection->uuid,
         type: 'photo',
+        audience: BroadcastAudience::group(groupId: 'group-1'),
         data: [
             'media_id' => 'media-photo',
             'text' => 'Новая акция',
             'group_id' => 'foreign-group',
         ],
-        groupId: 'group-1',
     );
 
     Http::assertSent(function (Request $request): bool {
@@ -219,25 +221,34 @@ it('rejects invalid broadcast parameters before an API request', function (
 })->with([
     'empty UUID' => [
         fn (TeleggaInterface $telegga) => $telegga->startBroadcast(
-            uuid: '   ',
+            viaConnectionUuid: '   ',
             type: 'text',
+            audience: BroadcastAudience::allLinkedUsers(),
         ),
         'Connection UUID cannot be empty.',
     ],
     'empty type' => [
         fn (TeleggaInterface $telegga) => $telegga->startBroadcast(
-            uuid: 'connection-uuid',
+            viaConnectionUuid: 'connection-uuid',
             type: '   ',
+            audience: BroadcastAudience::allLinkedUsers(),
         ),
         'Broadcast type cannot be empty.',
     ],
     'empty group' => [
         fn (TeleggaInterface $telegga) => $telegga->startBroadcast(
-            uuid: 'connection-uuid',
+            viaConnectionUuid: 'connection-uuid',
             type: 'text',
-            groupId: '   ',
+            audience: BroadcastAudience::group(groupId: '   '),
         ),
         'Group identifier cannot be empty.',
+    ],
+    'missing audience' => [
+        fn (TeleggaInterface $telegga) => $telegga->startBroadcast(
+            viaConnectionUuid: 'connection-uuid',
+            type: 'text',
+        ),
+        'Broadcast audience must be specified.',
     ],
     'empty progress identifier' => [
         fn (TeleggaInterface $telegga) => $telegga->getBroadcast(

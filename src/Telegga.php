@@ -204,16 +204,16 @@ final class Telegga implements TeleggaInterface
 
     /** {@inheritDoc} */
     public function startBroadcast(
-        string $uuid,
+        string $viaConnectionUuid,
         string $type,
+        ?BroadcastAudience $audience = null,
         array $data = [],
-        ?string $groupId = null,
     ): BroadcastCreatedData {
         return $this->broadcasts->start(
-            uuid: $uuid,
+            viaConnectionUuid: $viaConnectionUuid,
             type: $type,
+            audience: $audience,
             data: $data,
-            groupId: $groupId,
         );
     }
 

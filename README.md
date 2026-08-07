@@ -442,31 +442,40 @@ Groups and memberships are not stored locally. Group responses use `GroupData`, 
 
 ## Broadcasts
 
+Import the explicit broadcast audience value object:
+
+```php
+use Telegga\Laravel\BroadcastAudience;
+```
+
 Start a broadcast to all connected users of a bot using a local connection UUID:
 
 ```php
 $broadcast = $telegga->startBroadcast(
-    uuid: $connectionUuid,
+    viaConnectionUuid: $connectionUuid,
     type: 'text',
+    audience: BroadcastAudience::allLinkedUsers(),
     data: [
         'text' => 'Special offer!',
     ],
 );
 ```
 
-To limit recipients to group members, pass `groupId`:
+To limit recipients to group members, select a group audience:
 
 ```php
 $broadcast = $telegga->startBroadcast(
-    uuid: $connectionUuid,
+    viaConnectionUuid: $connectionUuid,
     type: 'photo',
+    audience: BroadcastAudience::group(groupId: $groupId),
     data: [
         'media_id' => $mediaId,
         'text' => 'New special offer',
     ],
-    groupId: $groupId,
 );
 ```
+
+The audience must always be selected explicitly. Omitting it throws `BroadcastException` before any API request. The connection UUID is used only to resolve the bot and is not a broadcast recipient.
 
 Message fields are passed through the open `data` payload, as in `sendMessage()`. Values for `external_id`, `user_id`, `bot_id`, `group_id`, and `type` supplied in `data` are removed or replaced with parameters resolved by the package.
 
