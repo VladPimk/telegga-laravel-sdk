@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Dto\BotData;
@@ -88,6 +89,102 @@ it('caches the available bot list for ten minutes', function (): void {
         ->toBe('bot-2');
 
     Http::assertSentCount(2);
+});
+
+it('stores only the raw API response array in the bot cache', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/bots' => Http::response([
+            'data' => [
+                [
+                    'bot_id' => 'bot-1',
+                    'username' => 'mybot',
+                    'display_name' => 'Notifications',
+                    'status' => 'active',
+                    'new_api_field' => [
+                        'enabled' => true,
+                    ],
+                ],
+            ],
+        ]),
+    ]);
+
+    $bots = app(TeleggaInterface::class)->getBots();
+    $scope = implode('|', [
+        (string) config('telegga.base_url'),
+        (string) config('telegga.api_key'),
+    ]);
+    $cacheKey = 'telegga:bots:v2:'.hash('sha256', $scope);
+    $cached = Cache::get($cacheKey);
+    $containsObject = function (mixed $value) use (&$containsObject): bool {
+        if (is_object($value)) {
+            return true;
+        }
+
+        if (! is_array($value)) {
+            return false;
+        }
+
+        foreach ($value as $item) {
+            if ($containsObject($item)) {
+                return true;
+            }
+        }
+
+        return false;
+    };
+
+    expect($cached)
+        ->toBeArray()
+        ->and($containsObject($cached))
+        ->toBeFalse()
+        ->and($cached['data'][0]['new_api_field']['enabled'])
+        ->toBeTrue()
+        ->and($bots->first())
+        ->toBeInstanceOf(BotData::class)
+        ->and($bots->first()->raw()->new_api_field->enabled)
+        ->toBeTrue();
+});
+
+it('ignores the legacy unversioned bot cache key', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/bots' => Http::response([
+            'data' => [
+                [
+                    'bot_id' => 'fresh-bot',
+                    'username' => 'fresh_bot',
+                    'status' => 'active',
+                ],
+            ],
+        ]),
+    ]);
+    $scope = implode('|', [
+        (string) config('telegga.base_url'),
+        (string) config('telegga.api_key'),
+    ]);
+    $legacyCacheKey = 'telegga:bots:'.hash('sha256', $scope);
+
+    Cache::put($legacyCacheKey, collect([
+        new BotData(
+            bot_id: 'legacy-bot',
+            username: 'legacy_bot',
+            display_name: null,
+            status: 'active',
+            raw: (object) [
+                'bot_id' => 'legacy-bot',
+                'username' => 'legacy_bot',
+                'status' => 'active',
+            ],
+        ),
+    ]), 600);
+
+    $bots = app(TeleggaInterface::class)->getBots();
+
+    expect($bots->first()->bot_id)
+        ->toBe('fresh-bot');
+
+    Http::assertSentCount(1);
 });
 
 it('does not cache an invalid bot list response', function (): void {

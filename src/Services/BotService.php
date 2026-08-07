@@ -17,6 +17,8 @@ use Throwable;
 
 final class BotService
 {
+    private const int CACHE_VERSION = 2;
+
     private const int CACHE_TTL_SECONDS = 600;
 
     private readonly string $cacheKey;
@@ -34,7 +36,11 @@ final class BotService
             (string) config(key: 'telegga.api_key'),
         ]);
 
-        $this->cacheKey = 'telegga:bots:'.hash('sha256', $scope);
+        $this->cacheKey = sprintf(
+            'telegga:bots:v%d:%s',
+            self::CACHE_VERSION,
+            hash('sha256', $scope),
+        );
     }
 
     /**
@@ -44,22 +50,24 @@ final class BotService
      */
     public function getAll(): Collection
     {
-        return $this->cache->remember(
+        $response = $this->cache->remember(
             $this->cacheKey,
             self::CACHE_TTL_SECONDS,
-            fn (): Collection => $this->fetchAll(),
+            fn (): array => $this->fetchAll(),
         );
+
+        return $this->mapper->fromArray(response: $response);
     }
 
     /**
      * Fetch the current list of available bots from the API.
      *
-     * @return Collection<int, BotData>
+     * @return array<mixed>
      */
-    private function fetchAll(): Collection
+    private function fetchAll(): array
     {
-        return $this->mapper->fromList(
-            response: $this->client->get(uri: 'bots')->object(),
+        return $this->mapper->validatedArray(
+            response: $this->client->get(uri: 'bots')->json(),
         );
     }
 

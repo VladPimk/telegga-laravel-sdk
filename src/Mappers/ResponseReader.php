@@ -9,6 +9,23 @@ use Telegga\Laravel\Exceptions\TeleggaApiException;
 final class ResponseReader
 {
     /**
+     * Get a response array.
+     *
+     * @return array<mixed>
+     */
+    public function array(mixed $response, string $context): array
+    {
+        if (! is_array($response)) {
+            $this->invalid(
+                context: $context,
+                message: 'response must be an array',
+            );
+        }
+
+        return $response;
+    }
+
+    /**
      * Get a response object.
      */
     public function object(mixed $response, string $context): object

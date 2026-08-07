@@ -39,6 +39,38 @@ final class BotResponseMapper
     }
 
     /**
+     * Map a cached bot list response array.
+     *
+     * @return Collection<int, BotData>
+     */
+    public function fromArray(mixed $response): Collection
+    {
+        $response = $this->reader->array(
+            response: $response,
+            context: 'bot list response',
+        );
+
+        return $this->fromList(response: $this->toObject(values: $response));
+    }
+
+    /**
+     * Validate and return a bot list response array for caching.
+     *
+     * @return array<mixed>
+     */
+    public function validatedArray(mixed $response): array
+    {
+        $response = $this->reader->array(
+            response: $response,
+            context: 'bot list response',
+        );
+
+        $this->fromList(response: $this->toObject(values: $response));
+
+        return $response;
+    }
+
+    /**
      * Map bot data.
      */
     private function mapBot(mixed $response): BotData
@@ -70,6 +102,41 @@ final class BotResponseMapper
                 context: 'bot response',
             ),
             raw: $response,
+        );
+    }
+
+    /**
+     * Convert an associative response array to an object recursively.
+     *
+     * @param  array<mixed>  $values
+     */
+    private function toObject(array $values): object
+    {
+        $normalized = [];
+
+        foreach ($values as $key => $value) {
+            $normalized[$key] = $this->normalizeValue(value: $value);
+        }
+
+        return (object) $normalized;
+    }
+
+    /**
+     * Normalize a cached response value.
+     */
+    private function normalizeValue(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        if (! array_is_list($value)) {
+            return $this->toObject(values: $value);
+        }
+
+        return array_map(
+            fn (mixed $item): mixed => $this->normalizeValue(value: $item),
+            $value,
         );
     }
 }
