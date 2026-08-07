@@ -52,6 +52,10 @@ it('creates webhook event table indexes and a foreign key', function (): void {
             fn (array $index): bool => $index['columns'] === ['event']
                 && $index['unique'] === false,
         ))->toBeTrue()
+        ->and($indexes->contains(
+            fn (array $index): bool => $index['columns'] === ['created_at']
+                && $index['unique'] === false,
+        ))->toBeTrue()
         ->and($foreignKeys->contains(
             fn (array $foreignKey): bool => $foreignKey['columns'] === ['telegram_connected_user_id']
                 && $foreignKey['foreign_table'] === 'telegram_connected_users'

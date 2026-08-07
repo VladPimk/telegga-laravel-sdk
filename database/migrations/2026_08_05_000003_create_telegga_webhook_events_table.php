@@ -27,6 +27,7 @@ return new class extends Migration
             $table->timestamp('first_seen_at');
             $table->timestamp('processed_at')->nullable();
             $table->timestamps();
+            $table->index('created_at');
         });
     }
 
