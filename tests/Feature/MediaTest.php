@@ -140,7 +140,7 @@ it('does not send a media file larger than fifty megabytes', function (): void {
 
     try {
         app(TeleggaInterface::class)->uploadMedia(
-            contents: str_repeat(string: 'a', times: 50 * 1024 * 1024 + 1),
+            contents: str_repeat('a', 50 * 1024 * 1024 + 1),
             filename: 'large.bin',
         );
     } catch (MediaException $exception) {

@@ -27,9 +27,9 @@ final class ClearWebhookEventsCommand extends Command
     {
         $rawDays = $this->argument('days');
         $days = filter_var(
-            value: $rawDays,
-            filter: FILTER_VALIDATE_INT,
-            options: [
+            $rawDays,
+            FILTER_VALIDATE_INT,
+            [
                 'options' => [
                     'min_range' => 1,
                 ],

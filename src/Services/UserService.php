@@ -84,7 +84,7 @@ final class UserService
      */
     public function getAll(array $query = []): UserPageData
     {
-        if (array_key_exists(key: 'external_id', array: $query)) {
+        if (array_key_exists('external_id', $query)) {
             throw new InvalidArgumentException(
                 message: 'Use findByExternalId() for exact external_id lookup: the API returns a single object.',
             );

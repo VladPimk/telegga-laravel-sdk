@@ -68,9 +68,9 @@ abstract class TeleggaException extends RuntimeException
     public function isAlreadyInDesiredState(): bool
     {
         return in_array(
-            needle: $this->apiCode(),
-            haystack: ['already_linked', 'user_not_linked'],
-            strict: true,
+            $this->apiCode(),
+            ['already_linked', 'user_not_linked'],
+            true,
         );
     }
 

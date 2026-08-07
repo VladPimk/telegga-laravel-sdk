@@ -469,8 +469,8 @@ it('rejects invalid group parameters before an API request', function (
         fn (TeleggaInterface $telegga) => $telegga->addGroupMembers(
             groupId: 'group-1',
             uuids: array_map(
-                callback: fn (int $index): string => "uuid-{$index}",
-                array: range(start: 1, end: 10001),
+                fn (int $index): string => "uuid-{$index}",
+                range(1, 10001),
             ),
         ),
         'Group members cannot exceed 10000 users.',

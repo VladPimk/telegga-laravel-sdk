@@ -75,8 +75,8 @@ it('gets message history only for the specified connection', function (): void {
 
         $query = [];
         parse_str(
-            string: parse_url(url: $request->url(), component: PHP_URL_QUERY) ?: '',
-            result: $query,
+            parse_url($request->url(), PHP_URL_QUERY) ?: '',
+            $query,
         );
 
         return $query === [
@@ -128,8 +128,8 @@ it('returns null for a missing next page cursor', function (): void {
 
         $query = [];
         parse_str(
-            string: parse_url(url: $request->url(), component: PHP_URL_QUERY) ?: '',
-            result: $query,
+            parse_url($request->url(), PHP_URL_QUERY) ?: '',
+            $query,
         );
 
         return $query === [
