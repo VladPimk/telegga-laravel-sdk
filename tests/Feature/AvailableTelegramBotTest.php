@@ -81,6 +81,42 @@ it('adds a local bot after validating the API list', function (): void {
     Http::assertSentCount(1);
 });
 
+it('refreshes a cached API list before adding a local bot', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/bots' => Http::sequence()
+            ->push([
+                'data' => [
+                    [
+                        'bot_id' => 'old-bot-id',
+                        'username' => 'old_bot',
+                        'status' => 'active',
+                    ],
+                ],
+            ])
+            ->push([
+                'data' => [
+                    [
+                        'bot_id' => 'new-bot-id',
+                        'username' => 'mybot',
+                        'status' => 'active',
+                    ],
+                ],
+            ]),
+    ]);
+
+    app(TeleggaInterface::class)->getBots();
+
+    $bot = app(TeleggaInterface::class)->addTelegramBot(botName: 'mybot');
+
+    expect($bot->bot_name)
+        ->toBe('mybot')
+        ->and(app(TeleggaInterface::class)->getBots()->first()->bot_id)
+        ->toBe('new-bot-id');
+
+    Http::assertSentCount(2);
+});
+
 it('returns an existing local bot on repeated addition', function (): void {
     Http::preventStrayRequests();
     Http::fake([
@@ -264,6 +300,44 @@ it('deletes an unused local bot', function (): void {
         ->toBeTrue()
         ->and(AvailableTelegramBot::withTrashed()->find($bot->id)?->trashed())
         ->toBeTrue();
+});
+
+it('invalidates the cached API list when deleting a local bot', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/bots' => Http::sequence()
+            ->push([
+                'data' => [
+                    [
+                        'bot_id' => 'first-bot-id',
+                        'username' => 'mybot',
+                        'status' => 'active',
+                    ],
+                ],
+            ])
+            ->push([
+                'data' => [
+                    [
+                        'bot_id' => 'second-bot-id',
+                        'username' => 'mybot',
+                        'status' => 'active',
+                    ],
+                ],
+            ]),
+    ]);
+    $bot = AvailableTelegramBot::query()->create([
+        'bot_name' => 'mybot',
+    ]);
+
+    app(TeleggaInterface::class)->getBots();
+    app(TeleggaInterface::class)->deleteTelegramBot(uuid: $bot->uuid);
+
+    $bots = app(TeleggaInterface::class)->getBots();
+
+    expect($bots->first()->bot_id)
+        ->toBe('second-bot-id');
+
+    Http::assertSentCount(2);
 });
 
 it('creates a new local bot after soft-deleting a bot with the same name', function (): void {

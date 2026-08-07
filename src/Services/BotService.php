@@ -79,6 +79,8 @@ final class BotService
         $botName = $this->validateName(botName: $botName);
 
         try {
+            $this->cache->forget($this->cacheKey);
+
             $exists = $this->getAll()->contains(
                 fn (BotData $bot): bool => str()->lower($bot->username) === $botName,
             );
@@ -211,6 +213,7 @@ final class BotService
                 );
             }
 
+            $this->cache->forget($this->cacheKey);
             $bot->delete();
         } catch (BotException $exception) {
             throw $exception;
