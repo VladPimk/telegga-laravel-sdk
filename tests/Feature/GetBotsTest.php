@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Illuminate\Http\Client\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Telegga\Laravel\Contracts\TeleggaInterface;
@@ -29,14 +28,14 @@ it('gets available bots through the public interface', function () {
     $bots = app(TeleggaInterface::class)->getBots();
 
     expect($bots)
-        ->toBeInstanceOf(Collection::class)
-        ->and($bots)->toHaveCount(1)
+        ->toHaveCount(1)
         ->and($bots->first())->toBeInstanceOf(BotData::class)
         ->and($bots->first()->bot_id)->toBe('bot-1')
         ->and($bots->first()->username)->toBe('mybot')
         ->and($bots->first()->display_name)->toBe('Уведомления')
-        ->and($bots->first()->status)->toBe('active')
-        ->and($bots->first()->raw()->new_api_field)->toBe('new-value');
+        ->and($bots->first()->status)->toBe('active');
+
+    $this->assertSame('new-value', $bots->first()->raw()->new_api_field);
 
     Http::assertSent(function (Request $request): bool {
         return $request->method() === 'GET'
@@ -206,7 +205,7 @@ it('does not cache an invalid bot list response', function (): void {
     try {
         app(TeleggaInterface::class)->getBots();
 
-        test()->fail('Expected a TeleggaApiException.');
+        $this->fail('Expected a TeleggaApiException.');
     } catch (TeleggaApiException $exception) {
         expect($exception->apiCode)
             ->toBe('invalid_response');

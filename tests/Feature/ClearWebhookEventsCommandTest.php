@@ -50,7 +50,7 @@ afterEach(function (): void {
 });
 
 it('deletes only events older than ninety days by default', function (): void {
-    Log::spy();
+    $log = Log::spy();
     createWebhookEventForCleanup(
         connectionId: $this->connection->id,
         eventId: 'old-event',
@@ -83,7 +83,7 @@ it('deletes only events older than ninety days by default', function (): void {
     expect(TeleggaWebhookEvent::query()->pluck('event_id')->sort()->values()->all())
         ->toBe(['boundary-event', 'old-first-seen-event', 'recent-event']);
 
-    Log::shouldHaveReceived('info')
+    $this->receivedCall(spy: $log, method: 'info')
         ->once()
         ->withArgs(
             fn (string $message, array $context): bool => $message === 'Telegga webhook event cleanup completed.'
@@ -145,17 +145,15 @@ it('deletes a large event log in chunks of one thousand records', function (): v
     $queries = collect(DB::getQueryLog());
     DB::disableQueryLog();
 
-    expect(TeleggaWebhookEvent::query()->doesntExist())
-        ->toBeTrue()
-        ->and($queries->filter(
-            fn (array $query): bool => str_starts_with(strtolower($query['query']), 'delete from')
-                && str_contains(strtolower($query['query']), 'telegga_webhook_events'),
-        ))
-        ->toHaveCount(2);
+    expect(TeleggaWebhookEvent::query()->doesntExist())->toBeTrue();
+    $this->assertCount(2, $queries->filter(
+        fn (array $query): bool => str_starts_with(strtolower($query['query']), 'delete from')
+            && str_contains(strtolower($query['query']), 'telegga_webhook_events'),
+    ));
 });
 
 it('rejects an invalid day count without deleting events', function (string $days): void {
-    Log::spy();
+    $log = Log::spy();
     createWebhookEventForCleanup(
         connectionId: $this->connection->id,
         eventId: 'old-event',
@@ -172,7 +170,7 @@ it('rejects an invalid day count without deleting events', function (string $day
     expect(TeleggaWebhookEvent::query()->count())
         ->toBe(1);
 
-    Log::shouldHaveReceived('warning')
+    $this->receivedCall(spy: $log, method: 'warning')
         ->once()
         ->withArgs(
             fn (string $message, array $context): bool => $message === 'Telegga webhook event cleanup was rejected.'
@@ -190,14 +188,14 @@ it('rejects an invalid day count without deleting events', function (string $day
 
 it('logs a database error and returns a failure code', function (): void {
     Schema::drop('telegga_webhook_events');
-    Log::spy();
+    $log = Log::spy();
     Exceptions::fake();
 
     $this->artisan('telegga:webhook-events:clear')
         ->expectsOutput('Telegga webhook event records could not be deleted.')
         ->assertExitCode(Command::FAILURE);
 
-    Log::shouldHaveReceived('error')
+    $this->receivedCall(spy: $log, method: 'error')
         ->once()
         ->withArgs(
             fn (string $message, array $context): bool => $message === 'Telegga webhook event cleanup failed.'

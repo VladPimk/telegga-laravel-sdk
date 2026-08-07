@@ -3,12 +3,10 @@
 declare(strict_types=1);
 
 use Illuminate\Http\Client\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Dto\UserData;
-use Telegga\Laravel\Dto\UserPageData;
 use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Models\AvailableTelegramBot;
@@ -28,17 +26,13 @@ it('gets a connection page by email status and cursor', function (): void {
         cursor: 'current-cursor',
     );
 
-    expect($page)
-        ->toBeInstanceOf(UserPageData::class)
-        ->and($page->data)
-        ->toBeInstanceOf(Collection::class)
-        ->and($page->data)
+    expect($page->data)
         ->toHaveCount(1)
         ->and($page->data->first())->toBeInstanceOf(UserData::class)
-        ->and($page->data->first()->raw()->new_api_field)
-        ->toBe('new-value')
         ->and($page->next_cursor)
         ->toBe('next-cursor');
+
+    $this->assertSame('new-value', $page->data->first()->raw()->new_api_field);
 
     Http::assertSent(function (Request $request): bool {
         return $request->method() === 'GET'
@@ -71,8 +65,6 @@ it('resolves a local bot UUID to bot_id for the connection list', function (): v
     );
 
     expect($page->data)
-        ->toBeInstanceOf(Collection::class)
-        ->and($page->data)
         ->toBeEmpty()
         ->and($page->next_cursor)
         ->toBeNull();
@@ -107,7 +99,7 @@ it('does not send a request for an unknown local bot', function (): void {
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('wraps an invalid connection list response', function (): void {
@@ -127,5 +119,5 @@ it('wraps an invalid connection list response', function (): void {
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });

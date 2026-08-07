@@ -3,13 +3,9 @@
 declare(strict_types=1);
 
 use Illuminate\Http\Client\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Dto\GroupData;
-use Telegga\Laravel\Dto\GroupMembersAddedData;
-use Telegga\Laravel\Dto\GroupPageData;
-use Telegga\Laravel\Dto\UserGroupMembershipData;
 use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\GroupException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
@@ -55,12 +51,10 @@ it('creates a group for the local connection bot', function (): void {
         description: 'VIP-клиенты',
     );
 
-    expect($group)
-        ->toBeInstanceOf(GroupData::class)
-        ->and($group->group_id)
-        ->toBe('group-1')
-        ->and($group->raw()->new_api_field)
-        ->toBe('new-value');
+    expect($group->group_id)
+        ->toBe('group-1');
+
+    $this->assertSame('new-value', $group->raw()->new_api_field);
 
     Http::assertSent(function (Request $request): bool {
         return $request->method() === 'POST'
@@ -111,20 +105,15 @@ it('returns a group page for the local connection bot', function (): void {
         cursor: ' current-page ',
     );
 
-    expect($page)
-        ->toBeInstanceOf(GroupPageData::class)
-        ->and($page->data)
-        ->toBeInstanceOf(Collection::class)
-        ->and($page->data)
+    expect($page->data)
         ->toHaveCount(1)
         ->and($page->data->first())
         ->toBeInstanceOf(GroupData::class)
-        ->and($page->data->first()->raw()->new_api_field)
-        ->toBe('new-value')
         ->and($page->next_cursor)
-        ->toBe('next-page')
-        ->and($page->raw()->new_page_field)
-        ->toBe('new-page-value');
+        ->toBe('next-page');
+
+    $this->assertSame('new-value', $page->data->first()->raw()->new_api_field);
+    $this->assertSame('new-page-value', $page->raw()->new_page_field);
 
     Http::assertSent(function (Request $request): bool {
         return $request->method() === 'GET'
@@ -165,14 +154,12 @@ it('gets updates and deletes a group', function (): void {
     );
     app(TeleggaInterface::class)->deleteGroup(groupId: 'group-1');
 
-    expect($group)
-        ->toBeInstanceOf(GroupData::class)
-        ->and($group->members_count)
+    expect($group->members_count)
         ->toBe(10)
-        ->and($group->raw()->new_api_field)
-        ->toBe('new-value')
         ->and($updated->name)
         ->toBe('Premium');
+
+    $this->assertSame('new-value', $group->raw()->new_api_field);
 
     Http::assertSent(function (Request $request): bool {
         return $request->method() === 'PUT'
@@ -228,12 +215,10 @@ it('manages membership through user endpoints', function (): void {
         groupId: 'group-1',
     );
 
-    expect($result)
-        ->toBeInstanceOf(UserGroupMembershipData::class)
-        ->and($result->added)
-        ->toBeFalse()
-        ->and($result->raw()->new_api_field)
-        ->toBe('new-value');
+    expect($result->added)
+        ->toBeFalse();
+
+    $this->assertSame('new-value', $result->raw()->new_api_field);
 
     Http::assertSent(function (Request $request) use ($connection): bool {
         return $request->method() === 'POST'
@@ -280,16 +265,12 @@ it('sends local UUIDs as external_ids in one bulk member request', function (): 
         uuids: [$first->uuid, $second->uuid, $first->uuid],
     );
 
-    expect($result)
-        ->toBeInstanceOf(GroupMembersAddedData::class)
-        ->and($result->added)
+    expect($result->added)
         ->toBe(2)
-        ->and($result->not_found)
-        ->toBeInstanceOf(Collection::class)
         ->and($result->not_found->all())
-        ->toBe([$second->uuid])
-        ->and($result->raw()->new_api_field)
-        ->toBe('new-value');
+        ->toBe([$second->uuid]);
+
+    $this->assertSame('new-value', $result->raw()->new_api_field);
 
     Http::assertSent(function (Request $request) use ($first, $second, $unselected): bool {
         $data = $request->data();
@@ -330,7 +311,6 @@ it('accepts a bulk member response without not_found', function (): void {
     expect($result->added)
         ->toBe(1)
         ->and($result->not_found)
-        ->toBeInstanceOf(Collection::class)
         ->toBeEmpty();
 
     Http::assertSent(function (Request $request) use ($connection): bool {
@@ -363,7 +343,7 @@ it('does not add members when a local connection is missing', function (): void 
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('does not add members when a local connection is not created in Telegga', function (): void {
@@ -390,7 +370,7 @@ it('does not add members when a local connection is not created in Telegga', fun
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('removes a member through the group endpoint', function (): void {
@@ -438,7 +418,7 @@ it('rejects invalid group parameters before an API request', function (
         return;
     }
 
-    test()->fail('Expected a GroupException.');
+    $this->fail('Expected a GroupException.');
 })->with([
     'empty name' => [
         fn (TeleggaInterface $telegga) => $telegga->createGroup(
@@ -495,15 +475,15 @@ it('wraps an API error in a group exception', function (): void {
             ->toBe('group-1')
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('not_found')
-            ->and($exception->getPrevious()?->status)
+            ->and($this->previousApiException(exception: $exception)->status)
             ->toBe(404);
 
         return;
     }
 
-    test()->fail('Expected a GroupException.');
+    $this->fail('Expected a GroupException.');
 });
 
 it('rejects an invalid group list response', function (): void {
@@ -540,13 +520,13 @@ it('rejects an invalid group list response', function (): void {
             ->toBe($connection->uuid)
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('invalid_response');
 
         return;
     }
 
-    test()->fail('Expected a GroupException.');
+    $this->fail('Expected a GroupException.');
 });
 
 it('treats a group as deleted when a retry confirms it is absent from the API', function (): void {
@@ -585,5 +565,5 @@ it('does not hide a missing group in the first API response', function (): void 
         return;
     }
 
-    test()->fail('Expected a GroupException.');
+    $this->fail('Expected a GroupException.');
 });

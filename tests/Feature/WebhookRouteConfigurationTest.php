@@ -10,6 +10,10 @@ use Telegga\Laravel\TeleggaServiceProvider;
 it('does not register the webhook route when disabled in configuration', function (): void {
     $originalRoutes = Route::getRoutes();
 
+    if (! $originalRoutes instanceof RouteCollection) {
+        throw new RuntimeException('The router did not return a concrete route collection.');
+    }
+
     try {
         Route::setRoutes(new RouteCollection);
         config()->set('telegga.webhooks.enabled', false);
@@ -29,6 +33,10 @@ it('does not register the webhook route when disabled in configuration', functio
 
 it('registers the webhook with configured prefix and middleware', function (): void {
     $originalRoutes = Route::getRoutes();
+
+    if (! $originalRoutes instanceof RouteCollection) {
+        throw new RuntimeException('The router did not return a concrete route collection.');
+    }
 
     try {
         Route::setRoutes(new RouteCollection);
@@ -62,6 +70,10 @@ it('registers the webhook with configured prefix and middleware', function (): v
 
 it('keeps default webhook middleware with a partial legacy configuration', function (): void {
     $originalRoutes = Route::getRoutes();
+
+    if (! $originalRoutes instanceof RouteCollection) {
+        throw new RuntimeException('The router did not return a concrete route collection.');
+    }
 
     try {
         Route::setRoutes(new RouteCollection);

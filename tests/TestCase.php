@@ -7,12 +7,44 @@ namespace Telegga\Laravel\Tests;
 use App\Providers\TestDatabaseServiceProvider;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Schema;
+use Mockery\LegacyMockInterface;
+use Mockery\VerificationDirector;
 use Orchestra\Testbench\TestCase as Orchestra;
 use RuntimeException;
+use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\TeleggaServiceProvider;
+use Throwable;
 
 abstract class TestCase extends Orchestra
 {
+    /**
+     * Get a typed verification for a method received by a Mockery spy.
+     */
+    protected function receivedCall(LegacyMockInterface $spy, string $method): VerificationDirector
+    {
+        $verification = $spy->shouldHaveReceived($method);
+
+        if (! $verification instanceof VerificationDirector) {
+            throw new RuntimeException('Mockery did not return a verification director.');
+        }
+
+        return $verification;
+    }
+
+    /**
+     * Get a typed Telegga API exception from an exception chain.
+     */
+    protected function previousApiException(Throwable $exception): TeleggaApiException
+    {
+        $previous = $exception->getPrevious();
+
+        if (! $previous instanceof TeleggaApiException) {
+            throw new RuntimeException('Previous exception is not a Telegga API exception.');
+        }
+
+        return $previous;
+    }
+
     /**
      * Load a Telegga API response JSON fixture.
      *

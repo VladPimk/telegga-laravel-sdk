@@ -3,11 +3,9 @@
 declare(strict_types=1);
 
 use Illuminate\Http\Client\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Dto\MessageData;
-use Telegga\Laravel\Dto\MessagePageData;
 use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\MessageException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
@@ -48,22 +46,17 @@ it('gets message history only for the specified connection', function (): void {
         cursor: 'current-page',
     );
 
-    expect($page)
-        ->toBeInstanceOf(MessagePageData::class)
-        ->and($page->data)
-        ->toBeInstanceOf(Collection::class)
-        ->and($page->data)
+    expect($page->data)
         ->toHaveCount(1)
         ->and($page->data->first())
         ->toBeInstanceOf(MessageData::class)
         ->and($page->data->first()->message_id)
         ->toBe('message-1')
-        ->and($page->data->first()->raw()->new_message_field)
-        ->toBe('new-value')
         ->and($page->next_cursor)
-        ->toBe('next-page')
-        ->and($page->raw()->new_page_field)
-        ->toBe('new-value');
+        ->toBe('next-page');
+
+    $this->assertSame('new-value', $page->data->first()->raw()->new_message_field);
+    $this->assertSame('new-value', $page->raw()->new_page_field);
 
     Http::assertSent(function (Request $request) use ($connection): bool {
         if (
@@ -112,8 +105,6 @@ it('returns null for a missing next page cursor', function (): void {
     );
 
     expect($page->data)
-        ->toBeInstanceOf(Collection::class)
-        ->and($page->data)
         ->toBeEmpty()
         ->and($page->next_cursor)
         ->toBeNull();
@@ -162,7 +153,7 @@ it('does not request history with an empty connection UUID', function (): void {
         return;
     }
 
-    test()->fail('Expected a MessageException.');
+    $this->fail('Expected a MessageException.');
 });
 
 it('does not request history with a reversed date range', function (): void {
@@ -187,7 +178,7 @@ it('does not request history with a reversed date range', function (): void {
         return;
     }
 
-    test()->fail('Expected a MessageException.');
+    $this->fail('Expected a MessageException.');
 });
 
 it('does not request history for a local connection not created in Telegga', function (): void {
@@ -217,7 +208,7 @@ it('does not request history for a local connection not created in Telegga', fun
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('wraps an API error when getting message history', function (): void {
@@ -248,15 +239,15 @@ it('wraps an API error when getting message history', function (): void {
             ->toBe($connection->uuid)
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('rate_limited')
-            ->and($exception->getPrevious()?->status)
+            ->and($this->previousApiException(exception: $exception)->status)
             ->toBe(429);
 
         return;
     }
 
-    test()->fail('Expected a MessageException.');
+    $this->fail('Expected a MessageException.');
 });
 
 it('rejects an invalid message history page', function (): void {
@@ -284,11 +275,11 @@ it('rejects an invalid message history page', function (): void {
             ->toBe($connection->uuid)
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('invalid_response');
 
         return;
     }
 
-    test()->fail('Expected a MessageException.');
+    $this->fail('Expected a MessageException.');
 });

@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Telegga\Laravel\Contracts\TeleggaInterface;
-use Telegga\Laravel\Dto\MediaData;
 use Telegga\Laravel\Exceptions\MediaException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 
@@ -29,14 +28,12 @@ it('uploads a media file with a multipart request without losing response fields
         filename: $filename,
     );
 
-    expect($media)
-        ->toBeInstanceOf(MediaData::class)
-        ->and($media->media_id)
+    expect($media->media_id)
         ->toBe('media-1')
         ->and($media->mime_type)
-        ->toBe('image/jpeg')
-        ->and($media->raw()->new_api_field)
-        ->toBe('new-value');
+        ->toBe('image/jpeg');
+
+    $this->assertSame('new-value', $media->raw()->new_api_field);
 
     Http::assertSent(function (Request $request) use ($contents, $filename): bool {
         return $request->method() === 'POST'
@@ -68,14 +65,12 @@ it('gets media metadata without losing new response fields', function (): void {
         mediaId: $mediaId,
     );
 
-    expect($media)
-        ->toBeInstanceOf(MediaData::class)
-        ->and($media->media_id)
+    expect($media->media_id)
         ->toBe($mediaId)
         ->and($media->filename)
-        ->toBe('photo.jpg')
-        ->and($media->raw()->new_api_field)
-        ->toBe('new-value');
+        ->toBe('photo.jpg');
+
+    $this->assertSame('new-value', $media->raw()->new_api_field);
 
     Http::assertSent(function (Request $request) use ($mediaId): bool {
         return $request->method() === 'GET'
@@ -106,7 +101,7 @@ it('does not send a request with empty media contents', function (): void {
         return;
     }
 
-    test()->fail('Expected a MediaException.');
+    $this->fail('Expected a MediaException.');
 });
 
 it('does not send a request without a media filename', function (): void {
@@ -132,7 +127,7 @@ it('does not send a request without a media filename', function (): void {
         return;
     }
 
-    test()->fail('Expected a MediaException.');
+    $this->fail('Expected a MediaException.');
 });
 
 it('does not send a media file larger than fifty megabytes', function (): void {
@@ -158,7 +153,7 @@ it('does not send a media file larger than fifty megabytes', function (): void {
         return;
     }
 
-    test()->fail('Expected a MediaException.');
+    $this->fail('Expected a MediaException.');
 });
 
 it('wraps an API error when uploading a media file', function (): void {
@@ -184,15 +179,15 @@ it('wraps an API error when uploading a media file', function (): void {
             ->toBeNull()
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('invalid_request')
-            ->and($exception->getPrevious()?->status)
+            ->and($this->previousApiException(exception: $exception)->status)
             ->toBe(400);
 
         return;
     }
 
-    test()->fail('Expected a MediaException.');
+    $this->fail('Expected a MediaException.');
 });
 
 it('does not send a request with an empty media identifier', function (): void {
@@ -215,7 +210,7 @@ it('does not send a request with an empty media identifier', function (): void {
         return;
     }
 
-    test()->fail('Expected a MediaException.');
+    $this->fail('Expected a MediaException.');
 });
 
 it('wraps an API error when getting media metadata', function (): void {
@@ -242,15 +237,15 @@ it('wraps an API error when getting media metadata', function (): void {
             ->toBeNull()
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('not_found')
-            ->and($exception->getPrevious()?->status)
+            ->and($this->previousApiException(exception: $exception)->status)
             ->toBe(404);
 
         return;
     }
 
-    test()->fail('Expected a MediaException.');
+    $this->fail('Expected a MediaException.');
 });
 
 it('rejects a successful media response with invalid JSON', function (): void {
@@ -273,11 +268,11 @@ it('rejects a successful media response with invalid JSON', function (): void {
             ->toBe($mediaId)
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('invalid_response');
 
         return;
     }
 
-    test()->fail('Expected a MediaException.');
+    $this->fail('Expected a MediaException.');
 });

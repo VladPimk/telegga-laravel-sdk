@@ -3,11 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Http\Client\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
-use Telegga\Laravel\Dto\ConnectionData;
-use Telegga\Laravel\Dto\UserData;
-use Telegga\Laravel\Dto\UserPageData;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Services\UserService;
 
@@ -31,14 +27,12 @@ it('creates a Telegga user without losing new response fields', function (): voi
         groupId: 'group-1',
     );
 
-    expect($user)
-        ->toBeInstanceOf(ConnectionData::class)
-        ->and($user->user_id)
+    expect($user->user_id)
         ->toBe('telegga-user-1')
         ->and($user->external_id)
-        ->toBe('connection-uuid')
-        ->and($user->raw()->new_api_field)
-        ->toBe('new-value');
+        ->toBe('connection-uuid');
+
+    $this->assertSame('new-value', $user->raw()->new_api_field);
 
     Http::assertSent(function (Request $request): bool {
         return $request->method() === 'POST'
@@ -67,14 +61,12 @@ it('gets a Telegga user by external_id without losing new fields', function (): 
         externalId: 'connection-uuid',
     );
 
-    expect($user)
-        ->toBeInstanceOf(UserData::class)
-        ->and($user->user_id)
+    expect($user->user_id)
         ->toBe('telegga-user-1')
         ->and($user->external_id)
-        ->toBe('connection-uuid')
-        ->and($user->raw()->new_api_field)
-        ->toBe('new-value');
+        ->toBe('connection-uuid');
+
+    $this->assertSame('new-value', $user->raw()->new_api_field);
 
     Http::assertSent(function (Request $request): bool {
         return $request->method() === 'GET'
@@ -94,11 +86,7 @@ it('gets a Telegga user page by email', function (): void {
         query: ['email' => 'ivan@example.com'],
     );
 
-    expect($page)
-        ->toBeInstanceOf(UserPageData::class)
-        ->and($page->data)
-        ->toBeInstanceOf(Collection::class)
-        ->and($page->data)
+    expect($page->data)
         ->toHaveCount(1)
         ->and($page->data->first()->external_id)
         ->toBe('connection-uuid')
@@ -146,5 +134,5 @@ it('rejects a successful user response with invalid JSON', function (): void {
         return;
     }
 
-    test()->fail('Expected a TeleggaApiException.');
+    $this->fail('Expected a TeleggaApiException.');
 });

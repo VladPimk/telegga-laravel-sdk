@@ -69,18 +69,10 @@ it('generates a UUID and relates an event to a connection', function (): void {
         'processed_at' => now(),
     ]);
 
-    expect($event->id)
-        ->toBeInt()
-        ->and($event->uuid)
-        ->toBeString()
-        ->and(Str::isUuid($event->uuid, 7))
+    expect(Str::isUuid($event->uuid, 7))
         ->toBeTrue()
         ->and($event->attempts)
         ->toBe(1)
-        ->and($event->first_seen_at)
-        ->toBeInstanceOf(DateTimeInterface::class)
-        ->and($event->processed_at)
-        ->toBeInstanceOf(DateTimeInterface::class)
         ->and($event->connection->is($this->connection))
         ->toBeTrue()
         ->and($this->connection->webhookEvents->first()?->is($event))

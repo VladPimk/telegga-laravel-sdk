@@ -6,9 +6,6 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Telegga\Laravel\BroadcastAudience;
 use Telegga\Laravel\Contracts\TeleggaInterface;
-use Telegga\Laravel\Dto\BroadcastCancellationData;
-use Telegga\Laravel\Dto\BroadcastCreatedData;
-use Telegga\Laravel\Dto\BroadcastData;
 use Telegga\Laravel\Exceptions\BroadcastException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Models\AvailableTelegramBot;
@@ -59,14 +56,12 @@ it('starts a broadcast to all users of the connection bot', function (): void {
         ],
     );
 
-    expect($broadcast)
-        ->toBeInstanceOf(BroadcastCreatedData::class)
-        ->and($broadcast->broadcast_id)
+    expect($broadcast->broadcast_id)
         ->toBe('broadcast-1')
         ->and($broadcast->status)
-        ->toBe('pending')
-        ->and($broadcast->raw()->new_api_field)
-        ->toBe('new-value');
+        ->toBe('pending');
+
+    $this->assertSame('new-value', $broadcast->raw()->new_api_field);
 
     Http::assertSent(function (Request $request): bool {
         return $request->method() === 'POST'
@@ -153,16 +148,14 @@ it('gets broadcast progress without losing new fields', function (): void {
         broadcastId: 'broadcast-1',
     );
 
-    expect($broadcast)
-        ->toBeInstanceOf(BroadcastData::class)
-        ->and($broadcast->status)
+    expect($broadcast->status)
         ->toBe('in_progress')
         ->and($broadcast->total)
         ->toBe(2003)
         ->and($broadcast->sent)
-        ->toBe(1200)
-        ->and($broadcast->raw()->new_api_field)
-        ->toBe('new-value');
+        ->toBe(1200);
+
+    $this->assertSame('new-value', $broadcast->raw()->new_api_field);
 
     Http::assertSent(function (Request $request): bool {
         return $request->method() === 'GET'
@@ -184,14 +177,12 @@ it('cancels a broadcast and returns the API result', function (): void {
         broadcastId: 'broadcast-1',
     );
 
-    expect($result)
-        ->toBeInstanceOf(BroadcastCancellationData::class)
-        ->and($result->status)
+    expect($result->status)
         ->toBe('cancelled')
         ->and($result->cancelled_messages)
-        ->toBe(803)
-        ->and($result->raw()->new_api_field)
-        ->toBe('new-value');
+        ->toBe(803);
+
+    $this->assertSame('new-value', $result->raw()->new_api_field);
 
     Http::assertSent(function (Request $request): bool {
         return $request->method() === 'POST'
@@ -217,7 +208,7 @@ it('rejects invalid broadcast parameters before an API request', function (
         return;
     }
 
-    test()->fail('Expected a BroadcastException.');
+    $this->fail('Expected a BroadcastException.');
 })->with([
     'empty UUID' => [
         fn (TeleggaInterface $telegga) => $telegga->startBroadcast(
@@ -286,15 +277,15 @@ it('wraps an API error when getting a broadcast', function (): void {
             ->toBeNull()
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('not_found')
-            ->and($exception->getPrevious()?->status)
+            ->and($this->previousApiException(exception: $exception)->status)
             ->toBe(404);
 
         return;
     }
 
-    test()->fail('Expected a BroadcastException.');
+    $this->fail('Expected a BroadcastException.');
 });
 
 it('rejects a successful broadcast response with invalid JSON', function (): void {
@@ -315,11 +306,11 @@ it('rejects a successful broadcast response with invalid JSON', function (): voi
             ->toBe('broadcast-1')
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('invalid_response');
 
         return;
     }
 
-    test()->fail('Expected a BroadcastException.');
+    $this->fail('Expected a BroadcastException.');
 });

@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Telegga\Laravel\Contracts\TeleggaInterface;
-use Telegga\Laravel\Dto\QueuedMessageData;
 use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\MessageException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
@@ -52,14 +51,12 @@ it('passes message type and data to the unified API endpoint', function (
         data: $data,
     );
 
-    expect($result)
-        ->toBeInstanceOf(QueuedMessageData::class)
-        ->and($result->message_id)
+    expect($result->message_id)
         ->toBe('message-1')
         ->and($result->status)
-        ->toBe('queued')
-        ->and($result->raw()->new_api_field)
-        ->toBe('new-value');
+        ->toBe('queued');
+
+    $this->assertSame('new-value', $result->raw()->new_api_field);
 
     Http::assertSent(function (Request $request) use ($connection, $data, $type): bool {
         return $request->method() === 'POST'
@@ -215,7 +212,7 @@ it('does not send a message with an empty connection UUID', function (): void {
         return;
     }
 
-    test()->fail('Expected a MessageException.');
+    $this->fail('Expected a MessageException.');
 });
 
 it('does not send a message with an empty type', function (): void {
@@ -237,7 +234,7 @@ it('does not send a message with an empty type', function (): void {
         return;
     }
 
-    test()->fail('Expected a MessageException.');
+    $this->fail('Expected a MessageException.');
 });
 
 it('does not send a message without an active link', function (): void {
@@ -277,7 +274,7 @@ it('does not send a message without an active link', function (): void {
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('wraps an API error when sending a message', function (): void {
@@ -319,15 +316,15 @@ it('wraps an API error when sending a message', function (): void {
             ->toBe($connection->uuid)
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('user_disabled')
-            ->and($exception->getPrevious()?->status)
+            ->and($this->previousApiException(exception: $exception)->status)
             ->toBe(409);
 
         return;
     }
 
-    test()->fail('Expected a MessageException.');
+    $this->fail('Expected a MessageException.');
 });
 
 it('rejects a successful message response with invalid JSON', function (): void {
@@ -367,11 +364,11 @@ it('rejects a successful message response with invalid JSON', function (): void 
             ->toBe($connection->uuid)
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('invalid_response');
 
         return;
     }
 
-    test()->fail('Expected a MessageException.');
+    $this->fail('Expected a MessageException.');
 });

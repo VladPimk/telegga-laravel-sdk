@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -27,10 +26,7 @@ it('creates the available bots table and generates a local UUID', function (): v
         'updated_at',
         'deleted_at',
     ]))->toBeTrue()
-        ->and($bot->getKey())
-        ->toBeInt()
         ->and($bot->uuid)
-        ->toBeString()
         ->not->toBe($providedUuid)
         ->and(Str::isUuid($bot->uuid, 7))
         ->toBeTrue()
@@ -69,9 +65,7 @@ it('adds a local bot after validating the API list', function (): void {
 
     $bot = app(TeleggaInterface::class)->addTelegramBot(botName: 'mybot');
 
-    expect($bot)
-        ->toBeInstanceOf(AvailableTelegramBot::class)
-        ->and($bot->bot_name)
+    expect($bot->bot_name)
         ->toBe('mybot')
         ->and(Str::isUuid($bot->uuid))
         ->toBeTrue()
@@ -165,7 +159,7 @@ it('rejects an API username with an extra character', function (string $apiUsern
         return;
     }
 
-    test()->fail('Expected a BotException.');
+    $this->fail('Expected a BotException.');
 })->with([
     'username with an extra at sign' => '@mybot',
 ]);
@@ -206,7 +200,7 @@ it('rejects an invalid bot name', function (string $botName): void {
         return;
     }
 
-    test()->fail('Expected a BotException.');
+    $this->fail('Expected a BotException.');
 })->with([
     'empty string' => '',
     'with an at sign' => '@mybot',
@@ -233,7 +227,7 @@ it('does not create a local record for a bot missing from the API', function ():
         return;
     }
 
-    test()->fail('Expected a BotException.');
+    $this->fail('Expected a BotException.');
 });
 
 it('wraps an invalid API response when adding a bot', function (): void {
@@ -253,7 +247,7 @@ it('wraps an invalid API response when adding a bot', function (): void {
         return;
     }
 
-    test()->fail('Expected a BotException.');
+    $this->fail('Expected a BotException.');
 });
 
 it('gets locally available bots without an API request', function (): void {
@@ -265,8 +259,6 @@ it('gets locally available bots without an API request', function (): void {
     $bots = app(TeleggaInterface::class)->getAvailableBots();
 
     expect($bots)
-        ->toBeInstanceOf(Collection::class)
-        ->and($bots)
         ->toHaveCount(1)
         ->and($bots->first()->is($bot))
         ->toBeTrue();
@@ -385,7 +377,7 @@ it('rejects deletion of an unknown local bot', function (): void {
         return;
     }
 
-    test()->fail('Expected a BotException.');
+    $this->fail('Expected a BotException.');
 });
 
 it('does not delete a bot used by a connection', function (): void {
@@ -408,5 +400,5 @@ it('does not delete a bot used by a connection', function (): void {
         return;
     }
 
-    test()->fail('Expected a BotException.');
+    $this->fail('Expected a BotException.');
 });

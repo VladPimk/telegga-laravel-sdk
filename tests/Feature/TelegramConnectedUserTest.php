@@ -68,10 +68,7 @@ it('generates a UUID and sets initial statuses', function (): void {
 
     expect($connection->getKey())
         ->toBe($connection->id)
-        ->and($connection->id)
-        ->toBeInt()
         ->and($connection->uuid)
-        ->toBeString()
         ->not->toBe($providedUuid)
         ->and(Str::isUuid($connection->uuid, 7))
         ->toBeTrue()

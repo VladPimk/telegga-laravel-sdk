@@ -132,15 +132,14 @@ it('accepts a connection event and returns the result idempotently', function ()
         ->and($webhookEvent->first_seen_at)
         ->not->toBeNull()
         ->and($webhookEvent->processed_at)
-        ->not->toBeNull()
-        ->and($duplicateQueries->filter(
-            fn (array $query): bool => str_contains($query['query'], 'available_telegram_bots'),
-        ))
-        ->toBeEmpty()
-        ->and($duplicateQueries->filter(
-            fn (array $query): bool => str_contains($query['query'], 'update "telegram_connected_users"'),
-        ))
-        ->toBeEmpty();
+        ->not->toBeNull();
+
+    $this->assertEmpty($duplicateQueries->filter(
+        fn (array $query): bool => str_contains($query['query'], 'available_telegram_bots'),
+    ));
+    $this->assertEmpty($duplicateQueries->filter(
+        fn (array $query): bool => str_contains($query['query'], 'update "telegram_connected_users"'),
+    ));
 });
 
 it('records a new event_id for an already connected user', function (): void {
@@ -178,7 +177,7 @@ it('records a new event_id for an already connected user', function (): void {
 });
 
 it('rejects an event_id already assigned to another connection', function (): void {
-    Log::spy();
+    $log = Log::spy();
     $firstConnection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -227,7 +226,7 @@ it('rejects an event_id already assigned to another connection', function (): vo
         ->and($secondConnection->refresh()->is_connected)
         ->toBeFalse();
 
-    Log::shouldHaveReceived('warning')
+    $this->receivedCall(spy: $log, method: 'warning')
         ->once()
         ->withArgs(
             fn (string $message, array $context): bool => $message === 'Telegga webhook request was rejected.'
@@ -293,7 +292,7 @@ it('accepts a test event without changing connections', function (): void {
 });
 
 it('returns an error for an unknown external_id', function (): void {
-    Log::spy();
+    $log = Log::spy();
     DB::flushQueryLog();
     DB::enableQueryLog();
 
@@ -320,20 +319,16 @@ it('returns an error for an unknown external_id', function (): void {
     $queries = collect(DB::getQueryLog());
     DB::disableQueryLog();
 
-    expect(TelegramConnectedUser::query()->doesntExist())
-        ->toBeTrue()
-        ->and(TeleggaWebhookEvent::query()->doesntExist())
-        ->toBeTrue()
-        ->and($queries->filter(
-            fn (array $query): bool => str_contains($query['query'], 'telegram_connected_users'),
-        ))
-        ->toHaveCount(1)
-        ->and($queries->filter(
-            fn (array $query): bool => str_contains($query['query'], 'available_telegram_bots'),
-        ))
-        ->toBeEmpty();
+    expect(TelegramConnectedUser::query()->doesntExist())->toBeTrue();
+    expect(TeleggaWebhookEvent::query()->doesntExist())->toBeTrue();
+    $this->assertCount(1, $queries->filter(
+        fn (array $query): bool => str_contains($query['query'], 'telegram_connected_users'),
+    ));
+    $this->assertEmpty($queries->filter(
+        fn (array $query): bool => str_contains($query['query'], 'available_telegram_bots'),
+    ));
 
-    Log::shouldHaveReceived('warning')
+    $this->receivedCall(spy: $log, method: 'warning')
         ->once()
         ->withArgs(
             fn (string $message, array $context): bool => $message === 'Telegga webhook request was rejected.'
@@ -556,7 +551,7 @@ it('requests another delivery when the bot name does not match', function (): vo
 });
 
 it('acknowledges an unresolved bot failure after the retry window expires', function (): void {
-    Log::spy();
+    $log = Log::spy();
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -604,7 +599,7 @@ it('acknowledges an unresolved bot failure after the retry window expires', func
         ->and($webhookEvent->processed_at)
         ->toBeNull();
 
-    Log::shouldHaveReceived('error')
+    $this->receivedCall(spy: $log, method: 'error')
         ->once()
         ->withArgs(
             fn (string $message, array $context): bool => $message === 'Telegga webhook retry window expired.'
@@ -648,7 +643,7 @@ it('rejects a webhook without a bearer token', function (): void {
 });
 
 it('rejects a webhook with an invalid bearer token', function (): void {
-    Log::spy();
+    $log = Log::spy();
 
     $this
         ->withToken('wrong-secret')
@@ -664,7 +659,7 @@ it('rejects a webhook with an invalid bearer token', function (): void {
             ],
         ]);
 
-    Log::shouldHaveReceived('warning')
+    $this->receivedCall(spy: $log, method: 'warning')
         ->once()
         ->withArgs(
             fn (string $message, array $context): bool => $message === 'Telegga webhook authorization failed.'
@@ -707,7 +702,7 @@ it('rejects a token outside the configured rotation set', function (): void {
 });
 
 it('rate-limits webhook requests before bearer token validation', function (): void {
-    Log::spy();
+    $log = Log::spy();
 
     for ($attempt = 1; $attempt <= 60; $attempt++) {
         $this
@@ -727,7 +722,7 @@ it('rate-limits webhook requests before bearer token validation', function (): v
         ])
         ->assertStatus(429);
 
-    Log::shouldHaveReceived('warning')
+    $this->receivedCall(spy: $log, method: 'warning')
         ->times(60)
         ->withArgs(
             fn (string $message, array $context): bool => $message === 'Telegga webhook authorization failed.'
@@ -759,7 +754,7 @@ it('rejects a webhook when no valid token is configured', function (mixed $confi
 ]);
 
 it('rejects a payload without an event name', function (): void {
-    Log::spy();
+    $log = Log::spy();
 
     $this
         ->withToken('webhook-secret')
@@ -773,7 +768,7 @@ it('rejects a payload without an event name', function (): void {
             ],
         ]);
 
-    Log::shouldHaveReceived('warning')
+    $this->receivedCall(spy: $log, method: 'warning')
         ->once()
         ->withArgs(
             fn (string $message, array $context): bool => $message === 'Telegga webhook request validation failed.'
@@ -881,9 +876,9 @@ it('rejects an invalid event name', function (mixed $event): void {
             ],
         ]);
 })->with([
-    'empty string' => '',
-    'whitespace-only string' => '   ',
-    'number' => 1,
+    'empty string' => [''],
+    'whitespace-only string' => ['   '],
+    'number' => [1],
     'array' => [[]],
 ]);
 
@@ -970,7 +965,7 @@ it('returns server error JSON when the local table is unavailable', function ():
         Schema::enableForeignKeyConstraints();
     }
 
-    Log::spy();
+    $log = Log::spy();
     Exceptions::fake();
 
     $this
@@ -989,7 +984,7 @@ it('returns server error JSON when the local table is unavailable', function ():
             ],
         ]);
 
-    Log::shouldHaveReceived('error')
+    $this->receivedCall(spy: $log, method: 'error')
         ->once()
         ->withArgs(
             fn (string $message, array $context): bool => $message === 'Telegga webhook could not be processed.'

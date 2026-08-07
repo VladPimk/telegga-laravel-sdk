@@ -73,7 +73,7 @@ it('maps an API error and preserves retry after', function () {
         return;
     }
 
-    test()->fail('Expected a TeleggaApiException.');
+    $this->fail('Expected a TeleggaApiException.');
 });
 
 it('wraps a transport error', function () {
@@ -107,7 +107,7 @@ it('wraps a transport error', function () {
         return;
     }
 
-    test()->fail('Expected a TeleggaApiException.');
+    $this->fail('Expected a TeleggaApiException.');
 });
 
 it('retries a safe GET request after temporary errors', function (): void {
@@ -166,7 +166,7 @@ it('honors retry after when retrying an idempotent POST request', function (): v
         idempotent: true,
     );
 
-    expect($response->object()->user_id)->toBe('user-1');
+    expect((string) $response->object()->user_id)->toBe('user-1');
 
     Http::assertSentCount(2);
     Sleep::assertSequence([
@@ -213,7 +213,7 @@ it('does not retry when retry after exceeds the synchronous wait limit', functio
         return;
     }
 
-    test()->fail('Expected a TeleggaApiException.');
+    $this->fail('Expected a TeleggaApiException.');
 });
 
 it('does not retry a non-idempotent POST request', function (): void {
@@ -245,7 +245,7 @@ it('does not retry a non-idempotent POST request', function (): void {
         return;
     }
 
-    test()->fail('Expected a TeleggaApiException.');
+    $this->fail('Expected a TeleggaApiException.');
 });
 
 it('returns the final error after exhausting attempts', function (): void {
@@ -278,7 +278,7 @@ it('returns the final error after exhausting attempts', function (): void {
         return;
     }
 
-    test()->fail('Expected a TeleggaApiException.');
+    $this->fail('Expected a TeleggaApiException.');
 });
 
 it('does not retry a permanent idempotent request error', function (): void {
@@ -311,7 +311,7 @@ it('does not retry a permanent idempotent request error', function (): void {
         return;
     }
 
-    test()->fail('Expected a TeleggaApiException.');
+    $this->fail('Expected a TeleggaApiException.');
 });
 
 it('rejects a request without an API key', function () {
@@ -349,5 +349,5 @@ it('rejects an insecure API base URL', function (): void {
         return;
     }
 
-    test()->fail('Expected a TeleggaApiException.');
+    $this->fail('Expected a TeleggaApiException.');
 });

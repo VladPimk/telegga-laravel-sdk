@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-use Illuminate\Support\Collection;
 use Telegga\Laravel\Dto\DeliveryAttemptData;
-use Telegga\Laravel\Dto\GroupPageData;
-use Telegga\Laravel\Dto\MessageData;
-use Telegga\Laravel\Dto\UserData;
 use Telegga\Laravel\Dto\UserGroupData;
 use Telegga\Laravel\Dto\UserLinkData;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
@@ -31,10 +27,10 @@ it('preserves unknown response fields in the raw DTO object', function (): void 
     $bots = app(BotResponseMapper::class)->fromList(response: $response);
 
     expect($bots)
-        ->toBeInstanceOf(Collection::class)
-        ->and($bots)->toHaveCount(1)
-        ->and($bots->first()?->bot_id)->toBe('bot-1')
-        ->and($bots->first()?->raw()->new_api_field)->toBe('new-value');
+        ->toHaveCount(1)
+        ->and($bots->first()?->bot_id)->toBe('bot-1');
+
+    $this->assertSame('new-value', $bots->first()?->raw()->new_api_field);
 });
 
 it('maps missing optional connection fields to null', function (): void {
@@ -77,13 +73,11 @@ it('maps nested user links and groups to DTOs', function (): void {
 
     $user = app(UserResponseMapper::class)->fromGet(response: $response);
 
-    expect($user)
-        ->toBeInstanceOf(UserData::class)
-        ->and($user->links)->toBeInstanceOf(Collection::class)
-        ->and($user->links->first())->toBeInstanceOf(UserLinkData::class)
+    expect($user->links->first())
+        ->toBeInstanceOf(UserLinkData::class)
         ->and($user->links->first()?->bot_username)->toBe('mybot')
-        ->and($user->groups)->toBeInstanceOf(Collection::class)
-        ->and($user->groups->first())->toBeInstanceOf(UserGroupData::class)
+        ->and($user->groups->first())
+        ->toBeInstanceOf(UserGroupData::class)
         ->and($user->groups->first()?->name)->toBe('VIP');
 });
 
@@ -102,10 +96,8 @@ it('maps message delivery attempts to nested DTOs', function (): void {
 
     $message = app(MessageResponseMapper::class)->fromGet(response: $response);
 
-    expect($message)
-        ->toBeInstanceOf(MessageData::class)
-        ->and($message->delivery_attempts)->toBeInstanceOf(Collection::class)
-        ->and($message->delivery_attempts->first())->toBeInstanceOf(DeliveryAttemptData::class)
+    expect($message->delivery_attempts->first())
+        ->toBeInstanceOf(DeliveryAttemptData::class)
         ->and($message->delivery_attempts->first()?->latency_ms)->toBe(42);
 });
 
@@ -117,10 +109,8 @@ it('normalizes an empty group page cursor to null', function (): void {
 
     $page = app(GroupResponseMapper::class)->fromList(response: $response);
 
-    expect($page)
-        ->toBeInstanceOf(GroupPageData::class)
-        ->and($page->data)->toBeInstanceOf(Collection::class)
-        ->and($page->data)->toBeEmpty()
+    expect($page->data)
+        ->toBeEmpty()
         ->and($page->next_cursor)->toBeNull()
         ->and($page->raw())->toBe($response);
 });
@@ -151,7 +141,6 @@ it('maps an absent or null not_found field to an empty collection', function (ob
     expect($result->added)
         ->toBe(2)
         ->and($result->not_found)
-        ->toBeInstanceOf(Collection::class)
         ->toBeEmpty()
         ->and($result->raw())
         ->toBe($response);
@@ -174,7 +163,7 @@ it('rejects a response without a required field', function (): void {
         return;
     }
 
-    test()->fail('Expected a TeleggaApiException.');
+    $this->fail('Expected a TeleggaApiException.');
 });
 
 it('rejects an invalid optional field type', function (): void {

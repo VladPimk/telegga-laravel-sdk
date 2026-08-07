@@ -111,9 +111,9 @@ it('uses the current API key when resolving the client again', function (): void
 
     $requests = Http::recorded();
 
-    expect($requests)
-        ->toHaveCount(2)
-        ->and($requests[0][0]->hasHeader('Authorization', 'Bearer tg_live_first'))
+    $this->assertCount(2, $requests);
+
+    expect($requests[0][0]->hasHeader('Authorization', 'Bearer tg_live_first'))
         ->toBeTrue()
         ->and($requests[1][0]->hasHeader('Authorization', 'Bearer tg_live_second'))
         ->toBeTrue();
@@ -141,7 +141,7 @@ it('uses safe retry defaults when the retry section is missing', function (): vo
         return;
     }
 
-    test()->fail('Expected a TeleggaApiException.');
+    $this->fail('Expected a TeleggaApiException.');
 });
 
 it('loads package migrations through the service provider', function (): void {

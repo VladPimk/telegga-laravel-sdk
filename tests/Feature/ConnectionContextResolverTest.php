@@ -6,8 +6,6 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use Telegga\Laravel\Dto\UserData;
-use Telegga\Laravel\Dto\UserLinkData;
 use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Models\AvailableTelegramBot;
@@ -52,26 +50,17 @@ it('resolves a connection context through an active Telegga link', function (): 
         uuid: $connection->uuid,
     );
 
-    expect($context)
-        ->toBeInstanceOf(stdClass::class)
-        ->and($context->connection)
-        ->toBeInstanceOf(TelegramConnectedUser::class)
-        ->and($context->connection->is($connection))
+    expect($context->connection->is($connection))
         ->toBeTrue()
-        ->and($context->user)
-        ->toBeInstanceOf(UserData::class)
         ->and($context->user->user_id)
         ->toBe('telegga-user-1')
-        ->and($context->user->raw()->new_user_field)
-        ->toBe('new-value')
-        ->and($context->link)
-        ->toBeInstanceOf(UserLinkData::class)
         ->and($context->link->bot_id)
         ->toBe('bot-active')
-        ->and($context->link->raw()->new_api_field)
-        ->toBe('new-value')
         ->and($connection->getAttributes())
         ->not->toHaveKeys(['bot_id', 'telegga_user_id']);
+
+    $this->assertSame('new-value', $context->user->raw()->new_user_field);
+    $this->assertSame('new-value', $context->link->raw()->new_api_field);
 
     Http::assertSent(function (Request $request) use ($connection): bool {
         return $request->method() === 'GET'
@@ -137,12 +126,8 @@ it('resolves a Telegga user without an active bot link', function (): void {
         uuid: $connection->uuid,
     );
 
-    expect($context)
-        ->toBeInstanceOf(stdClass::class)
-        ->and($context->connection->is($connection))
+    expect($context->connection->is($connection))
         ->toBeTrue()
-        ->and($context->user)
-        ->toBeInstanceOf(UserData::class)
         ->and($context->user->user_id)
         ->toBe('telegga-user-1')
         ->and($context)
@@ -202,7 +187,7 @@ it('does not call the API for an unknown local connection', function (): void {
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('does not call the API for a connection that is not yet created', function (): void {
@@ -228,7 +213,7 @@ it('does not call the API for a connection that is not yet created', function ()
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('wraps an API error when looking up a Telegga user', function (): void {
@@ -257,13 +242,13 @@ it('wraps an API error when looking up a Telegga user', function (): void {
             ->toBe($connection->uuid)
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('not_found');
 
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('rejects a Telegga user without an active bot link', function (): void {
@@ -301,7 +286,7 @@ it('rejects a Telegga user without an active bot link', function (): void {
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('does not accept a link when the bot name only partially matches', function (): void {
@@ -337,7 +322,7 @@ it('does not accept a link when the bot name only partially matches', function (
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('wraps a database error when looking up a local connection', function (): void {
@@ -359,7 +344,7 @@ it('wraps a database error when looking up a local connection', function (): voi
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('wraps a database error during a bulk connection lookup', function (): void {
@@ -381,5 +366,5 @@ it('wraps a database error during a bulk connection lookup', function (): void {
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });

@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Telegga\Laravel\Contracts\TeleggaInterface;
-use Telegga\Laravel\Dto\UserData;
 use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Models\AvailableTelegramBot;
@@ -44,12 +43,10 @@ it('gets a Telegga user by local connection UUID', function (): void {
         uuid: $connection->uuid,
     );
 
-    expect($user)
-        ->toBeInstanceOf(UserData::class)
-        ->and($user->user_id)
-        ->toBe('telegga-user-1')
-        ->and($user->raw()->new_api_field)
-        ->toBe('new-value');
+    expect($user->user_id)
+        ->toBe('telegga-user-1');
+
+    $this->assertSame('new-value', $user->raw()->new_api_field);
 
     Http::assertSent(function (Request $request) use ($connection): bool {
         return $request->method() === 'GET'
@@ -95,9 +92,9 @@ it('updates a Telegga user and local name and email', function (): void {
 
     $connection->refresh();
 
-    expect($user->raw()->new_api_field)
-        ->toBe('new-value')
-        ->and($connection->name)
+    $this->assertSame('new-value', $user->raw()->new_api_field);
+
+    expect($connection->name)
         ->toBe('Иван Петров')
         ->and($connection->email)
         ->toBe('new@example.com')
@@ -213,13 +210,13 @@ it('rejects an invalid email type in a Telegga response', function (): void {
             ->toBe($connection->uuid)
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('invalid_response');
 
         return;
     }
 
-    test()->fail('Expected ConnectionException.');
+    $this->fail('Expected ConnectionException.');
 });
 
 it('does not send an empty connection update', function (): void {
@@ -241,7 +238,7 @@ it('does not send an empty connection update', function (): void {
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('stops the operation when user_id is missing from the Telegga response', function (): void {
@@ -269,7 +266,7 @@ it('stops the operation when user_id is missing from the Telegga response', func
             ->toBe($connection->uuid)
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('invalid_response');
 
         Http::assertSentCount(1);
@@ -277,7 +274,7 @@ it('stops the operation when user_id is missing from the Telegga response', func
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('generates a new code through the bot_id of a pending link', function (): void {
@@ -356,7 +353,7 @@ it('does not generate a code without a user-to-bot link', function (): void {
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('unlinks a user and resets the local connection status', function (): void {
@@ -467,7 +464,7 @@ it('preserves the local record when API deletion fails', function (): void {
             ->toBe($connection->uuid)
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('internal')
             ->and(TelegramConnectedUser::query()
                 ->where('uuid', $connection->uuid)
@@ -477,7 +474,7 @@ it('preserves the local record when API deletion fails', function (): void {
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('resets state and writes a critical log when local deletion fails', function (): void {
@@ -493,7 +490,7 @@ it('resets state and writes a critical log when local deletion fails', function 
             message: 'Local connection deletion failed.',
         ),
     );
-    Log::spy();
+    $log = Log::spy();
     Exceptions::fake();
     Http::preventStrayRequests();
     Http::fake([
@@ -525,7 +522,7 @@ it('resets state and writes a critical log when local deletion fails', function 
             ->and($connection->is_connected)
             ->toBeFalse();
 
-        Log::shouldHaveReceived('critical')
+        $this->receivedCall(spy: $log, method: 'critical')
             ->once()
             ->withArgs(function (string $message, array $context) use ($connection): bool {
                 return $message === 'Telegga connection orphaned: remote user deleted, local record kept.'
@@ -547,7 +544,7 @@ it('resets state and writes a critical log when local deletion fails', function 
         TelegramConnectedUser::clearBootedModels();
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('completes local deletion when a retry confirms the API user is absent', function (): void {

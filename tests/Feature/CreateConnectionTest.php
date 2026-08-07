@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Telegga\Laravel\Contracts\TeleggaInterface;
-use Telegga\Laravel\Dto\ConnectionData;
 use Telegga\Laravel\Exceptions\BotException;
 use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
@@ -73,9 +72,7 @@ it('creates an independent connection through the selected active bot', function
     );
     $connection = TelegramConnectedUser::query()->sole();
 
-    expect($result)
-        ->toBeInstanceOf(ConnectionData::class)
-        ->and($result->external_id)
+    expect($result->external_id)
         ->toBe($connection->uuid)
         ->and($result->link_url)
         ->toBe('https://t.me/second_bot?start=6U828WSH')
@@ -193,10 +190,10 @@ it('retries user creation after a temporary API error', function (): void {
         ->and($connection->is_connected)
         ->toBeFalse()
         ->and(TelegramConnectedUser::query()->count())
-        ->toBe(1)
-        ->and($userRequests)
-        ->toHaveCount(2)
-        ->and($userRequests[0][0]->data())
+        ->toBe(1);
+
+    $this->assertCount(2, $userRequests);
+    expect($userRequests[0][0]->data())
         ->toBe($userRequests[1][0]->data());
 
     Http::assertSentCount(3);
@@ -239,7 +236,7 @@ it('leaves the local record uncreated after an API error', function (): void {
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('resends an existing connection with the same UUID', function (): void {
@@ -308,7 +305,7 @@ it('rejects an empty group identifier before creating a local record', function 
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('does not retry an already created connection', function (): void {
@@ -335,7 +332,7 @@ it('does not retry an already created connection', function (): void {
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('preserves the UUID in an exception when the selected active bot is missing', function (): void {
@@ -377,7 +374,7 @@ it('preserves the UUID in an exception when the selected active bot is missing',
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('does not create a connection when the active bot name only partially matches', function (): void {
@@ -412,7 +409,7 @@ it('does not create a connection when the active bot name only partially matches
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('does not create a local record with an empty name', function (): void {
@@ -430,7 +427,7 @@ it('does not create a local record with an empty name', function (): void {
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('does not create a connection for an unknown local bot', function (): void {
@@ -455,7 +452,7 @@ it('does not create a connection for an unknown local bot', function (): void {
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('wraps a database error when creating a local record', function (): void {
@@ -480,7 +477,7 @@ it('wraps a database error when creating a local record', function (): void {
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('wraps a database error when looking up a connection', function (): void {
@@ -502,7 +499,7 @@ it('wraps a database error when looking up a connection', function (): void {
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('rejects a retry for an unknown UUID', function (): void {
@@ -523,7 +520,7 @@ it('rejects a retry for an unknown UUID', function (): void {
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
 it('rejects a successful API response with invalid JSON', function (): void {
@@ -550,7 +547,7 @@ it('rejects a successful API response with invalid JSON', function (): void {
             ->toBe($connection->uuid)
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('invalid_response')
             ->and($connection->is_created)
             ->toBeFalse();
@@ -560,5 +557,5 @@ it('rejects a successful API response with invalid JSON', function (): void {
         return;
     }
 
-    test()->fail('Expected a ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });

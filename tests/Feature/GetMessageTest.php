@@ -6,7 +6,6 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Dto\DeliveryAttemptData;
-use Telegga\Laravel\Dto\MessageData;
 use Telegga\Laravel\Exceptions\MessageException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 
@@ -38,9 +37,7 @@ it('gets message status without losing new response fields', function (): void {
         messageId: $messageId,
     );
 
-    expect($message)
-        ->toBeInstanceOf(MessageData::class)
-        ->and($message->message_id)
+    expect($message->message_id)
         ->toBe($messageId)
         ->and($message->status)
         ->toBe('sent')
@@ -49,9 +46,9 @@ it('gets message status without losing new response fields', function (): void {
         ->and($message->delivery_attempts->first())
         ->toBeInstanceOf(DeliveryAttemptData::class)
         ->and($message->delivery_attempts[0]->ok)
-        ->toBeTrue()
-        ->and($message->raw()->new_api_field)
-        ->toBe('new-value');
+        ->toBeTrue();
+
+    $this->assertSame('new-value', $message->raw()->new_api_field);
 
     Http::assertSent(function (Request $request) use ($messageId): bool {
         return $request->method() === 'GET'
@@ -79,7 +76,7 @@ it('does not send a request with an empty message identifier', function (): void
         return;
     }
 
-    test()->fail('Expected a MessageException.');
+    $this->fail('Expected a MessageException.');
 });
 
 it('wraps an API error when getting a message', function (): void {
@@ -106,15 +103,15 @@ it('wraps an API error when getting a message', function (): void {
             ->toBeNull()
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('not_found')
-            ->and($exception->getPrevious()?->status)
+            ->and($this->previousApiException(exception: $exception)->status)
             ->toBe(404);
 
         return;
     }
 
-    test()->fail('Expected a MessageException.');
+    $this->fail('Expected a MessageException.');
 });
 
 it('rejects a successful status response with invalid JSON', function (): void {
@@ -137,11 +134,11 @@ it('rejects a successful status response with invalid JSON', function (): void {
             ->toBe($messageId)
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('invalid_response');
 
         return;
     }
 
-    test()->fail('Expected a MessageException.');
+    $this->fail('Expected a MessageException.');
 });

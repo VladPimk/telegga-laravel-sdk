@@ -9,11 +9,14 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
  * @property string $uuid
  * @property string $bot_name
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 final class AvailableTelegramBot extends Model
 {
