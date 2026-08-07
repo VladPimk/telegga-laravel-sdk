@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Telegga\Laravel\Contracts\TeleggaInterface;
@@ -493,6 +494,7 @@ it('resets state and writes a critical log when local deletion fails', function 
         ),
     );
     Log::spy();
+    Exceptions::fake();
     Http::preventStrayRequests();
     Http::fake([
         "api.telegga.net/api/v1/users/{$connection->uuid}" => Http::response(
@@ -529,9 +531,15 @@ it('resets state and writes a critical log when local deletion fails', function 
                 return $message === 'Telegga connection orphaned: remote user deleted, local record kept.'
                     && $context['connection_uuid'] === $connection->uuid
                     && $context['state_synchronized'] === true
-                    && $context['deletion_exception'] instanceof RuntimeException
+                    && $context['deletion_exception']['class'] === RuntimeException::class
+                    && ! array_key_exists('message', $context['deletion_exception'])
                     && $context['state_exception'] === null;
             });
+
+        Exceptions::assertReported(
+            fn (RuntimeException $reported): bool => $reported->getMessage() === 'Local connection deletion failed.',
+        );
+        Exceptions::assertReportedCount(1);
 
         return;
     } finally {

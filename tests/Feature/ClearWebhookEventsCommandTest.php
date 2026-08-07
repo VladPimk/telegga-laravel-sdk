@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use Illuminate\Console\Command;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Telegga\Laravel\Models\AvailableTelegramBot;
@@ -189,6 +191,7 @@ it('rejects an invalid day count without deleting events', function (string $day
 it('logs a database error and returns a failure code', function (): void {
     Schema::drop('telegga_webhook_events');
     Log::spy();
+    Exceptions::fake();
 
     $this->artisan('telegga:webhook-events:clear')
         ->expectsOutput('Telegga webhook event records could not be deleted.')
@@ -202,6 +205,10 @@ it('logs a database error and returns a failure code', function (): void {
                 && $context['days'] === 90
                 && $context['deleted_records'] === 0
                 && $context['error_code'] === 'database_error'
-                && $context['exception'] instanceof Throwable,
+                && $context['exception']['class'] === QueryException::class
+                && is_string($context['exception']['sql'])
+                && ! array_key_exists('message', $context['exception']),
         );
+
+    Exceptions::assertReported(QueryException::class);
 });

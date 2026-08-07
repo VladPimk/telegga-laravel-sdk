@@ -12,6 +12,7 @@ use Telegga\Laravel\Exceptions\WebhookException;
 use Telegga\Laravel\Http\Responses\WebhookResponse;
 use Telegga\Laravel\Http\Responses\WebhookResponseCode;
 use Telegga\Laravel\Services\WebhookService;
+use Telegga\Laravel\Support\ExceptionLogContext;
 use Telegga\Laravel\Webhooks\WebhookProcessingResult;
 use Telegga\Laravel\Webhooks\WebhookProcessingStatus;
 
@@ -155,8 +156,10 @@ final class ConnectAccountWebhookController
                 'external_id' => $externalId,
                 'bot_username' => $botName,
                 'error_code' => 'internal',
-                'exception' => $exception,
+                'exception' => ExceptionLogContext::from(exception: $exception),
             ]);
+
+            report($exception);
 
             return WebhookResponse::error(
                 code: WebhookResponseCode::Internal,

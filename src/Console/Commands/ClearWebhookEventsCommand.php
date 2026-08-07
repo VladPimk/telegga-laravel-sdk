@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Log;
 use Telegga\Laravel\Models\TeleggaWebhookEvent;
+use Telegga\Laravel\Support\ExceptionLogContext;
 
 final class ClearWebhookEventsCommand extends Command
 {
@@ -65,8 +66,11 @@ final class ClearWebhookEventsCommand extends Command
                 'days' => $days,
                 'deleted_records' => $deleted,
                 'error_code' => 'database_error',
-                'exception' => $exception,
+                'exception' => ExceptionLogContext::from(exception: $exception),
             ]);
+
+            report($exception);
+
             $this->error('Telegga webhook event records could not be deleted.');
 
             return self::FAILURE;

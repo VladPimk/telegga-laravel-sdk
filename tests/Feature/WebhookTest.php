@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
+use Telegga\Laravel\Exceptions\WebhookException;
 use Telegga\Laravel\Http\Middleware\VerifyWebhookToken;
 use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Models\TeleggaWebhookEvent;
@@ -968,6 +971,7 @@ it('returns server error JSON when the local table is unavailable', function ():
     }
 
     Log::spy();
+    Exceptions::fake();
 
     $this
         ->withToken('webhook-secret')
@@ -990,6 +994,17 @@ it('returns server error JSON when the local table is unavailable', function ():
         ->withArgs(
             fn (string $message, array $context): bool => $message === 'Telegga webhook could not be processed.'
                 && $context['error_code'] === 'internal'
-                && $context['external_id'] === 'unknown-external-id',
+                && $context['external_id'] === 'unknown-external-id'
+                && is_array($context['exception'])
+                && $context['exception']['class'] === WebhookException::class
+                && $context['exception']['previous']['class'] === QueryException::class
+                && ! str_contains(
+                    json_encode($context['exception'], JSON_THROW_ON_ERROR),
+                    'unknown-external-id',
+                ),
         );
+
+    Exceptions::assertReported(
+        fn (WebhookException $exception): bool => $exception->getPrevious() instanceof QueryException,
+    );
 });

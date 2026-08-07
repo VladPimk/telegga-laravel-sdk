@@ -15,6 +15,7 @@ use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Models\TelegramConnectedUser;
 use Telegga\Laravel\Resolvers\ConnectionContextResolver;
+use Telegga\Laravel\Support\ExceptionLogContext;
 use Throwable;
 
 final class ConnectionService
@@ -440,10 +441,18 @@ final class ConnectionService
             context: [
                 'connection_uuid' => $connection->uuid,
                 'state_synchronized' => $stateSynchronized,
-                'deletion_exception' => $deletionException,
-                'state_exception' => $stateException,
+                'deletion_exception' => ExceptionLogContext::from(exception: $deletionException),
+                'state_exception' => $stateException === null
+                    ? null
+                    : ExceptionLogContext::from(exception: $stateException),
             ],
         );
+
+        report($deletionException);
+
+        if ($stateException !== null) {
+            report($stateException);
+        }
 
         throw new ConnectionException(
             message: 'Local Telegga connection could not be deleted after remote deletion.',
