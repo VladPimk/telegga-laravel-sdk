@@ -45,6 +45,7 @@ Configure the Telegga API key and a project-generated token for incoming webhook
 ```dotenv
 TELEGGA_API_KEY=tg_live_XXXXXXXXXXXXXXXX
 TELEGGA_WEBHOOK_TOKEN=replace-with-a-random-64-character-secret
+TELEGGA_WEBHOOK_PREVIOUS_TOKEN=
 TELEGGA_WEBHOOKS_ENABLED=true
 TELEGGA_WEBHOOKS_PREFIX=webhooks/v1/telegram
 TELEGGA_TIMEOUT=15
@@ -55,7 +56,7 @@ TELEGGA_RETRY_SLEEP_MS=200
 
 The API base URL defaults to `https://api.telegga.net/api/v1` and must use HTTPS. `TELEGGA_TIMEOUT` limits the total request time, while `TELEGGA_CONNECT_TIMEOUT` limits the time spent establishing a connection. `TELEGGA_RETRY_TIMES` is the total number of attempts, including the first request. `TELEGGA_RETRY_SLEEP_MS` is the base delay used for linear backoff.
 
-Generate a strong webhook token with `str()->random(64)` and set the same `TELEGGA_WEBHOOK_TOKEN` value as the webhook bearer token in the Telegga admin panel.
+Generate a strong webhook token with `str()->random(64)` and set the same `TELEGGA_WEBHOOK_TOKEN` value as the webhook bearer token in the Telegga admin panel. `TELEGGA_WEBHOOK_PREVIOUS_TOKEN` is optional and should remain empty outside a token rotation.
 
 ## API response DTOs
 
@@ -503,7 +504,9 @@ Every request must contain the project token:
 Authorization: Bearer <TELEGGA_WEBHOOK_TOKEN>
 ```
 
-An empty, missing, or invalid token returns `401`. Tokens are compared securely using `hash_equals`. Rejected tokens are logged at `warning` level with the request path and source IP, but the token value is never logged. Requests rejected by the rate limiter return `429` before token validation.
+The package accepts either a string or an array in `telegga.webhook_token`. The default configuration builds the array from `TELEGGA_WEBHOOK_TOKEN` and the optional `TELEGGA_WEBHOOK_PREVIOUS_TOKEN`. Empty and non-string entries are ignored, and every valid configured value is compared securely using `hash_equals`. An empty, missing, or invalid token returns `401`. Rejected tokens are logged at `warning` level with the request path and source IP, but token values are never logged. Requests rejected by the rate limiter return `429` before token validation.
+
+To rotate a webhook token without losing events, deploy the new token as `TELEGGA_WEBHOOK_TOKEN` while retaining the old value in `TELEGGA_WEBHOOK_PREVIOUS_TOKEN`. Clear and rebuild the application configuration cache, then change the bearer token in the Telegga admin panel. Both values remain valid during the transition. After all application instances and Telegga use the new token, remove `TELEGGA_WEBHOOK_PREVIOUS_TOKEN` and rebuild the configuration cache again. A compromised token should not be retained for a transition period.
 
 The `user.linked` event requires every field documented by Telegga, including `event_id`. It finds the local record by matching `external_id` with `telegram_connected_users.uuid`, including soft-deleted records for accurate diagnostics, and loads its assigned local bot, including a soft-deleted bot. The received and local bot usernames are converted to lowercase before comparison. Both values use the username without the `@` prefix. Processing stops at the first failed check.
 

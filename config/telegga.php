@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+
 use App\Models\User;
 
 return [
@@ -8,7 +9,10 @@ return [
     'api_key' => env('TELEGGA_API_KEY'),
     'user_model' => User::class,
     'users_table' => 'users',
-    'webhook_token' => env('TELEGGA_WEBHOOK_TOKEN'),
+    'webhook_token' => [
+        env('TELEGGA_WEBHOOK_TOKEN'),
+        env('TELEGGA_WEBHOOK_PREVIOUS_TOKEN'),
+    ],
     'webhooks' => [
         'enabled' => env('TELEGGA_WEBHOOKS_ENABLED', true),
         'prefix' => env('TELEGGA_WEBHOOKS_PREFIX', 'webhooks/v1/telegram'),

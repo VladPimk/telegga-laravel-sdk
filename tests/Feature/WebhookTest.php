@@ -670,6 +670,39 @@ it('rejects a webhook with an invalid bearer token', function (): void {
         );
 });
 
+it('accepts current and previous webhook tokens during rotation', function (string $token): void {
+    config()->set('telegga.webhook_token', [
+        'current-webhook-secret',
+        'previous-webhook-secret',
+    ]);
+
+    $this
+        ->withToken($token)
+        ->postJson('/webhooks/v1/telegram/connect-account', [
+            'event' => 'test',
+            'service_id' => '0a1f376a-0000-4000-8000-000000000001',
+            'sent_at' => '2026-07-22T10:15:00Z',
+        ])
+        ->assertOk();
+})->with([
+    'current token' => 'current-webhook-secret',
+    'previous token' => 'previous-webhook-secret',
+]);
+
+it('rejects a token outside the configured rotation set', function (): void {
+    config()->set('telegga.webhook_token', [
+        'current-webhook-secret',
+        'previous-webhook-secret',
+    ]);
+
+    $this
+        ->withToken('unknown-webhook-secret')
+        ->postJson('/webhooks/v1/telegram/connect-account', [
+            'event' => 'test',
+        ])
+        ->assertUnauthorized();
+});
+
 it('rate-limits webhook requests before bearer token validation', function (): void {
     Log::spy();
 
@@ -700,8 +733,8 @@ it('rate-limits webhook requests before bearer token validation', function (): v
         );
 });
 
-it('rejects a webhook when the configured token is empty', function (): void {
-    config()->set('telegga.webhook_token', '');
+it('rejects a webhook when no valid token is configured', function (mixed $configuredTokens): void {
+    config()->set('telegga.webhook_token', $configuredTokens);
 
     $this
         ->withToken('webhook-secret')
@@ -716,7 +749,11 @@ it('rejects a webhook when the configured token is empty', function (): void {
                 'message' => 'Invalid webhook token.',
             ],
         ]);
-});
+})->with([
+    'empty string' => '',
+    'empty array' => [[]],
+    'invalid array entries' => [[null, '', 123]],
+]);
 
 it('rejects a payload without an event name', function (): void {
     Log::spy();

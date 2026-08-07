@@ -18,14 +18,13 @@ final class VerifyWebhookToken
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $expectedToken = (string) config(key: 'telegga.webhook_token');
+        $configuredTokens = config(key: 'telegga.webhook_token');
         $providedToken = $request->bearerToken();
 
-        if (
-            $expectedToken === ''
-            || ! is_string($providedToken)
-            || ! hash_equals($expectedToken, $providedToken)
-        ) {
+        if (! $this->tokenMatches(
+            configuredTokens: $configuredTokens,
+            providedToken: $providedToken,
+        )) {
             Log::warning('Telegga webhook authorization failed.', [
                 'path' => $request->path(),
                 'ip' => $request->ip(),
@@ -38,5 +37,31 @@ final class VerifyWebhookToken
         }
 
         return $next($request);
+    }
+
+    /**
+     * Determine whether the provided token matches a configured token.
+     */
+    private function tokenMatches(mixed $configuredTokens, ?string $providedToken): bool
+    {
+        if ($providedToken === null || $providedToken === '') {
+            return false;
+        }
+
+        $expectedTokens = is_array($configuredTokens)
+            ? $configuredTokens
+            : [$configuredTokens];
+
+        foreach ($expectedTokens as $expectedToken) {
+            if (
+                is_string($expectedToken)
+                && $expectedToken !== ''
+                && hash_equals($expectedToken, $providedToken)
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
