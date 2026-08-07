@@ -59,3 +59,35 @@ it('registers the webhook with configured prefix and middleware', function (): v
         Route::setRoutes($originalRoutes);
     }
 });
+
+it('keeps default webhook middleware with a partial legacy configuration', function (): void {
+    $originalRoutes = Route::getRoutes();
+
+    try {
+        Route::setRoutes(new RouteCollection);
+        config()->set('telegga.webhooks', [
+            'enabled' => true,
+            'prefix' => 'legacy/telegga',
+        ]);
+
+        $provider = new TeleggaServiceProvider(app: $this->app);
+        $provider->register();
+        $provider->boot();
+
+        Route::getRoutes()->refreshNameLookups();
+
+        $route = Route::getRoutes()->getByName('telegga.webhooks.connect-account');
+
+        expect($route)
+            ->not->toBeNull()
+            ->and($route?->uri())
+            ->toBe('legacy/telegga/connect-account')
+            ->and($route?->gatherMiddleware())
+            ->toBe([
+                'throttle:60,1',
+                VerifyWebhookToken::class,
+            ]);
+    } finally {
+        Route::setRoutes($originalRoutes);
+    }
+});

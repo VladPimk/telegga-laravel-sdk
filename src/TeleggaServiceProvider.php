@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Telegga\Laravel;
 
+use Illuminate\Contracts\Config\Repository;
+use Illuminate\Contracts\Foundation\CachesConfiguration;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Support\ServiceProvider;
 use Telegga\Laravel\Console\Commands\ClearWebhookEventsCommand;
@@ -26,10 +28,7 @@ final class TeleggaServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->mergeConfigFrom(
-            path: __DIR__.'/../config/telegga.php',
-            key: 'telegga',
-        );
+        $this->mergePackageConfiguration();
 
         $this->app->bind(TeleggaClient::class, function (): TeleggaClient {
             return new TeleggaClient(
@@ -53,6 +52,59 @@ final class TeleggaServiceProvider extends ServiceProvider
         $this->app->bind(WebhookService::class);
         $this->app->bind(ConnectionContextResolver::class);
         $this->app->bind(TeleggaInterface::class, Telegga::class);
+    }
+
+    /**
+     * Merge package defaults with application configuration recursively.
+     */
+    private function mergePackageConfiguration(): void
+    {
+        if ($this->app instanceof CachesConfiguration && $this->app->configurationIsCached()) {
+            return;
+        }
+
+        $config = $this->app->make(Repository::class);
+        $configured = $config->get('telegga', []);
+
+        /** @var array<string, mixed> $defaults */
+        $defaults = require __DIR__.'/../config/telegga.php';
+
+        $config->set('telegga', $this->mergeConfiguration(
+            defaults: $defaults,
+            configured: is_array($configured) ? $configured : [],
+        ));
+    }
+
+    /**
+     * Merge associative configuration sections while replacing configured lists.
+     *
+     * @param  array<string, mixed>  $defaults
+     * @param  array<string, mixed>  $configured
+     * @return array<string, mixed>
+     */
+    private function mergeConfiguration(array $defaults, array $configured): array
+    {
+        foreach ($configured as $key => $value) {
+            $default = $defaults[$key] ?? null;
+
+            if (
+                is_array($default)
+                && is_array($value)
+                && ! array_is_list($default)
+                && ($value === [] || ! array_is_list($value))
+            ) {
+                $defaults[$key] = $this->mergeConfiguration(
+                    defaults: $default,
+                    configured: $value,
+                );
+
+                continue;
+            }
+
+            $defaults[$key] = $value;
+        }
+
+        return $defaults;
     }
 
     /**

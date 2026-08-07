@@ -41,6 +41,42 @@ it('registers the public contract and configuration', function () {
         ->toBe('users');
 });
 
+it('recursively merges missing nested configuration defaults', function (): void {
+    config()->set('telegga', [
+        'api_key' => 'tg_live_custom',
+        'webhooks' => [
+            'enabled' => true,
+            'prefix' => 'integrations/telegga',
+        ],
+        'retry' => [
+            'times' => 5,
+        ],
+    ]);
+
+    (new TeleggaServiceProvider(app: $this->app))->register();
+
+    expect(config('telegga.api_key'))
+        ->toBe('tg_live_custom')
+        ->and(config('telegga.webhooks.enabled'))
+        ->toBeTrue()
+        ->and(config('telegga.webhooks.prefix'))
+        ->toBe('integrations/telegga')
+        ->and(config('telegga.webhooks.middleware'))
+        ->toBe(['throttle:60,1'])
+        ->and(config('telegga.retry.times'))
+        ->toBe(5)
+        ->and(config('telegga.retry.sleep_ms'))
+        ->toBe(200);
+});
+
+it('replaces configured lists instead of merging them', function (): void {
+    config()->set('telegga.webhooks.middleware', []);
+
+    (new TeleggaServiceProvider(app: $this->app))->register();
+
+    expect(config('telegga.webhooks.middleware'))->toBe([]);
+});
+
 it('creates a new instance for each package service resolution', function (): void {
     $abstracts = [
         TeleggaClient::class,
