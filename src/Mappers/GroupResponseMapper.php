@@ -77,7 +77,7 @@ final class GroupResponseMapper
 
         return new GroupMembersAddedData(
             added: $this->reader->requiredInteger(response: $response, field: 'added', context: $context),
-            not_found: collect($this->reader->requiredStringArray(
+            not_found: collect($this->reader->optionalStringArray(
                 response: $response,
                 field: 'not_found',
                 context: $context,

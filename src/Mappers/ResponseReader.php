@@ -195,6 +195,31 @@ final class ResponseReader
     }
 
     /**
+     * Get an optional string array.
+     *
+     * @return array<int, string>
+     */
+    public function optionalStringArray(object $response, string $field, string $context): array
+    {
+        $values = $this->optionalArray(
+            response: $response,
+            field: $field,
+            context: $context,
+        );
+
+        foreach ($values as $value) {
+            if (! is_string($value)) {
+                $this->invalid(
+                    context: $context,
+                    message: sprintf('optional string array field "%s" is invalid', $field),
+                );
+            }
+        }
+
+        return $values;
+    }
+
+    /**
      * Throw an invalid API response exception.
      */
     private function invalid(string $context, string $message): never

@@ -308,6 +308,40 @@ it('sends local UUIDs as external_ids in one bulk member request', function (): 
     Http::assertSentCount(1);
 });
 
+it('accepts a bulk member response without not_found', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/groups/group-1/members' => Http::response([
+            'added' => 1,
+        ]),
+    ]);
+
+    $result = app(TeleggaInterface::class)->addGroupMembers(
+        groupId: 'group-1',
+        uuids: [$connection->uuid],
+    );
+
+    expect($result->added)
+        ->toBe(1)
+        ->and($result->not_found)
+        ->toBeInstanceOf(Collection::class)
+        ->toBeEmpty();
+
+    Http::assertSent(function (Request $request) use ($connection): bool {
+        return $request->method() === 'POST'
+            && $request->url() === 'https://api.telegga.net/api/v1/groups/group-1/members'
+            && $request->data() === ['external_ids' => [$connection->uuid]];
+    });
+
+    Http::assertSentCount(1);
+});
+
 it('does not add members when a local connection is missing', function (): void {
     $uuid = str()->uuid()->toString();
 

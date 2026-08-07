@@ -141,9 +141,24 @@ it('rejects a non-string external id in a group member result', function (): voi
         'not_found' => [123],
     ]))->toThrow(
         TeleggaApiException::class,
-        'Telegga returned an invalid group members response: required string array field "not_found" is invalid.',
+        'Telegga returned an invalid group members response: optional string array field "not_found" is invalid.',
     );
 });
+
+it('maps an absent or null not_found field to an empty collection', function (object $response): void {
+    $result = app(GroupResponseMapper::class)->fromAddMembers(response: $response);
+
+    expect($result->added)
+        ->toBe(2)
+        ->and($result->not_found)
+        ->toBeInstanceOf(Collection::class)
+        ->toBeEmpty()
+        ->and($result->raw())
+        ->toBe($response);
+})->with([
+    'absent field' => [(object) ['added' => 2]],
+    'null field' => [(object) ['added' => 2, 'not_found' => null]],
+]);
 
 it('rejects a response without a required field', function (): void {
     try {
