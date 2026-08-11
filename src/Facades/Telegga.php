@@ -10,7 +10,7 @@ use Telegga\Laravel\Contracts\TeleggaInterface;
 final class Telegga extends Facade
 {
     /**
-     * Получить имя компонента из контейнера.
+     * Get the component name from the container.
      */
     protected static function getFacadeAccessor(): string
     {

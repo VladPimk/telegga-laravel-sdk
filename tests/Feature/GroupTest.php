@@ -2,42 +2,21 @@
 
 declare(strict_types=1);
 
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Client\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Schema;
 use Telegga\Laravel\Contracts\TeleggaInterface;
+use Telegga\Laravel\Dto\GroupData;
+use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\GroupException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Models\TelegramConnectedUser;
 
 beforeEach(function (): void {
-    Schema::enableForeignKeyConstraints();
-
-    Schema::create('users', function (Blueprint $table): void {
-        $table->id();
-        $table->string('name');
-        $table->timestamps();
-    });
-
-    $botMigration = require __DIR__.'/../../database/migrations/2026_07_31_000001_create_available_telegram_bots_table.php';
-    $botMigration->up();
-
-    $connectionMigration = require __DIR__.'/../../database/migrations/2026_07_31_000002_create_telegram_connected_users_table.php';
-    $connectionMigration->up();
-
     $this->telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
 });
 
-afterEach(function (): void {
-    Schema::dropIfExists('telegram_connected_users');
-    Schema::dropIfExists('available_telegram_bots');
-    Schema::dropIfExists('users');
-});
-
-it('создаёт группу для бота локального подключения', function (): void {
+it('creates a group for the local connection bot', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -53,7 +32,7 @@ it('создаёт группу для бота локального подкл�
             'description' => 'VIP-клиенты',
             'new_api_field' => 'new-value',
         ], 201),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'links' => [
@@ -72,12 +51,10 @@ it('создаёт группу для бота локального подкл�
         description: 'VIP-клиенты',
     );
 
-    expect($group)
-        ->toBeInstanceOf(stdClass::class)
-        ->and($group->group_id)
-        ->toBe('group-1')
-        ->and($group->new_api_field)
-        ->toBe('new-value');
+    expect($group->group_id)
+        ->toBe('group-1');
+
+    $this->assertSame('new-value', $group->raw()->new_api_field);
 
     Http::assertSent(function (Request $request): bool {
         return $request->method() === 'POST'
@@ -90,7 +67,7 @@ it('создаёт группу для бота локального подкл�
     });
 });
 
-it('возвращает коллекцию групп бота локального подключения', function (): void {
+it('returns a group page for the local connection bot', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -107,8 +84,10 @@ it('возвращает коллекцию групп бота локально
                     'new_api_field' => 'new-value',
                 ],
             ],
+            'next_cursor' => 'next-page',
+            'new_page_field' => 'new-page-value',
         ]),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'links' => [
@@ -121,26 +100,28 @@ it('возвращает коллекцию групп бота локально
         ]),
     ]);
 
-    $groups = app(TeleggaInterface::class)->getGroups(
+    $page = app(TeleggaInterface::class)->getGroups(
         uuid: $connection->uuid,
+        cursor: ' current-page ',
     );
 
-    expect($groups)
-        ->toBeInstanceOf(Collection::class)
-        ->and($groups)
+    expect($page->data)
         ->toHaveCount(1)
-        ->and($groups->first())
-        ->toBeInstanceOf(stdClass::class)
-        ->and($groups->first()->new_api_field)
-        ->toBe('new-value');
+        ->and($page->data->first())
+        ->toBeInstanceOf(GroupData::class)
+        ->and($page->next_cursor)
+        ->toBe('next-page');
+
+    $this->assertSame('new-value', $page->data->first()->raw()->new_api_field);
+    $this->assertSame('new-page-value', $page->raw()->new_page_field);
 
     Http::assertSent(function (Request $request): bool {
         return $request->method() === 'GET'
-            && $request->url() === 'https://api.telegga.net/api/v1/groups?bot_id=bot-active';
+            && $request->url() === 'https://api.telegga.net/api/v1/groups?bot_id=bot-active&cursor=current-page';
     });
 });
 
-it('получает обновляет и удаляет группу', function (): void {
+it('gets updates and deletes a group', function (): void {
     Http::preventStrayRequests();
     Http::fake(function (Request $request) {
         if ($request->method() === 'GET') {
@@ -175,10 +156,10 @@ it('получает обновляет и удаляет группу', functio
 
     expect($group->members_count)
         ->toBe(10)
-        ->and($group->new_api_field)
-        ->toBe('new-value')
         ->and($updated->name)
         ->toBe('Premium');
+
+    $this->assertSame('new-value', $group->raw()->new_api_field);
 
     Http::assertSent(function (Request $request): bool {
         return $request->method() === 'PUT'
@@ -197,7 +178,7 @@ it('получает обновляет и удаляет группу', functio
     Http::assertSentCount(3);
 });
 
-it('управляет членством через маршруты пользователя', function (): void {
+it('manages membership through user endpoints', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -235,25 +216,25 @@ it('управляет членством через маршруты польз
     );
 
     expect($result->added)
-        ->toBeFalse()
-        ->and($result->new_api_field)
-        ->toBe('new-value');
+        ->toBeFalse();
 
-    Http::assertSent(function (Request $request): bool {
+    $this->assertSame('new-value', $result->raw()->new_api_field);
+
+    Http::assertSent(function (Request $request) use ($connection): bool {
         return $request->method() === 'POST'
-            && $request->url() === 'https://api.telegga.net/api/v1/users/telegga-user-1/groups'
+            && $request->url() === "https://api.telegga.net/api/v1/users/{$connection->uuid}/groups"
             && $request->data() === ['group_id' => 'group-1'];
     });
 
-    Http::assertSent(function (Request $request): bool {
+    Http::assertSent(function (Request $request) use ($connection): bool {
         return $request->method() === 'DELETE'
-            && $request->url() === 'https://api.telegga.net/api/v1/users/telegga-user-1/groups/group-1';
+            && $request->url() === "https://api.telegga.net/api/v1/users/{$connection->uuid}/groups/group-1";
     });
 
-    Http::assertSentCount(4);
+    Http::assertSentCount(2);
 });
 
-it('преобразует локальные uuid при массовом добавлении участников', function (): void {
+it('sends local UUIDs as external_ids in one bulk member request', function (): void {
     $first = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -264,20 +245,18 @@ it('преобразует локальные uuid при массовом до�
         'is_created' => true,
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
+    $unselected = TelegramConnectedUser::query()->create([
+        'name' => 'Анна',
+        'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
 
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/groups/group-1/members' => Http::response([
             'added' => 2,
+            'not_found' => [$second->uuid],
             'new_api_field' => 'new-value',
-        ]),
-        "api.telegga.net/api/v1/users?external_id={$first->uuid}" => Http::response([
-            'user_id' => 'telegga-user-1',
-            'external_id' => $first->uuid,
-        ]),
-        "api.telegga.net/api/v1/users?external_id={$second->uuid}" => Http::response([
-            'user_id' => 'telegga-user-2',
-            'external_id' => $second->uuid,
         ]),
     ]);
 
@@ -288,24 +267,29 @@ it('преобразует локальные uuid при массовом до�
 
     expect($result->added)
         ->toBe(2)
-        ->and($result->new_api_field)
-        ->toBe('new-value');
+        ->and($result->not_found->all())
+        ->toBe([$second->uuid]);
 
-    Http::assertSent(function (Request $request): bool {
+    $this->assertSame('new-value', $result->raw()->new_api_field);
+
+    Http::assertSent(function (Request $request) use ($first, $second, $unselected): bool {
+        $data = $request->data();
+
         return $request->method() === 'POST'
             && $request->url() === 'https://api.telegga.net/api/v1/groups/group-1/members'
-            && $request->data() === [
-                'user_ids' => [
-                    'telegga-user-1',
-                    'telegga-user-2',
+            && $data === [
+                'external_ids' => [
+                    $first->uuid,
+                    $second->uuid,
                 ],
-            ];
+            ]
+            && ! in_array($unselected->uuid, $data['external_ids'], true);
     });
 
-    Http::assertSentCount(3);
+    Http::assertSentCount(1);
 });
 
-it('удаляет участника через групповой маршрут', function (): void {
+it('accepts a bulk member response without not_found', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -314,14 +298,94 @@ it('удаляет участника через групповой маршру
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/groups/group-1/members/telegga-user-1' => Http::response(
+        'api.telegga.net/api/v1/groups/group-1/members' => Http::response([
+            'added' => 1,
+        ]),
+    ]);
+
+    $result = app(TeleggaInterface::class)->addGroupMembers(
+        groupId: 'group-1',
+        uuids: [$connection->uuid],
+    );
+
+    expect($result->added)
+        ->toBe(1)
+        ->and($result->not_found)
+        ->toBeEmpty();
+
+    Http::assertSent(function (Request $request) use ($connection): bool {
+        return $request->method() === 'POST'
+            && $request->url() === 'https://api.telegga.net/api/v1/groups/group-1/members'
+            && $request->data() === ['external_ids' => [$connection->uuid]];
+    });
+
+    Http::assertSentCount(1);
+});
+
+it('does not add members when a local connection is missing', function (): void {
+    $uuid = str()->uuid()->toString();
+
+    Http::preventStrayRequests();
+
+    try {
+        app(TeleggaInterface::class)->addGroupMembers(
+            groupId: 'group-1',
+            uuids: [$uuid],
+        );
+    } catch (ConnectionException $exception) {
+        expect($exception->getMessage())
+            ->toBe('Telegga connection was not found.')
+            ->and($exception->connectionUuid)
+            ->toBe($uuid);
+
+        Http::assertNothingSent();
+
+        return;
+    }
+
+    $this->fail('Expected a ConnectionException.');
+});
+
+it('does not add members when a local connection is not created in Telegga', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+
+    Http::preventStrayRequests();
+
+    try {
+        app(TeleggaInterface::class)->addGroupMembers(
+            groupId: 'group-1',
+            uuids: [$connection->uuid],
+        );
+    } catch (ConnectionException $exception) {
+        expect($exception->getMessage())
+            ->toBe('Telegga connection is not created.')
+            ->and($exception->connectionUuid)
+            ->toBe($connection->uuid);
+
+        Http::assertNothingSent();
+
+        return;
+    }
+
+    $this->fail('Expected a ConnectionException.');
+});
+
+it('removes a member through the group endpoint', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        "api.telegga.net/api/v1/groups/group-1/members/{$connection->uuid}" => Http::response(
             body: null,
             status: 204,
         ),
-        'api.telegga.net/api/v1/users*' => Http::response([
-            'user_id' => 'telegga-user-1',
-            'external_id' => $connection->uuid,
-        ]),
     ]);
 
     app(TeleggaInterface::class)->removeGroupMember(
@@ -329,13 +393,15 @@ it('удаляет участника через групповой маршру
         uuid: $connection->uuid,
     );
 
-    Http::assertSent(function (Request $request): bool {
+    Http::assertSent(function (Request $request) use ($connection): bool {
         return $request->method() === 'DELETE'
-            && $request->url() === 'https://api.telegga.net/api/v1/groups/group-1/members/telegga-user-1';
+            && $request->url() === "https://api.telegga.net/api/v1/groups/group-1/members/{$connection->uuid}";
     });
+
+    Http::assertSentCount(1);
 });
 
-it('отклоняет некорректные параметры группы до api запроса', function (
+it('rejects invalid group parameters before an API request', function (
     Closure $action,
     string $message,
 ): void {
@@ -352,46 +418,46 @@ it('отклоняет некорректные параметры группы 
         return;
     }
 
-    test()->fail('Ожидалось исключение GroupException.');
+    $this->fail('Expected a GroupException.');
 })->with([
-    'пустое имя' => [
+    'empty name' => [
         fn (TeleggaInterface $telegga) => $telegga->createGroup(
             uuid: 'connection-uuid',
             name: '   ',
         ),
         'Group name cannot be empty.',
     ],
-    'пустой идентификатор' => [
+    'empty identifier' => [
         fn (TeleggaInterface $telegga) => $telegga->getGroup(groupId: '   '),
         'Group identifier cannot be empty.',
     ],
-    'пустое обновление' => [
+    'empty update' => [
         fn (TeleggaInterface $telegga) => $telegga->updateGroup(
             groupId: 'group-1',
             data: [],
         ),
         'Group update data cannot be empty.',
     ],
-    'пустой список участников' => [
+    'empty member list' => [
         fn (TeleggaInterface $telegga) => $telegga->addGroupMembers(
             groupId: 'group-1',
             uuids: [],
         ),
         'Group members cannot be empty.',
     ],
-    'превышен лимит участников' => [
+    'member limit exceeded' => [
         fn (TeleggaInterface $telegga) => $telegga->addGroupMembers(
             groupId: 'group-1',
             uuids: array_map(
-                callback: fn (int $index): string => "uuid-{$index}",
-                array: range(start: 1, end: 10001),
+                fn (int $index): string => "uuid-{$index}",
+                range(1, 10001),
             ),
         ),
         'Group members cannot exceed 10000 users.',
     ],
 ]);
 
-it('скрывает ошибку api в исключении группы', function (): void {
+it('wraps an API error in a group exception', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/groups/group-1' => Http::response([
@@ -409,18 +475,18 @@ it('скрывает ошибку api в исключении группы', fun
             ->toBe('group-1')
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('not_found')
-            ->and($exception->getPrevious()?->status)
+            ->and($this->previousApiException(exception: $exception)->status)
             ->toBe(404);
 
         return;
     }
 
-    test()->fail('Ожидалось исключение GroupException.');
+    $this->fail('Expected a GroupException.');
 });
 
-it('отклоняет некорректный ответ списка групп', function (): void {
+it('rejects an invalid group list response', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -432,7 +498,7 @@ it('отклоняет некорректный ответ списка груп
         'api.telegga.net/api/v1/groups*' => Http::response([
             'data' => 'not-an-array',
         ]),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'links' => [
@@ -454,11 +520,50 @@ it('отклоняет некорректный ответ списка груп
             ->toBe($connection->uuid)
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('invalid_response');
 
         return;
     }
 
-    test()->fail('Ожидалось исключение GroupException.');
+    $this->fail('Expected a GroupException.');
+});
+
+it('treats a group as deleted when a retry confirms it is absent from the API', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/groups/group-1' => Http::sequence()
+            ->push(['error' => ['code' => 'internal', 'message' => 'Temporary error.']], 503)
+            ->push(['error' => ['code' => 'not_found', 'message' => 'Group was not found.']], 404),
+    ]);
+
+    app(TeleggaInterface::class)->deleteGroup(groupId: 'group-1');
+
+    Http::assertSentCount(2);
+});
+
+it('does not hide a missing group in the first API response', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/groups/group-1' => Http::response([
+            'error' => ['code' => 'not_found', 'message' => 'Group was not found.'],
+        ], 404),
+    ]);
+
+    try {
+        app(TeleggaInterface::class)->deleteGroup(groupId: 'group-1');
+    } catch (GroupException $exception) {
+        expect($exception->apiCode())
+            ->toBe('not_found')
+            ->and($exception->attempts())
+            ->toBe(1)
+            ->and($exception->wasRetried())
+            ->toBeFalse();
+
+        Http::assertSentCount(1);
+
+        return;
+    }
+
+    $this->fail('Expected a GroupException.');
 });

@@ -2,10 +2,9 @@
 
 declare(strict_types=1);
 
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Schema;
+use Telegga\Laravel\BroadcastAudience;
 use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Exceptions\BroadcastException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
@@ -13,30 +12,10 @@ use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Models\TelegramConnectedUser;
 
 beforeEach(function (): void {
-    Schema::enableForeignKeyConstraints();
-
-    Schema::create('users', function (Blueprint $table): void {
-        $table->id();
-        $table->string('name');
-        $table->timestamps();
-    });
-
-    $botMigration = require __DIR__.'/../../database/migrations/2026_07_31_000001_create_available_telegram_bots_table.php';
-    $botMigration->up();
-
-    $connectionMigration = require __DIR__.'/../../database/migrations/2026_07_31_000002_create_telegram_connected_users_table.php';
-    $connectionMigration->up();
-
     $this->telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
 });
 
-afterEach(function (): void {
-    Schema::dropIfExists('telegram_connected_users');
-    Schema::dropIfExists('available_telegram_bots');
-    Schema::dropIfExists('users');
-});
-
-it('запускает рассылку всем пользователям бота подключения', function (): void {
+it('starts a broadcast to all users of the connection bot', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -50,7 +29,7 @@ it('запускает рассылку всем пользователям бо
             'status' => 'pending',
             'new_api_field' => 'new-value',
         ], 202),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'links' => [
@@ -64,8 +43,9 @@ it('запускает рассылку всем пользователям бо
     ]);
 
     $broadcast = app(TeleggaInterface::class)->startBroadcast(
-        uuid: $connection->uuid,
+        viaConnectionUuid: $connection->uuid,
         type: 'text',
+        audience: BroadcastAudience::allLinkedUsers(),
         data: [
             'text' => 'Акция!',
             'bot_id' => 'foreign-bot',
@@ -76,14 +56,12 @@ it('запускает рассылку всем пользователям бо
         ],
     );
 
-    expect($broadcast)
-        ->toBeInstanceOf(stdClass::class)
-        ->and($broadcast->broadcast_id)
+    expect($broadcast->broadcast_id)
         ->toBe('broadcast-1')
         ->and($broadcast->status)
-        ->toBe('pending')
-        ->and($broadcast->new_api_field)
-        ->toBe('new-value');
+        ->toBe('pending');
+
+    $this->assertSame('new-value', $broadcast->raw()->new_api_field);
 
     Http::assertSent(function (Request $request): bool {
         return $request->method() === 'POST'
@@ -95,10 +73,15 @@ it('запускает рассылку всем пользователям бо
             ];
     });
 
+    Http::assertSent(function (Request $request) use ($connection): bool {
+        return $request->method() === 'GET'
+            && $request->url() === "https://api.telegga.net/api/v1/users?external_id={$connection->uuid}";
+    });
+
     Http::assertSentCount(2);
 });
 
-it('запускает медиа рассылку участникам указанной группы', function (): void {
+it('starts a media broadcast to members of the specified group', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -111,7 +94,7 @@ it('запускает медиа рассылку участникам указ
             'broadcast_id' => 'broadcast-1',
             'status' => 'pending',
         ], 202),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'links' => [
@@ -125,14 +108,14 @@ it('запускает медиа рассылку участникам указ
     ]);
 
     app(TeleggaInterface::class)->startBroadcast(
-        uuid: $connection->uuid,
+        viaConnectionUuid: $connection->uuid,
         type: 'photo',
+        audience: BroadcastAudience::group(groupId: 'group-1'),
         data: [
             'media_id' => 'media-photo',
             'text' => 'Новая акция',
             'group_id' => 'foreign-group',
         ],
-        groupId: 'group-1',
     );
 
     Http::assertSent(function (Request $request): bool {
@@ -148,7 +131,7 @@ it('запускает медиа рассылку участникам указ
     });
 });
 
-it('получает прогресс рассылки без потери новых полей', function (): void {
+it('gets broadcast progress without losing new fields', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/broadcasts/broadcast-1' => Http::response([
@@ -170,9 +153,9 @@ it('получает прогресс рассылки без потери но�
         ->and($broadcast->total)
         ->toBe(2003)
         ->and($broadcast->sent)
-        ->toBe(1200)
-        ->and($broadcast->new_api_field)
-        ->toBe('new-value');
+        ->toBe(1200);
+
+    $this->assertSame('new-value', $broadcast->raw()->new_api_field);
 
     Http::assertSent(function (Request $request): bool {
         return $request->method() === 'GET'
@@ -180,7 +163,7 @@ it('получает прогресс рассылки без потери но�
     });
 });
 
-it('отменяет рассылку и возвращает результат api', function (): void {
+it('cancels a broadcast and returns the API result', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/broadcasts/broadcast-1/cancel' => Http::response([
@@ -197,9 +180,9 @@ it('отменяет рассылку и возвращает результат
     expect($result->status)
         ->toBe('cancelled')
         ->and($result->cancelled_messages)
-        ->toBe(803)
-        ->and($result->new_api_field)
-        ->toBe('new-value');
+        ->toBe(803);
+
+    $this->assertSame('new-value', $result->raw()->new_api_field);
 
     Http::assertSent(function (Request $request): bool {
         return $request->method() === 'POST'
@@ -208,7 +191,7 @@ it('отменяет рассылку и возвращает результат
     });
 });
 
-it('отклоняет некорректные параметры рассылки до api запроса', function (
+it('rejects invalid broadcast parameters before an API request', function (
     Closure $action,
     string $message,
 ): void {
@@ -225,37 +208,46 @@ it('отклоняет некорректные параметры рассыл�
         return;
     }
 
-    test()->fail('Ожидалось исключение BroadcastException.');
+    $this->fail('Expected a BroadcastException.');
 })->with([
-    'пустой uuid' => [
+    'empty UUID' => [
         fn (TeleggaInterface $telegga) => $telegga->startBroadcast(
-            uuid: '   ',
+            viaConnectionUuid: '   ',
             type: 'text',
+            audience: BroadcastAudience::allLinkedUsers(),
         ),
         'Connection UUID cannot be empty.',
     ],
-    'пустой тип' => [
+    'empty type' => [
         fn (TeleggaInterface $telegga) => $telegga->startBroadcast(
-            uuid: 'connection-uuid',
+            viaConnectionUuid: 'connection-uuid',
             type: '   ',
+            audience: BroadcastAudience::allLinkedUsers(),
         ),
         'Broadcast type cannot be empty.',
     ],
-    'пустая группа' => [
+    'empty group' => [
         fn (TeleggaInterface $telegga) => $telegga->startBroadcast(
-            uuid: 'connection-uuid',
+            viaConnectionUuid: 'connection-uuid',
             type: 'text',
-            groupId: '   ',
+            audience: BroadcastAudience::group(groupId: '   '),
         ),
         'Group identifier cannot be empty.',
     ],
-    'пустой идентификатор прогресса' => [
+    'missing audience' => [
+        fn (TeleggaInterface $telegga) => $telegga->startBroadcast(
+            viaConnectionUuid: 'connection-uuid',
+            type: 'text',
+        ),
+        'Broadcast audience must be specified.',
+    ],
+    'empty progress identifier' => [
         fn (TeleggaInterface $telegga) => $telegga->getBroadcast(
             broadcastId: '   ',
         ),
         'Broadcast identifier cannot be empty.',
     ],
-    'пустой идентификатор отмены' => [
+    'empty cancellation identifier' => [
         fn (TeleggaInterface $telegga) => $telegga->cancelBroadcast(
             broadcastId: '   ',
         ),
@@ -263,7 +255,7 @@ it('отклоняет некорректные параметры рассыл�
     ],
 ]);
 
-it('скрывает ошибку api при получении рассылки', function (): void {
+it('wraps an API error when getting a broadcast', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/broadcasts/broadcast-1' => Http::response([
@@ -285,18 +277,18 @@ it('скрывает ошибку api при получении рассылки
             ->toBeNull()
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('not_found')
-            ->and($exception->getPrevious()?->status)
+            ->and($this->previousApiException(exception: $exception)->status)
             ->toBe(404);
 
         return;
     }
 
-    test()->fail('Ожидалось исключение BroadcastException.');
+    $this->fail('Expected a BroadcastException.');
 });
 
-it('отклоняет успешный ответ рассылки с некорректным json', function (): void {
+it('rejects a successful broadcast response with invalid JSON', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/broadcasts/broadcast-1' => Http::response(
@@ -314,11 +306,11 @@ it('отклоняет успешный ответ рассылки с неко�
             ->toBe('broadcast-1')
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('invalid_response');
 
         return;
     }
 
-    test()->fail('Ожидалось исключение BroadcastException.');
+    $this->fail('Expected a BroadcastException.');
 });

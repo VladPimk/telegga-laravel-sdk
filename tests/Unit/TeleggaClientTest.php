@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Http\TeleggaClient;
 
-it('подписывает запрос api ключом и возвращает json', function () {
+it('authorizes an API request with the key and returns JSON', function () {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
@@ -20,6 +21,7 @@ it('подписывает запрос api ключом и возвращает
         baseUrl: 'https://api.telegga.net/api/v1',
         apiKey: 'tg_live_test',
         timeout: 15,
+        connectTimeout: 5,
     );
 
     $response = $client->get(uri: 'bots');
@@ -32,7 +34,8 @@ it('подписывает запрос api ключом и возвращает
     ));
 });
 
-it('преобразует ошибку api и сохраняет retry after', function () {
+it('maps an API error and preserves retry after', function () {
+    Sleep::fake();
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/messages' => Http::response(
@@ -52,6 +55,7 @@ it('преобразует ошибку api и сохраняет retry after', 
         baseUrl: 'https://api.telegga.net/api/v1',
         apiKey: 'tg_live_test',
         timeout: 15,
+        connectTimeout: 5,
     );
 
     try {
@@ -60,15 +64,20 @@ it('преобразует ошибку api и сохраняет retry after', 
         expect($exception->status)->toBe(429)
             ->and($exception->apiCode)->toBe('rate_limited')
             ->and($exception->retryAfter)->toBe(7)
+            ->and($exception->attempts)->toBe(1)
             ->and($exception->getMessage())->toBe('Too many requests.');
+
+        Http::assertSentCount(1);
+        Sleep::assertNeverSlept();
 
         return;
     }
 
-    test()->fail('Ожидалось исключение TeleggaApiException.');
+    $this->fail('Expected a TeleggaApiException.');
 });
 
-it('скрывает ошибку транспорта', function () {
+it('wraps a transport error', function () {
+    Sleep::fake();
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::failedConnection(),
@@ -79,27 +88,266 @@ it('скрывает ошибку транспорта', function () {
         baseUrl: 'https://api.telegga.net/api/v1',
         apiKey: 'tg_live_test',
         timeout: 15,
+        connectTimeout: 5,
     );
 
     try {
         $client->get(uri: 'bots');
     } catch (TeleggaApiException $exception) {
         expect($exception->status)->toBe(0)
-            ->and($exception->apiCode)->toBe('transport_error');
+            ->and($exception->apiCode)->toBe('transport_error')
+            ->and($exception->attempts)->toBe(3);
+
+        Http::assertSentCount(3);
+        Sleep::assertSequence([
+            Sleep::for(200)->milliseconds(),
+            Sleep::for(400)->milliseconds(),
+        ]);
 
         return;
     }
 
-    test()->fail('Ожидалось исключение TeleggaApiException.');
+    $this->fail('Expected a TeleggaApiException.');
 });
 
-it('отклоняет запрос без api ключа', function () {
+it('retries a safe GET request after temporary errors', function (): void {
+    Sleep::fake();
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/bots' => Http::sequence()
+            ->push(['error' => ['code' => 'internal', 'message' => 'Temporary error.']], 503)
+            ->push(['error' => ['code' => 'internal', 'message' => 'Temporary error.']], 503)
+            ->push(['data' => [['bot_id' => 'bot-1']]], 200),
+    ]);
+
+    $client = new TeleggaClient(
+        http: app(Factory::class),
+        baseUrl: 'https://api.telegga.net/api/v1',
+        apiKey: 'tg_live_test',
+        timeout: 15,
+        connectTimeout: 5,
+    );
+
+    $response = $client->get(uri: 'bots');
+
+    expect($response->object()->data[0]->bot_id)->toBe('bot-1');
+
+    Http::assertSentCount(3);
+    Sleep::assertSequence([
+        Sleep::for(200)->milliseconds(),
+        Sleep::for(400)->milliseconds(),
+    ]);
+});
+
+it('honors retry after when retrying an idempotent POST request', function (): void {
+    Sleep::fake();
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/users' => Http::sequence()
+            ->push(
+                body: ['error' => ['code' => 'rate_limited', 'message' => 'Too many requests.']],
+                status: 429,
+                headers: ['Retry-After' => '2'],
+            )
+            ->push(['user_id' => 'user-1'], 201),
+    ]);
+
+    $client = new TeleggaClient(
+        http: app(Factory::class),
+        baseUrl: 'https://api.telegga.net/api/v1',
+        apiKey: 'tg_live_test',
+        timeout: 15,
+        connectTimeout: 5,
+    );
+
+    $response = $client->post(
+        uri: 'users',
+        data: ['external_id' => 'external-1'],
+        idempotent: true,
+    );
+
+    expect((string) $response->object()->user_id)->toBe('user-1');
+
+    Http::assertSentCount(2);
+    Sleep::assertSequence([
+        Sleep::for(2)->seconds(),
+    ]);
+});
+
+it('does not retry when retry after exceeds the synchronous wait limit', function (): void {
+    Sleep::fake();
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/users' => Http::sequence()
+            ->push(
+                body: ['error' => ['code' => 'rate_limited', 'message' => 'Too many requests.']],
+                status: 429,
+                headers: ['Retry-After' => '6'],
+            )
+            ->push(['user_id' => 'user-1'], 201),
+    ]);
+
+    $client = new TeleggaClient(
+        http: app(Factory::class),
+        baseUrl: 'https://api.telegga.net/api/v1',
+        apiKey: 'tg_live_test',
+        timeout: 15,
+        connectTimeout: 5,
+    );
+
+    try {
+        $client->post(
+            uri: 'users',
+            data: ['external_id' => 'external-1'],
+            idempotent: true,
+        );
+    } catch (TeleggaApiException $exception) {
+        expect($exception->status)->toBe(429)
+            ->and($exception->apiCode)->toBe('rate_limited')
+            ->and($exception->retryAfter)->toBe(6)
+            ->and($exception->attempts)->toBe(1);
+
+        Http::assertSentCount(1);
+        Sleep::assertNeverSlept();
+
+        return;
+    }
+
+    $this->fail('Expected a TeleggaApiException.');
+});
+
+it('does not retry a non-idempotent POST request', function (): void {
+    Sleep::fake();
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/messages' => Http::sequence()
+            ->push(['error' => ['code' => 'internal', 'message' => 'Temporary error.']], 503)
+            ->push(['message_id' => 'message-1'], 202),
+    ]);
+
+    $client = new TeleggaClient(
+        http: app(Factory::class),
+        baseUrl: 'https://api.telegga.net/api/v1',
+        apiKey: 'tg_live_test',
+        timeout: 15,
+        connectTimeout: 5,
+    );
+
+    try {
+        $client->post(uri: 'messages', data: ['type' => 'text']);
+    } catch (TeleggaApiException $exception) {
+        expect($exception->status)->toBe(503)
+            ->and($exception->attempts)->toBe(1);
+
+        Http::assertSentCount(1);
+        Sleep::assertNeverSlept();
+
+        return;
+    }
+
+    $this->fail('Expected a TeleggaApiException.');
+});
+
+it('returns the final error after exhausting attempts', function (): void {
+    Sleep::fake();
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/bots' => Http::sequence()
+            ->push(['error' => ['code' => 'internal', 'message' => 'First error.']], 503)
+            ->push(['error' => ['code' => 'internal', 'message' => 'Second error.']], 503)
+            ->push(['error' => ['code' => 'internal', 'message' => 'Last error.']], 503),
+    ]);
+
+    $client = new TeleggaClient(
+        http: app(Factory::class),
+        baseUrl: 'https://api.telegga.net/api/v1',
+        apiKey: 'tg_live_test',
+        timeout: 15,
+        connectTimeout: 5,
+    );
+
+    try {
+        $client->get(uri: 'bots');
+    } catch (TeleggaApiException $exception) {
+        expect($exception->getMessage())->toBe('Last error.')
+            ->and($exception->status)->toBe(503)
+            ->and($exception->attempts)->toBe(3);
+
+        Http::assertSentCount(3);
+
+        return;
+    }
+
+    $this->fail('Expected a TeleggaApiException.');
+});
+
+it('does not retry a permanent idempotent request error', function (): void {
+    Sleep::fake();
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/groups/missing' => Http::response([
+            'error' => ['code' => 'not_found', 'message' => 'Group was not found.'],
+        ], 404),
+    ]);
+
+    $client = new TeleggaClient(
+        http: app(Factory::class),
+        baseUrl: 'https://api.telegga.net/api/v1',
+        apiKey: 'tg_live_test',
+        timeout: 15,
+        connectTimeout: 5,
+    );
+
+    try {
+        $client->delete(uri: 'groups/missing', idempotent: true);
+    } catch (TeleggaApiException $exception) {
+        expect($exception->status)->toBe(404)
+            ->and($exception->attempts)->toBe(1)
+            ->and($exception->wasRetried())->toBeFalse();
+
+        Http::assertSentCount(1);
+        Sleep::assertNeverSlept();
+
+        return;
+    }
+
+    $this->fail('Expected a TeleggaApiException.');
+});
+
+it('rejects a request without an API key', function () {
     $client = new TeleggaClient(
         http: app(Factory::class),
         baseUrl: 'https://api.telegga.net/api/v1',
         apiKey: '',
         timeout: 15,
+        connectTimeout: 5,
     );
 
     $client->get(uri: 'bots');
 })->throws(TeleggaApiException::class, 'Telegga API key is not configured.');
+
+it('rejects an insecure API base URL', function (): void {
+    Http::preventStrayRequests();
+
+    $client = new TeleggaClient(
+        http: app(Factory::class),
+        baseUrl: 'http://api.telegga.net/api/v1',
+        apiKey: 'tg_live_test',
+        timeout: 15,
+        connectTimeout: 5,
+    );
+
+    try {
+        $client->get(uri: 'bots');
+    } catch (TeleggaApiException $exception) {
+        expect($exception->status)->toBe(0)
+            ->and($exception->apiCode)->toBe('invalid_base_url')
+            ->and($exception->getMessage())->toBe('Telegga API base URL must use HTTPS.');
+
+        Http::assertNothingSent();
+
+        return;
+    }
+
+    $this->fail('Expected a TeleggaApiException.');
+});

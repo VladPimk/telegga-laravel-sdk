@@ -3,6 +3,11 @@
     "description": "Laravel SDK for the Telegga API, developed for internal projects at Par Soft.",
     "type": "library",
     "license": "MIT",
+    "homepage": "https://github.com/VladPimk/telegga-laravel-sdk",
+    "support": {
+        "issues": "https://github.com/VladPimk/telegga-laravel-sdk/issues",
+        "source": "https://github.com/VladPimk/telegga-laravel-sdk"
+    },
     "authors": [
         {
             "name": "Vlad Pimkin"
@@ -16,13 +21,18 @@
     ],
     "require": {
         "php": "^8.3",
+        "illuminate/cache": "^12.0 || ^13.0",
         "illuminate/database": "^12.0 || ^13.0",
         "illuminate/http": "^12.0 || ^13.0",
         "illuminate/routing": "^12.0 || ^13.0",
-        "illuminate/support": "^12.0 || ^13.0"
+        "illuminate/support": "^12.0 || ^13.0",
+        "illuminate/validation": "^12.0 || ^13.0",
+        "symfony/http-foundation": "^7.2 || ^8.0"
     },
     "require-dev": {
+        "larastan/larastan": "^3.10",
         "laravel/pint": "^1.24",
+        "mrpunyapal/peststan": "^0.2.12",
         "orchestra/testbench": "^10.0 || ^11.0",
         "pestphp/pest": "^3.8"
     },
@@ -54,7 +64,14 @@
         "sort-packages": true
     },
     "scripts": {
+        "analyse": "phpstan analyse --memory-limit=1G",
+        "check": [
+            "@format:check",
+            "@analyse",
+            "@test"
+        ],
         "format": "pint",
+        "format:check": "pint --test",
         "test": "pest --compact"
     },
     "minimum-stability": "stable",

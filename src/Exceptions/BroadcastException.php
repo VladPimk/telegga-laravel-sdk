@@ -9,7 +9,7 @@ use Throwable;
 final class BroadcastException extends TeleggaException
 {
     /**
-     * Создать исключение рассылки.
+     * Create a broadcast exception.
      */
     public function __construct(
         string $message,

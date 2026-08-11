@@ -1,0 +1,12 @@
+{
+    "data": [
+        {
+            "user_id": "telegga-user-1",
+            "external_id": "connection-uuid",
+            "email": "ivan@example.com",
+            "status": "active",
+            "link_status": "active"
+        }
+    ],
+    "next_cursor": "next-cursor"
+}

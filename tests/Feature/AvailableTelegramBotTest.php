@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -13,30 +11,10 @@ use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Models\TelegramConnectedUser;
 
-beforeEach(function (): void {
-    Schema::enableForeignKeyConstraints();
-
-    Schema::create('users', function (Blueprint $table): void {
-        $table->id();
-        $table->string('name');
-        $table->timestamps();
-    });
-
-    $botMigration = require __DIR__.'/../../database/migrations/2026_07_31_000001_create_available_telegram_bots_table.php';
-    $botMigration->up();
-
-    $connectionMigration = require __DIR__.'/../../database/migrations/2026_07_31_000002_create_telegram_connected_users_table.php';
-    $connectionMigration->up();
-});
-
-afterEach(function (): void {
-    Schema::dropIfExists('telegram_connected_users');
-    Schema::dropIfExists('available_telegram_bots');
-    Schema::dropIfExists('users');
-});
-
-it('создаёт таблицу доступных ботов и генерирует локальный uuid', function (): void {
+it('creates the available bots table and generates a local UUID', function (): void {
+    $providedUuid = Str::uuid()->toString();
     $bot = AvailableTelegramBot::query()->create([
+        'uuid' => $providedUuid,
         'bot_name' => 'mybot',
     ]);
 
@@ -46,10 +24,11 @@ it('создаёт таблицу доступных ботов и генери�
         'bot_name',
         'created_at',
         'updated_at',
+        'deleted_at',
     ]))->toBeTrue()
-        ->and($bot->getKey())
-        ->toBeInt()
-        ->and(Str::isUuid($bot->uuid))
+        ->and($bot->uuid)
+        ->not->toBe($providedUuid)
+        ->and(Str::isUuid($bot->uuid, 7))
         ->toBeTrue()
         ->and($bot->bot_name)
         ->toBe('mybot')
@@ -57,9 +36,20 @@ it('создаёт таблицу доступных ботов и генери�
         ->not->toBeNull()
         ->and($bot->updated_at)
         ->not->toBeNull();
+
+    $indexes = collect(Schema::getIndexes('available_telegram_bots'));
+
+    expect($indexes->contains(
+        fn (array $index): bool => $index['columns'] === ['uuid']
+            && $index['unique'] === false,
+    ))->toBeTrue()
+        ->and($indexes->contains(
+            fn (array $index): bool => $index['columns'] === ['bot_name', 'deleted_at']
+                && $index['unique'] === true,
+        ))->toBeTrue();
 });
 
-it('добавляет локального бота после проверки списка api', function (): void {
+it('adds a local bot after validating the API list', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
@@ -75,9 +65,7 @@ it('добавляет локального бота после проверки
 
     $bot = app(TeleggaInterface::class)->addTelegramBot(botName: 'mybot');
 
-    expect($bot)
-        ->toBeInstanceOf(AvailableTelegramBot::class)
-        ->and($bot->bot_name)
+    expect($bot->bot_name)
         ->toBe('mybot')
         ->and(Str::isUuid($bot->uuid))
         ->toBeTrue()
@@ -87,7 +75,43 @@ it('добавляет локального бота после проверки
     Http::assertSentCount(1);
 });
 
-it('повторно возвращает существующего локального бота', function (): void {
+it('refreshes a cached API list before adding a local bot', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/bots' => Http::sequence()
+            ->push([
+                'data' => [
+                    [
+                        'bot_id' => 'old-bot-id',
+                        'username' => 'old_bot',
+                        'status' => 'active',
+                    ],
+                ],
+            ])
+            ->push([
+                'data' => [
+                    [
+                        'bot_id' => 'new-bot-id',
+                        'username' => 'mybot',
+                        'status' => 'active',
+                    ],
+                ],
+            ]),
+    ]);
+
+    app(TeleggaInterface::class)->getBots();
+
+    $bot = app(TeleggaInterface::class)->addTelegramBot(botName: 'mybot');
+
+    expect($bot->bot_name)
+        ->toBe('mybot')
+        ->and(app(TeleggaInterface::class)->getBots()->first()->bot_id)
+        ->toBe('new-bot-id');
+
+    Http::assertSentCount(2);
+});
+
+it('returns an existing local bot on repeated addition', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
@@ -110,7 +134,7 @@ it('повторно возвращает существующего локал�
         ->toBe(1);
 });
 
-it('требует точного соответствия username из api локальному имени', function (string $apiUsername): void {
+it('rejects an API username with an extra character', function (string $apiUsername): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
@@ -135,13 +159,34 @@ it('требует точного соответствия username из api л�
         return;
     }
 
-    test()->fail('Ожидалось исключение BotException.');
+    $this->fail('Expected a BotException.');
 })->with([
-    'username с лишним символом @' => '@mybot',
-    'username в другом регистре' => 'MyBot',
+    'username with an extra at sign' => '@mybot',
 ]);
 
-it('отклоняет некорректное имя бота', function (string $botName): void {
+it('matches and stores a bot name in lowercase', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/bots' => Http::response([
+            'data' => [
+                [
+                    'bot_id' => 'remote-bot-id',
+                    'username' => 'MyBot',
+                    'status' => 'active',
+                ],
+            ],
+        ]),
+    ]);
+
+    $bot = app(TeleggaInterface::class)->addTelegramBot(botName: 'MYBOT');
+
+    expect($bot->bot_name)
+        ->toBe('mybot')
+        ->and($bot->refresh()->bot_name)
+        ->toBe('mybot');
+});
+
+it('rejects an invalid bot name', function (string $botName): void {
     Http::preventStrayRequests();
 
     try {
@@ -155,15 +200,15 @@ it('отклоняет некорректное имя бота', function (stri
         return;
     }
 
-    test()->fail('Ожидалось исключение BotException.');
+    $this->fail('Expected a BotException.');
 })->with([
-    'пустая строка' => '',
-    'с символом @' => '@mybot',
-    'только символ @' => '@',
-    'с недопустимым символом' => 'my-bot',
+    'empty string' => '',
+    'with an at sign' => '@mybot',
+    'only an at sign' => '@',
+    'with a forbidden character' => 'my-bot',
 ]);
 
-it('не создаёт локальную запись для отсутствующего в api бота', function (): void {
+it('does not create a local record for a bot missing from the API', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
@@ -182,10 +227,10 @@ it('не создаёт локальную запись для отсутств�
         return;
     }
 
-    test()->fail('Ожидалось исключение BotException.');
+    $this->fail('Expected a BotException.');
 });
 
-it('скрывает некорректный ответ api при добавлении бота', function (): void {
+it('wraps an invalid API response when adding a bot', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response('not-json'),
@@ -202,10 +247,10 @@ it('скрывает некорректный ответ api при добавл
         return;
     }
 
-    test()->fail('Ожидалось исключение BotException.');
+    $this->fail('Expected a BotException.');
 });
 
-it('получает локально доступных ботов без запроса api', function (): void {
+it('gets locally available bots without an API request', function (): void {
     $bot = AvailableTelegramBot::query()->create([
         'bot_name' => 'mybot',
     ]);
@@ -214,8 +259,6 @@ it('получает локально доступных ботов без за�
     $bots = app(TeleggaInterface::class)->getAvailableBots();
 
     expect($bots)
-        ->toBeInstanceOf(Collection::class)
-        ->and($bots)
         ->toHaveCount(1)
         ->and($bots->first()->is($bot))
         ->toBeTrue();
@@ -223,7 +266,7 @@ it('получает локально доступных ботов без за�
     Http::assertNothingSent();
 });
 
-it('связывает доступного бота с подключениями', function (): void {
+it('relates an available bot to connections', function (): void {
     $bot = AvailableTelegramBot::query()->create([
         'bot_name' => 'mybot',
     ]);
@@ -238,7 +281,7 @@ it('связывает доступного бота с подключениям
         ->toBeTrue();
 });
 
-it('удаляет неиспользуемого локального бота', function (): void {
+it('deletes an unused local bot', function (): void {
     $bot = AvailableTelegramBot::query()->create([
         'bot_name' => 'mybot',
     ]);
@@ -246,10 +289,81 @@ it('удаляет неиспользуемого локального бота'
     app(TeleggaInterface::class)->deleteTelegramBot(uuid: $bot->uuid);
 
     expect(AvailableTelegramBot::query()->doesntExist())
+        ->toBeTrue()
+        ->and(AvailableTelegramBot::withTrashed()->find($bot->id)?->trashed())
         ->toBeTrue();
 });
 
-it('отклоняет удаление неизвестного локального бота', function (): void {
+it('invalidates the cached API list when deleting a local bot', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/bots' => Http::sequence()
+            ->push([
+                'data' => [
+                    [
+                        'bot_id' => 'first-bot-id',
+                        'username' => 'mybot',
+                        'status' => 'active',
+                    ],
+                ],
+            ])
+            ->push([
+                'data' => [
+                    [
+                        'bot_id' => 'second-bot-id',
+                        'username' => 'mybot',
+                        'status' => 'active',
+                    ],
+                ],
+            ]),
+    ]);
+    $bot = AvailableTelegramBot::query()->create([
+        'bot_name' => 'mybot',
+    ]);
+
+    app(TeleggaInterface::class)->getBots();
+    app(TeleggaInterface::class)->deleteTelegramBot(uuid: $bot->uuid);
+
+    $bots = app(TeleggaInterface::class)->getBots();
+
+    expect($bots->first()->bot_id)
+        ->toBe('second-bot-id');
+
+    Http::assertSentCount(2);
+});
+
+it('creates a new local bot after soft-deleting a bot with the same name', function (): void {
+    $bot = AvailableTelegramBot::query()->create([
+        'bot_name' => 'mybot',
+    ]);
+    $bot->delete();
+
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/bots' => Http::response([
+            'data' => [
+                [
+                    'bot_id' => 'remote-bot-id',
+                    'username' => 'mybot',
+                    'status' => 'active',
+                ],
+            ],
+        ]),
+    ]);
+
+    $newBot = app(TeleggaInterface::class)->addTelegramBot(botName: 'mybot');
+
+    expect($newBot->is($bot))
+        ->toBeFalse()
+        ->and($newBot->uuid)
+        ->not->toBe($bot->uuid)
+        ->and(AvailableTelegramBot::query()->count())
+        ->toBe(1)
+        ->and(AvailableTelegramBot::withTrashed()->count())
+        ->toBe(2);
+});
+
+it('rejects deletion of an unknown local bot', function (): void {
     $botUuid = Str::uuid()->toString();
 
     try {
@@ -263,10 +377,10 @@ it('отклоняет удаление неизвестного локальн�
         return;
     }
 
-    test()->fail('Ожидалось исключение BotException.');
+    $this->fail('Expected a BotException.');
 });
 
-it('не удаляет бота используемого подключением', function (): void {
+it('does not delete a bot used by a connection', function (): void {
     $bot = AvailableTelegramBot::query()->create([
         'bot_name' => 'mybot',
     ]);
@@ -286,5 +400,5 @@ it('не удаляет бота используемого подключени
         return;
     }
 
-    test()->fail('Ожидалось исключение BotException.');
+    $this->fail('Expected a BotException.');
 });

@@ -9,20 +9,22 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Создать таблицу доступных Telegram-ботов.
+     * Create the available Telegram bots table.
      */
     public function up(): void
     {
         Schema::create('available_telegram_bots', function (Blueprint $table): void {
             $table->id();
-            $table->uuid('uuid')->unique();
-            $table->string('bot_name')->unique();
+            $table->uuid('uuid')->index();
+            $table->string('bot_name')->index();
             $table->timestamps();
+            $table->softDeletes();
+            $table->unique(['bot_name', 'deleted_at']);
         });
     }
 
     /**
-     * Удалить таблицу доступных Telegram-ботов.
+     * Drop the available Telegram bots table.
      */
     public function down(): void
     {

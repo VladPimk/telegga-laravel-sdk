@@ -4,21 +4,26 @@ declare(strict_types=1);
 
 namespace Telegga\Laravel\Services;
 
-use Illuminate\Support\Collection;
-use Telegga\Laravel\Exceptions\TeleggaApiException;
+use InvalidArgumentException;
+use Telegga\Laravel\Dto\ConnectionData;
+use Telegga\Laravel\Dto\UserData;
+use Telegga\Laravel\Dto\UserGroupMembershipData;
+use Telegga\Laravel\Dto\UserPageData;
 use Telegga\Laravel\Http\TeleggaClient;
+use Telegga\Laravel\Mappers\UserResponseMapper;
 
 final class UserService
 {
     /**
-     * Создать сервис пользователей.
+     * Create the user service.
      */
     public function __construct(
         private readonly TeleggaClient $client,
+        private readonly UserResponseMapper $mapper,
     ) {}
 
     /**
-     * Создать или обновить пользователя Telegga.
+     * Create or update a Telegga user.
      *
      * @param  array<string, mixed>  $meta
      */
@@ -29,7 +34,7 @@ final class UserService
         ?string $email = null,
         array $meta = [],
         ?string $groupId = null,
-    ): object {
+    ): ConnectionData {
         $data = [
             'external_id' => $externalId,
             'bot_id' => $botId,
@@ -48,20 +53,21 @@ final class UserService
             $data['group_id'] = $groupId;
         }
 
-        return $this->ensureObject(
+        return $this->mapper->fromCreate(
             response: $this->client->post(
                 uri: 'users',
                 data: $data,
+                idempotent: true,
             )->object(),
         );
     }
 
     /**
-     * Получить пользователя Telegga по внешнему идентификатору.
+     * Get a Telegga user by external identifier.
      */
-    public function findByExternalId(string $externalId): object
+    public function findByExternalId(string $externalId): UserData
     {
-        return $this->ensureObject(
+        return $this->mapper->fromExternalIdLookup(
             response: $this->client->get(
                 uri: 'users',
                 query: ['external_id' => $externalId],
@@ -70,13 +76,21 @@ final class UserService
     }
 
     /**
-     * Получить список пользователей Telegga.
+     * Get a list of Telegga users.
+     *
+     * An external_id lookup returns a single object and is performed through findByExternalId().
      *
      * @param  array<string, string>  $query
      */
-    public function getAll(array $query = []): object
+    public function getAll(array $query = []): UserPageData
     {
-        return $this->ensurePage(
+        if (array_key_exists('external_id', $query)) {
+            throw new InvalidArgumentException(
+                message: 'Use findByExternalId() for exact external_id lookup: the API returns a single object.',
+            );
+        }
+
+        return $this->mapper->fromList(
             response: $this->client->get(
                 uri: 'users',
                 query: $query,
@@ -85,11 +99,11 @@ final class UserService
     }
 
     /**
-     * Получить пользователя Telegga по идентификатору.
+     * Get a Telegga user by identifier.
      */
-    public function get(string $userId): object
+    public function get(string $userId): UserData
     {
-        return $this->ensureObject(
+        return $this->mapper->fromGet(
             response: $this->client->get(
                 uri: 'users/'.rawurlencode($userId),
             )->object(),
@@ -97,36 +111,38 @@ final class UserService
     }
 
     /**
-     * Обновить пользователя Telegga.
+     * Update a Telegga user.
      *
      * @param  array<string, mixed>  $data
      */
-    public function update(string $userId, array $data): object
+    public function update(string $userId, array $data): UserData
     {
-        return $this->ensureObject(
+        return $this->mapper->fromUpdate(
             response: $this->client->patch(
                 uri: 'users/'.rawurlencode($userId),
                 data: $data,
+                idempotent: true,
             )->object(),
         );
     }
 
     /**
-     * Удалить пользователя Telegga.
+     * Delete a Telegga user.
      */
     public function delete(string $userId): void
     {
         $this->client->delete(
             uri: 'users/'.rawurlencode($userId),
+            idempotent: true,
         );
     }
 
     /**
-     * Выпустить новый код подключения пользователя.
+     * Generate a new user connection code.
      */
-    public function regenerateCode(string $userId, string $botId): object
+    public function regenerateCode(string $userId, string $botId): ConnectionData
     {
-        return $this->ensureObject(
+        return $this->mapper->fromRegenerateCode(
             response: $this->client->post(
                 uri: 'users/'.rawurlencode($userId).'/regenerate-code',
                 data: ['bot_id' => $botId],
@@ -135,99 +151,38 @@ final class UserService
     }
 
     /**
-     * Отвязать пользователя от бота.
+     * Unlink a user from the bot.
      */
     public function unlink(string $userId, string $botId): void
     {
         $this->client->delete(
             uri: 'users/'.rawurlencode($userId).'/link',
             query: ['bot_id' => $botId],
+            idempotent: true,
         );
     }
 
     /**
-     * Добавить пользователя Telegga в группу.
+     * Add a Telegga user to a group.
      */
-    public function addToGroup(string $userId, string $groupId): object
+    public function addToGroup(string $userId, string $groupId): UserGroupMembershipData
     {
-        return $this->ensureObject(
+        return $this->mapper->fromAddToGroup(
             response: $this->client->post(
                 uri: 'users/'.rawurlencode($userId).'/groups',
                 data: ['group_id' => $groupId],
+                idempotent: true,
             )->object(),
         );
     }
 
     /**
-     * Удалить пользователя Telegga из группы.
+     * Remove a Telegga user from a group.
      */
     public function removeFromGroup(string $userId, string $groupId): void
     {
         $this->client->delete(
             uri: 'users/'.rawurlencode($userId).'/groups/'.rawurlencode($groupId),
         );
-    }
-
-    /**
-     * Проверить объект ответа пользователя.
-     */
-    private function ensureObject(mixed $response): object
-    {
-        if (! is_object($response)) {
-            throw new TeleggaApiException(
-                message: 'Telegga returned an invalid user response.',
-                status: 0,
-                apiCode: 'invalid_response',
-            );
-        }
-
-        return $response;
-    }
-
-    /**
-     * Проверить страницу пользователей.
-     *
-     * @return object{
-     *     data: Collection<int, object>,
-     *     next_cursor: string|null
-     * }
-     */
-    private function ensurePage(mixed $response): object
-    {
-        $response = $this->ensureObject(response: $response);
-        $data = $response->data ?? null;
-
-        if (! is_array($data)) {
-            throw new TeleggaApiException(
-                message: 'Telegga returned an invalid user list response.',
-                status: 0,
-                apiCode: 'invalid_response',
-            );
-        }
-
-        foreach ($data as $user) {
-            if (! is_object($user)) {
-                throw new TeleggaApiException(
-                    message: 'Telegga returned an invalid user list response.',
-                    status: 0,
-                    apiCode: 'invalid_response',
-                );
-            }
-        }
-
-        $nextCursor = $response->next_cursor ?? null;
-
-        if ($nextCursor !== null && ! is_string($nextCursor)) {
-            throw new TeleggaApiException(
-                message: 'Telegga returned an invalid user list response.',
-                status: 0,
-                apiCode: 'invalid_response',
-            );
-        }
-
-        $response->data = collect($data)->values();
-        $response->next_cursor = $nextCursor;
-
-        return $response;
     }
 }

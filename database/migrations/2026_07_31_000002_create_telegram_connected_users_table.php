@@ -9,28 +9,40 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Создать таблицу подключений Telegga.
+     * Create the Telegga connections table.
      */
     public function up(): void
     {
-        Schema::create('telegram_connected_users', function (Blueprint $table): void {
+        $usersTable = config(key: 'telegga.users_table');
+
+        if (! is_string($usersTable) || trim($usersTable) === '') {
+            throw new LogicException('Telegga users_table must be a non-empty table name.');
+        }
+
+        Schema::create('telegram_connected_users', function (Blueprint $table) use ($usersTable): void {
             $table->id();
-            $table->uuid('uuid')->unique();
+            $table->uuid('uuid')->index();
             $table->string('name');
             $table->string('email')->nullable();
-            $table->foreignId('user_id')->nullable()->index()->constrained()->nullOnDelete();
-            $table->foreignId('available_telegram_bot_id')
-                ->index()
-                ->constrained('available_telegram_bots')
+            $table->unsignedBigInteger('user_id')->nullable()->index();
+            $table->foreign('user_id', 'fk_telegram_connected_users_user_id')
+                ->references('id')
+                ->on($usersTable)
+                ->nullOnDelete();
+            $table->unsignedBigInteger('available_telegram_bot_id')->index();
+            $table->foreign('available_telegram_bot_id', 'fk_telegram_connected_users_available_telegram_bot_id')
+                ->references('id')
+                ->on('available_telegram_bots')
                 ->restrictOnDelete();
             $table->boolean('is_connected')->default(false);
             $table->boolean('is_created')->default(false);
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 
     /**
-     * Удалить таблицу подключений Telegga.
+     * Drop the Telegga connections table.
      */
     public function down(): void
     {

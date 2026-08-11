@@ -2,10 +2,8 @@
 
 declare(strict_types=1);
 
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Schema;
 use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\MessageException;
@@ -14,30 +12,10 @@ use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Models\TelegramConnectedUser;
 
 beforeEach(function (): void {
-    Schema::enableForeignKeyConstraints();
-
-    Schema::create('users', function (Blueprint $table): void {
-        $table->id();
-        $table->string('name');
-        $table->timestamps();
-    });
-
-    $botMigration = require __DIR__.'/../../database/migrations/2026_07_31_000001_create_available_telegram_bots_table.php';
-    $botMigration->up();
-
-    $connectionMigration = require __DIR__.'/../../database/migrations/2026_07_31_000002_create_telegram_connected_users_table.php';
-    $connectionMigration->up();
-
     $this->telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
 });
 
-afterEach(function (): void {
-    Schema::dropIfExists('telegram_connected_users');
-    Schema::dropIfExists('available_telegram_bots');
-    Schema::dropIfExists('users');
-});
-
-it('передаёт тип и данные сообщения в единый маршрут api', function (
+it('passes message type and data to the unified API endpoint', function (
     string $type,
     array $data,
 ): void {
@@ -49,7 +27,7 @@ it('передаёт тип и данные сообщения в единый �
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'links' => [
@@ -73,14 +51,12 @@ it('передаёт тип и данные сообщения в единый �
         data: $data,
     );
 
-    expect($result)
-        ->toBeInstanceOf(stdClass::class)
-        ->and($result->message_id)
+    expect($result->message_id)
         ->toBe('message-1')
         ->and($result->status)
-        ->toBe('queued')
-        ->and($result->new_api_field)
-        ->toBe('new-value');
+        ->toBe('queued');
+
+    $this->assertSame('new-value', $result->raw()->new_api_field);
 
     Http::assertSent(function (Request $request) use ($connection, $data, $type): bool {
         return $request->method() === 'POST'
@@ -91,6 +67,11 @@ it('передаёт тип и данные сообщения в единый �
                 'bot_id' => 'bot-active',
                 'type' => $type,
             ];
+    });
+
+    Http::assertSent(function (Request $request) use ($connection): bool {
+        return $request->method() === 'GET'
+            && $request->url() === "https://api.telegga.net/api/v1/users?external_id={$connection->uuid}";
     });
 
     Http::assertSentCount(2);
@@ -160,7 +141,7 @@ it('передаёт тип и данные сообщения в единый �
     ],
 ]);
 
-it('не позволяет переопределить служебные поля сообщения', function (): void {
+it('does not allow reserved message fields to be overridden', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -169,7 +150,7 @@ it('не позволяет переопределить служебные по
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'links' => [
@@ -193,6 +174,7 @@ it('не позволяет переопределить служебные по
             'external_id' => 'foreign-external-id',
             'user_id' => 'foreign-user-id',
             'bot_id' => 'foreign-bot',
+            'group_id' => 'foreign-group',
             'type' => 'contact',
             'media_id' => 'media-photo',
         ],
@@ -201,7 +183,7 @@ it('не позволяет переопределить служебные по
     Http::assertSent(function (Request $request) use ($connection): bool {
         return $request->method() === 'POST'
             && $request->url() === 'https://api.telegga.net/api/v1/messages'
-            && $request->data() === [
+            && $request->data() == [
                 'external_id' => $connection->uuid,
                 'bot_id' => 'bot-active',
                 'type' => 'photo',
@@ -210,7 +192,7 @@ it('не позволяет переопределить служебные по
     });
 });
 
-it('не отправляет сообщение с пустым uuid подключения', function (): void {
+it('does not send a message with an empty connection UUID', function (): void {
     Http::preventStrayRequests();
 
     try {
@@ -230,10 +212,10 @@ it('не отправляет сообщение с пустым uuid подкл
         return;
     }
 
-    test()->fail('Ожидалось исключение MessageException.');
+    $this->fail('Expected a MessageException.');
 });
 
-it('не отправляет сообщение с пустым типом', function (): void {
+it('does not send a message with an empty type', function (): void {
     Http::preventStrayRequests();
 
     try {
@@ -252,10 +234,10 @@ it('не отправляет сообщение с пустым типом', fu
         return;
     }
 
-    test()->fail('Ожидалось исключение MessageException.');
+    $this->fail('Expected a MessageException.');
 });
 
-it('не отправляет сообщение без активной привязки', function (): void {
+it('does not send a message without an active link', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -264,7 +246,7 @@ it('не отправляет сообщение без активной при�
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'links' => [
@@ -292,10 +274,10 @@ it('не отправляет сообщение без активной при�
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
-it('скрывает ошибку api при отправке сообщения', function (): void {
+it('wraps an API error when sending a message', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -304,7 +286,7 @@ it('скрывает ошибку api при отправке сообщения
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'links' => [
@@ -334,18 +316,18 @@ it('скрывает ошибку api при отправке сообщения
             ->toBe($connection->uuid)
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('user_disabled')
-            ->and($exception->getPrevious()?->status)
+            ->and($this->previousApiException(exception: $exception)->status)
             ->toBe(409);
 
         return;
     }
 
-    test()->fail('Ожидалось исключение MessageException.');
+    $this->fail('Expected a MessageException.');
 });
 
-it('отклоняет успешный ответ сообщения с некорректным json', function (): void {
+it('rejects a successful message response with invalid JSON', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -354,7 +336,7 @@ it('отклоняет успешный ответ сообщения с нек�
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'links' => [
@@ -382,11 +364,11 @@ it('отклоняет успешный ответ сообщения с нек�
             ->toBe($connection->uuid)
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('invalid_response');
 
         return;
     }
 
-    test()->fail('Ожидалось исключение MessageException.');
+    $this->fail('Expected a MessageException.');
 });

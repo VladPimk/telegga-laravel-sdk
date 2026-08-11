@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Log;
 use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
@@ -13,30 +13,10 @@ use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Models\TelegramConnectedUser;
 
 beforeEach(function (): void {
-    Schema::enableForeignKeyConstraints();
-
-    Schema::create('users', function (Blueprint $table): void {
-        $table->id();
-        $table->string('name');
-        $table->timestamps();
-    });
-
-    $botMigration = require __DIR__.'/../../database/migrations/2026_07_31_000001_create_available_telegram_bots_table.php';
-    $botMigration->up();
-
-    $connectionMigration = require __DIR__.'/../../database/migrations/2026_07_31_000002_create_telegram_connected_users_table.php';
-    $connectionMigration->up();
-
     $this->telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
 });
 
-afterEach(function (): void {
-    Schema::dropIfExists('telegram_connected_users');
-    Schema::dropIfExists('available_telegram_bots');
-    Schema::dropIfExists('users');
-});
-
-it('получает пользователя Telegga по uuid локального подключения', function (): void {
+it('gets a Telegga user by local connection UUID', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -45,7 +25,7 @@ it('получает пользователя Telegga по uuid локально
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users/telegga-user-1' => Http::response([
+        "api.telegga.net/api/v1/users/{$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'display_name' => 'Иван',
@@ -53,7 +33,7 @@ it('получает пользователя Telegga по uuid локально
             'groups' => [],
             'new_api_field' => 'new-value',
         ]),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
         ]),
@@ -63,22 +43,20 @@ it('получает пользователя Telegga по uuid локально
         uuid: $connection->uuid,
     );
 
-    expect($user)
-        ->toBeInstanceOf(stdClass::class)
-        ->and($user->user_id)
-        ->toBe('telegga-user-1')
-        ->and($user->new_api_field)
-        ->toBe('new-value');
+    expect($user->user_id)
+        ->toBe('telegga-user-1');
 
-    Http::assertSent(function (Request $request): bool {
+    $this->assertSame('new-value', $user->raw()->new_api_field);
+
+    Http::assertSent(function (Request $request) use ($connection): bool {
         return $request->method() === 'GET'
-            && $request->url() === 'https://api.telegga.net/api/v1/users/telegga-user-1';
+            && $request->url() === "https://api.telegga.net/api/v1/users/{$connection->uuid}";
     });
 
-    Http::assertSentCount(2);
+    Http::assertSentCount(1);
 });
 
-it('обновляет пользователя Telegga и локальные имя и email', function (): void {
+it('updates a Telegga user and local name and email', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'email' => 'ivan@example.com',
@@ -89,7 +67,7 @@ it('обновляет пользователя Telegga и локальные и
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users/telegga-user-1' => Http::response([
+        "api.telegga.net/api/v1/users/{$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'display_name' => 'Иван Петров',
@@ -97,7 +75,7 @@ it('обновляет пользователя Telegga и локальные и
             'status' => 'disabled',
             'new_api_field' => 'new-value',
         ]),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
         ]),
@@ -114,18 +92,18 @@ it('обновляет пользователя Telegga и локальные и
 
     $connection->refresh();
 
-    expect($user->new_api_field)
-        ->toBe('new-value')
-        ->and($connection->name)
+    $this->assertSame('new-value', $user->raw()->new_api_field);
+
+    expect($connection->name)
         ->toBe('Иван Петров')
         ->and($connection->email)
         ->toBe('new@example.com')
         ->and($connection->is_connected)
         ->toBeTrue();
 
-    Http::assertSent(function (Request $request): bool {
+    Http::assertSent(function (Request $request) use ($connection): bool {
         return $request->method() === 'PATCH'
-            && $request->url() === 'https://api.telegga.net/api/v1/users/telegga-user-1'
+            && $request->url() === "https://api.telegga.net/api/v1/users/{$connection->uuid}"
             && $request->data() === [
                 'display_name' => 'Иван Петров',
                 'email' => 'new@example.com',
@@ -134,7 +112,7 @@ it('обновляет пользователя Telegga и локальные и
     });
 });
 
-it('очищает локальный email после успешной очистки в Telegga', function (): void {
+it('clears the local email after successfully clearing it in Telegga', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'email' => 'ivan@example.com',
@@ -144,12 +122,12 @@ it('очищает локальный email после успешной очис
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users/telegga-user-1' => Http::response([
+        "api.telegga.net/api/v1/users/{$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'email' => '',
         ]),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
         ]),
@@ -164,7 +142,84 @@ it('очищает локальный email после успешной очис
         ->toBeNull();
 });
 
-it('не отправляет пустое обновление подключения', function (): void {
+it('preserves the local email when updating only the name', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'email' => 'ivan@example.com',
+        'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        "api.telegga.net/api/v1/users/{$connection->uuid}" => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+            'display_name' => 'Иван Петров',
+            'email' => null,
+        ]),
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+        ]),
+    ]);
+
+    app(TeleggaInterface::class)->updateConnection(
+        uuid: $connection->uuid,
+        data: ['display_name' => 'Иван Петров'],
+    );
+
+    $connection->refresh();
+
+    expect($connection->name)
+        ->toBe('Иван Петров')
+        ->and($connection->email)
+        ->toBe('ivan@example.com');
+});
+
+it('rejects an invalid email type in a Telegga response', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'email' => 'ivan@example.com',
+        'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        "api.telegga.net/api/v1/users/{$connection->uuid}" => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+            'email' => ['invalid'],
+        ]),
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+        ]),
+    ]);
+
+    try {
+        app(TeleggaInterface::class)->updateConnection(
+            uuid: $connection->uuid,
+            data: ['email' => 'new@example.com'],
+        );
+    } catch (ConnectionException $exception) {
+        expect($exception->getMessage())
+            ->toBe('Telegga returned an invalid user update response: optional string field "email" is invalid.')
+            ->and($exception->connectionUuid)
+            ->toBe($connection->uuid)
+            ->and($exception->getPrevious())
+            ->toBeInstanceOf(TeleggaApiException::class)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
+            ->toBe('invalid_response');
+
+        return;
+    }
+
+    $this->fail('Expected ConnectionException.');
+});
+
+it('does not send an empty connection update', function (): void {
     Http::preventStrayRequests();
 
     try {
@@ -183,10 +238,10 @@ it('не отправляет пустое обновление подключе
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
-it('останавливает операцию при отсутствии user id в ответе Telegga', function (): void {
+it('stops the operation when user_id is missing from the Telegga response', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -195,7 +250,7 @@ it('останавливает операцию при отсутствии user
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users/{$connection->uuid}" => Http::response([
             'external_id' => $connection->uuid,
         ]),
     ]);
@@ -206,21 +261,23 @@ it('останавливает операцию при отсутствии user
         );
     } catch (ConnectionException $exception) {
         expect($exception->getMessage())
-            ->toBe('Telegga user response does not contain user_id.')
+            ->toBe('Telegga returned an invalid user response: required string field "user_id" is missing or invalid.')
             ->and($exception->connectionUuid)
             ->toBe($connection->uuid)
             ->and($exception->getPrevious())
-            ->toBeNull();
+            ->toBeInstanceOf(TeleggaApiException::class)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
+            ->toBe('invalid_response');
 
         Http::assertSentCount(1);
 
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
-it('выпускает новый код через bot id ожидающей привязки', function (): void {
+it('generates a new code through the bot_id of a pending link', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -229,14 +286,14 @@ it('выпускает новый код через bot id ожидающей п
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users/telegga-user-1/regenerate-code' => Http::response([
+        "api.telegga.net/api/v1/users/{$connection->uuid}/regenerate-code" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'link_status' => 'pending',
             'link_code' => 'NEWCODE1',
             'link_url' => 'https://t.me/mybot?start=NEWCODE1',
         ]),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'links' => [
@@ -256,14 +313,14 @@ it('выпускает новый код через bot id ожидающей п
     expect($result->link_code)
         ->toBe('NEWCODE1');
 
-    Http::assertSent(function (Request $request): bool {
+    Http::assertSent(function (Request $request) use ($connection): bool {
         return $request->method() === 'POST'
-            && $request->url() === 'https://api.telegga.net/api/v1/users/telegga-user-1/regenerate-code'
+            && $request->url() === "https://api.telegga.net/api/v1/users/{$connection->uuid}/regenerate-code"
             && $request->data() === ['bot_id' => 'bot-pending'];
     });
 });
 
-it('не выпускает код без привязки пользователя к боту', function (): void {
+it('does not generate a code without a user-to-bot link', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -272,7 +329,7 @@ it('не выпускает код без привязки пользовате�
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'links' => [],
@@ -296,10 +353,10 @@ it('не выпускает код без привязки пользовате�
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
-it('отвязывает пользователя и сбрасывает локальный статус подключения', function (): void {
+it('unlinks a user and resets the local connection status', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -309,11 +366,11 @@ it('отвязывает пользователя и сбрасывает лок
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users/telegga-user-1/link*' => Http::response(
+        "api.telegga.net/api/v1/users/{$connection->uuid}/link*" => Http::response(
             body: null,
             status: 204,
         ),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
             'links' => [
@@ -333,13 +390,13 @@ it('отвязывает пользователя и сбрасывает лок
     expect($connection->refresh()->is_connected)
         ->toBeFalse();
 
-    Http::assertSent(function (Request $request): bool {
+    Http::assertSent(function (Request $request) use ($connection): bool {
         return $request->method() === 'DELETE'
-            && $request->url() === 'https://api.telegga.net/api/v1/users/telegga-user-1/link?bot_id=bot-active';
+            && $request->url() === "https://api.telegga.net/api/v1/users/{$connection->uuid}/link?bot_id=bot-active";
     });
 });
 
-it('удаляет локальную запись только после удаления пользователя Telegga', function (): void {
+it('deletes the local record only after deleting the Telegga user', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -349,11 +406,11 @@ it('удаляет локальную запись только после уд�
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users/telegga-user-1' => Http::response(
+        "api.telegga.net/api/v1/users/{$connection->uuid}" => Http::response(
             body: null,
             status: 204,
         ),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
         ]),
@@ -366,15 +423,17 @@ it('удаляет локальную запись только после уд�
     expect(TelegramConnectedUser::query()
         ->where('uuid', $connection->uuid)
         ->exists())
-        ->toBeFalse();
+        ->toBeFalse()
+        ->and(TelegramConnectedUser::withTrashed()->find($connection->id)?->trashed())
+        ->toBeTrue();
 
-    Http::assertSent(function (Request $request): bool {
+    Http::assertSent(function (Request $request) use ($connection): bool {
         return $request->method() === 'DELETE'
-            && $request->url() === 'https://api.telegga.net/api/v1/users/telegga-user-1';
+            && $request->url() === "https://api.telegga.net/api/v1/users/{$connection->uuid}";
     });
 });
 
-it('сохраняет локальную запись при ошибке удаления в api', function (): void {
+it('preserves the local record when API deletion fails', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -384,13 +443,13 @@ it('сохраняет локальную запись при ошибке уд�
 
     Http::preventStrayRequests();
     Http::fake([
-        'api.telegga.net/api/v1/users/telegga-user-1' => Http::response([
+        "api.telegga.net/api/v1/users/{$connection->uuid}" => Http::response([
             'error' => [
                 'code' => 'internal',
                 'message' => 'Internal error.',
             ],
         ], 500),
-        'api.telegga.net/api/v1/users*' => Http::response([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
         ]),
@@ -405,7 +464,7 @@ it('сохраняет локальную запись при ошибке уд�
             ->toBe($connection->uuid)
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('internal')
             ->and(TelegramConnectedUser::query()
                 ->where('uuid', $connection->uuid)
@@ -415,5 +474,135 @@ it('сохраняет локальную запись при ошибке уд�
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
+});
+
+it('resets state and writes a critical log when local deletion fails', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+        'is_connected' => true,
+    ]);
+
+    TelegramConnectedUser::deleting(
+        fn (TelegramConnectedUser $model): never => throw new RuntimeException(
+            message: 'Local connection deletion failed.',
+        ),
+    );
+    $log = Log::spy();
+    Exceptions::fake();
+    Http::preventStrayRequests();
+    Http::fake([
+        "api.telegga.net/api/v1/users/{$connection->uuid}" => Http::response(
+            body: null,
+            status: 204,
+        ),
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+        ]),
+    ]);
+
+    try {
+        app(TeleggaInterface::class)->deleteConnection(
+            uuid: $connection->uuid,
+        );
+    } catch (ConnectionException $exception) {
+        $connection->refresh();
+
+        expect($exception->getMessage())
+            ->toBe('Local Telegga connection could not be deleted after remote deletion.')
+            ->and($exception->connectionUuid)
+            ->toBe($connection->uuid)
+            ->and($exception->getPrevious())
+            ->toBeInstanceOf(RuntimeException::class)
+            ->and($connection->is_created)
+            ->toBeFalse()
+            ->and($connection->is_connected)
+            ->toBeFalse();
+
+        $this->receivedCall(spy: $log, method: 'critical')
+            ->once()
+            ->withArgs(function (string $message, array $context) use ($connection): bool {
+                return $message === 'Telegga connection orphaned: remote user deleted, local record kept.'
+                    && $context['connection_uuid'] === $connection->uuid
+                    && $context['state_synchronized'] === true
+                    && $context['deletion_exception']['class'] === RuntimeException::class
+                    && ! array_key_exists('message', $context['deletion_exception'])
+                    && $context['state_exception'] === null;
+            });
+
+        Exceptions::assertReported(
+            fn (RuntimeException $reported): bool => $reported->getMessage() === 'Local connection deletion failed.',
+        );
+        Exceptions::assertReportedCount(1);
+
+        return;
+    } finally {
+        TelegramConnectedUser::flushEventListeners();
+        TelegramConnectedUser::clearBootedModels();
+    }
+
+    $this->fail('Expected a ConnectionException.');
+});
+
+it('completes local deletion when a retry confirms the API user is absent', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+        'is_connected' => true,
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        "api.telegga.net/api/v1/users/{$connection->uuid}" => Http::sequence()
+            ->push(['error' => ['code' => 'internal', 'message' => 'Temporary error.']], 503)
+            ->push(['error' => ['code' => 'not_found', 'message' => 'User was not found.']], 404),
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+        ]),
+    ]);
+
+    app(TeleggaInterface::class)->deleteConnection(uuid: $connection->uuid);
+
+    expect(TelegramConnectedUser::withTrashed()->find($connection->id)?->trashed())
+        ->toBeTrue();
+
+    Http::assertSentCount(2);
+});
+
+it('resets local status when a retry confirms the API link is absent', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'is_created' => true,
+        'available_telegram_bot_id' => $this->telegramBot->id,
+        'is_connected' => true,
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        "api.telegga.net/api/v1/users/{$connection->uuid}/link*" => Http::sequence()
+            ->push(['error' => ['code' => 'internal', 'message' => 'Temporary error.']], 503)
+            ->push(['error' => ['code' => 'user_not_linked', 'message' => 'User is not linked.']], 409),
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+            'links' => [
+                [
+                    'bot_id' => 'bot-active',
+                    'bot_username' => 'mybot',
+                    'status' => 'active',
+                ],
+            ],
+        ]),
+    ]);
+
+    app(TeleggaInterface::class)->unlinkConnection(uuid: $connection->uuid);
+
+    expect($connection->refresh()->is_connected)->toBeFalse();
+
+    Http::assertSentCount(3);
 });

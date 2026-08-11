@@ -6,12 +6,28 @@ namespace Telegga\Laravel\Contracts;
 
 use DateTimeInterface;
 use Illuminate\Support\Collection;
+use Telegga\Laravel\BroadcastAudience;
+use Telegga\Laravel\Dto\BotData;
+use Telegga\Laravel\Dto\BroadcastCancellationData;
+use Telegga\Laravel\Dto\BroadcastCreatedData;
+use Telegga\Laravel\Dto\BroadcastData;
+use Telegga\Laravel\Dto\ConnectionData;
+use Telegga\Laravel\Dto\GroupData;
+use Telegga\Laravel\Dto\GroupMembersAddedData;
+use Telegga\Laravel\Dto\GroupPageData;
+use Telegga\Laravel\Dto\MediaData;
+use Telegga\Laravel\Dto\MessageData;
+use Telegga\Laravel\Dto\MessagePageData;
+use Telegga\Laravel\Dto\QueuedMessageData;
+use Telegga\Laravel\Dto\UserData;
+use Telegga\Laravel\Dto\UserGroupMembershipData;
+use Telegga\Laravel\Dto\UserPageData;
 use Telegga\Laravel\Models\AvailableTelegramBot;
 
 interface TeleggaInterface
 {
     /**
-     * Создать подключение пользователя.
+     * Create a user connection.
      *
      * @param  array<string, mixed>  $meta
      */
@@ -22,10 +38,10 @@ interface TeleggaInterface
         ?int $userId = null,
         array $meta = [],
         ?string $groupId = null,
-    ): object;
+    ): ConnectionData;
 
     /**
-     * Повторно отправить существующее подключение.
+     * Resend an existing connection.
      *
      * @param  array<string, mixed>  $meta
      */
@@ -33,124 +49,122 @@ interface TeleggaInterface
         string $uuid,
         array $meta = [],
         ?string $groupId = null,
-    ): object;
+    ): ConnectionData;
 
     /**
-     * Получить подключённого пользователя.
+     * Get a connected user.
      */
-    public function getConnection(string $uuid): object;
+    public function getConnection(string $uuid): UserData;
 
     /**
-     * Получить список подключений Telegga.
+     * Get a list of Telegga connections.
      */
     public function getConnections(
         ?string $email = null,
         ?string $telegramBotUuid = null,
         ?string $status = null,
         ?string $cursor = null,
-    ): object;
+    ): UserPageData;
 
     /**
-     * Обновить подключённого пользователя.
+     * Update a connected user.
      *
      * @param  array<string, mixed>  $data
      */
-    public function updateConnection(string $uuid, array $data): object;
+    public function updateConnection(string $uuid, array $data): UserData;
 
     /**
-     * Удалить подключённого пользователя.
+     * Delete a connected user.
      */
     public function deleteConnection(string $uuid): void;
 
     /**
-     * Выпустить новый код подключения.
+     * Generate a new connection code.
      */
-    public function regenerateConnectionCode(string $uuid): object;
+    public function regenerateConnectionCode(string $uuid): ConnectionData;
 
     /**
-     * Отвязать подключённого пользователя от бота.
+     * Unlink a connected user from the bot.
      */
     public function unlinkConnection(string $uuid): void;
 
     /**
-     * Создать группу для бота подключения.
+     * Create a group for the connection bot.
      */
     public function createGroup(
         string $uuid,
         string $name,
         ?string $description = null,
-    ): object;
+    ): GroupData;
 
     /**
-     * Получить группы бота подключения.
-     *
-     * @return Collection<int, object>
+     * Get groups for the connection bot.
      */
-    public function getGroups(string $uuid): Collection;
+    public function getGroups(string $uuid, ?string $cursor = null): GroupPageData;
 
     /**
-     * Получить группу.
+     * Get a group.
      */
-    public function getGroup(string $groupId): object;
+    public function getGroup(string $groupId): GroupData;
 
     /**
-     * Обновить группу.
+     * Update a group.
      *
      * @param  array<string, mixed>  $data
      */
-    public function updateGroup(string $groupId, array $data): object;
+    public function updateGroup(string $groupId, array $data): GroupData;
 
     /**
-     * Удалить группу.
+     * Delete a group.
      */
     public function deleteGroup(string $groupId): void;
 
     /**
-     * Добавить подключение в группу через маршрут пользователя.
+     * Add a connection to a group through the user endpoint.
      */
-    public function addConnectionToGroup(string $uuid, string $groupId): object;
+    public function addConnectionToGroup(string $uuid, string $groupId): UserGroupMembershipData;
 
     /**
-     * Удалить подключение из группы через маршрут пользователя.
+     * Remove a connection from a group through the user endpoint.
      */
     public function removeConnectionFromGroup(string $uuid, string $groupId): void;
 
     /**
-     * Добавить подключения в группу через групповой маршрут.
+     * Add connections to a group through the group endpoint.
      *
      * @param  array<int, string>  $uuids
      */
-    public function addGroupMembers(string $groupId, array $uuids): object;
+    public function addGroupMembers(string $groupId, array $uuids): GroupMembersAddedData;
 
     /**
-     * Удалить подключение из группы через групповой маршрут.
+     * Remove a connection from a group through the group endpoint.
      */
     public function removeGroupMember(string $groupId, string $uuid): void;
 
     /**
-     * Запустить рассылку.
+     * Start a broadcast for an explicit audience using the connection only to resolve the bot.
      *
      * @param  array<string, mixed>  $data
      */
     public function startBroadcast(
-        string $uuid,
+        string $viaConnectionUuid,
         string $type,
+        ?BroadcastAudience $audience = null,
         array $data = [],
-        ?string $groupId = null,
-    ): object;
+    ): BroadcastCreatedData;
 
     /**
-     * Получить прогресс рассылки.
+     * Get broadcast progress.
      */
-    public function getBroadcast(string $broadcastId): object;
+    public function getBroadcast(string $broadcastId): BroadcastData;
 
     /**
-     * Отменить рассылку.
+     * Cancel a broadcast.
      */
-    public function cancelBroadcast(string $broadcastId): object;
+    public function cancelBroadcast(string $broadcastId): BroadcastCancellationData;
 
     /**
-     * Отправить сообщение.
+     * Send a message.
      *
      * @param  array<string, mixed>  $data
      */
@@ -158,55 +172,55 @@ interface TeleggaInterface
         string $uuid,
         string $type,
         array $data = [],
-    ): object;
+    ): QueuedMessageData;
 
     /**
-     * Получить сообщение по идентификатору.
+     * Get a message by its identifier.
      */
-    public function getMessage(string $messageId): object;
+    public function getMessage(string $messageId): MessageData;
 
     /**
-     * Получить историю сообщений пользователя.
+     * Get user message history.
      */
     public function getMessages(
         string $uuid,
+        DateTimeInterface $from,
+        DateTimeInterface $to,
         ?string $status = null,
-        ?DateTimeInterface $from = null,
-        ?DateTimeInterface $to = null,
         ?string $cursor = null,
-    ): object;
+    ): MessagePageData;
 
     /**
-     * Загрузить медиафайл.
+     * Upload a media file.
      */
-    public function uploadMedia(string $path): object;
+    public function uploadMedia(string $contents, string $filename): MediaData;
 
     /**
-     * Получить метаданные медиафайла.
+     * Get media file metadata.
      */
-    public function getMedia(string $mediaId): object;
+    public function getMedia(string $mediaId): MediaData;
 
     /**
-     * Получить список доступных ботов.
+     * Get a list of available bots.
      *
-     * @return Collection<int, object>
+     * @return Collection<int, BotData>
      */
     public function getBots(): Collection;
 
     /**
-     * Добавить доступного Telegram-бота.
+     * Add an available Telegram bot.
      */
     public function addTelegramBot(string $botName): AvailableTelegramBot;
 
     /**
-     * Получить локально доступных Telegram-ботов.
+     * Get locally available Telegram bots.
      *
      * @return Collection<int, AvailableTelegramBot>
      */
     public function getAvailableBots(): Collection;
 
     /**
-     * Удалить локально доступного Telegram-бота.
+     * Delete a locally available Telegram bot.
      */
     public function deleteTelegramBot(string $uuid): void;
 }

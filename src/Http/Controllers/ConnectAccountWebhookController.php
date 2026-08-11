@@ -4,182 +4,299 @@ declare(strict_types=1);
 
 namespace Telegga\Laravel\Http\Controllers;
 
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 use Telegga\Laravel\Exceptions\WebhookException;
+use Telegga\Laravel\Http\Responses\WebhookResponse;
+use Telegga\Laravel\Http\Responses\WebhookResponseCode;
 use Telegga\Laravel\Services\WebhookService;
+use Telegga\Laravel\Support\ExceptionLogContext;
+use Telegga\Laravel\Webhooks\WebhookProcessingResult;
+use Telegga\Laravel\Webhooks\WebhookProcessingStatus;
 
 final class ConnectAccountWebhookController
 {
     /**
-     * Создать обработчик webhook подключения.
+     * Create the connection webhook handler.
      */
     public function __construct(
         private readonly WebhookService $webhooks,
     ) {}
 
     /**
-     * Обработать webhook подключения.
+     * Handle a connection webhook.
      */
-    public function __invoke(Request $request): JsonResponse
+    public function __invoke(Request $request): WebhookResponse
     {
-        $event = $request->input(key: 'event');
+        $eventValidation = Validator::make(
+            data: $request->json()->all(),
+            rules: [
+                'event' => ['required', 'string'],
+            ],
+            messages: [
+                'event.required' => 'Webhook event is required.',
+                'event.string' => 'Webhook event is required.',
+            ],
+        );
 
-        if (! is_string($event) || trim($event) === '') {
-            return $this->invalidRequest(message: 'Webhook event is required.');
-        }
-
-        if ($event === 'test') {
-            return response()->json(data: [
-                'success' => true,
-                'event' => 'test',
-                'message' => 'Webhook accepted.',
-            ]);
-        }
-
-        if ($event !== 'user.linked') {
-            return $this->errorResponse(
-                code: 'unsupported_event',
-                message: 'Webhook event is not supported.',
-                status: 400,
-                event: $event,
-            );
-        }
-
-        $eventId = $request->input(key: 'event_id');
-
-        if ($eventId !== null && (! is_string($eventId) || trim($eventId) === '')) {
+        if ($eventValidation->fails()) {
             return $this->invalidRequest(
-                message: 'Webhook event_id must be a non-empty string.',
-                event: $event,
+                message: $eventValidation->errors()->first(),
             );
         }
 
-        $externalId = $request->input(key: 'external_id');
+        $event = (string) $eventValidation->validated()['event'];
 
-        if (! is_string($externalId) || trim($externalId) === '') {
-            return $this->invalidRequest(
-                message: 'Webhook external_id is required.',
-                event: $event,
-                eventId: $eventId,
-            );
-        }
-
-        $botName = $request->input(key: 'bot_username');
-
-        if (! is_string($botName) || trim($botName) === '') {
-            return $this->invalidRequest(
-                message: 'Webhook bot_username is required.',
-                event: $event,
-                eventId: $eventId,
-            );
-        }
-
-        try {
-            $connected = $this->webhooks->markConnected(
-                externalId: $externalId,
-                botName: $botName,
-            );
-        } catch (WebhookException $exception) {
-            Log::error('Telegga webhook could not be processed.', [
-                'event_id' => $eventId,
-                'external_id' => $externalId,
-                'bot_username' => $botName,
-                'exception' => $exception,
-            ]);
-
-            return $this->errorResponse(
-                code: 'internal',
-                message: 'Webhook could not be processed.',
-                status: 500,
-                event: $event,
-                eventId: $eventId,
-            );
-        }
-
-        if (! $connected) {
-            Log::warning('Telegga webhook connection was not found.', [
-                'event_id' => $eventId,
-                'external_id' => $externalId,
-                'bot_username' => $botName,
-            ]);
-
-            return $this->errorResponse(
-                code: 'connection_not_found',
-                message: 'Connection was not found for the provided external_id and bot_username.',
-                status: 404,
-                event: $event,
-                eventId: $eventId,
-            );
-        }
-
-        $response = [
-            'success' => true,
-            'event' => $event,
-        ];
-
-        if ($eventId !== null) {
-            $response['event_id'] = $eventId;
-        }
-
-        $response['message'] = 'Telegram connection marked as connected.';
-        $response['data'] = [
-            'external_id' => $externalId,
-            'bot_username' => $botName,
-            'is_connected' => true,
-        ];
-
-        return response()->json(data: $response);
+        return match ($event) {
+            'test' => $this->handleTest(request: $request),
+            'user.linked' => $this->handleUserLinked(request: $request, event: $event),
+            default => $this->unsupportedEvent(event: $event),
+        };
     }
 
     /**
-     * Создать ответ о некорректном webhook.
+     * Handle a test event.
+     */
+    private function handleTest(Request $request): WebhookResponse
+    {
+        $validation = Validator::make(
+            data: $request->json()->all(),
+            rules: [
+                'service_id' => ['required', 'string'],
+                'sent_at' => ['required', 'date'],
+            ],
+            messages: [
+                'service_id.required' => 'Webhook service_id is required.',
+                'service_id.string' => 'Webhook service_id is required.',
+                'sent_at.required' => 'Webhook sent_at is required.',
+                'sent_at.date' => 'Webhook sent_at must be a valid RFC 3339 date.',
+            ],
+        );
+
+        if ($validation->fails()) {
+            return $this->invalidRequest(
+                message: $validation->errors()->first(),
+                event: 'test',
+            );
+        }
+
+        return WebhookResponse::success(
+            code: WebhookResponseCode::Accepted,
+            event: 'test',
+        );
+    }
+
+    /**
+     * Handle a user connection event.
+     */
+    private function handleUserLinked(Request $request, string $event): WebhookResponse
+    {
+        $payloadValidation = Validator::make(
+            data: $request->json()->all(),
+            rules: [
+                'event_id' => ['required', 'string'],
+                'external_id' => ['required', 'string'],
+                'bot_username' => ['required', 'string'],
+                'service_id' => ['required', 'string'],
+                'user_id' => ['required', 'string'],
+                'bot_id' => ['required', 'string'],
+                'telegram_user_id' => ['required', 'integer'],
+                'linked_at' => ['required', 'date'],
+            ],
+            messages: [
+                'event_id.required' => 'Webhook event_id must be a non-empty string.',
+                'event_id.string' => 'Webhook event_id must be a non-empty string.',
+                'external_id.required' => 'Webhook external_id is required.',
+                'external_id.string' => 'Webhook external_id is required.',
+                'bot_username.required' => 'Webhook bot_username is required.',
+                'bot_username.string' => 'Webhook bot_username is required.',
+                'service_id.required' => 'Webhook service_id is required.',
+                'service_id.string' => 'Webhook service_id is required.',
+                'user_id.required' => 'Webhook user_id is required.',
+                'user_id.string' => 'Webhook user_id is required.',
+                'bot_id.required' => 'Webhook bot_id is required.',
+                'bot_id.string' => 'Webhook bot_id is required.',
+                'telegram_user_id.required' => 'Webhook telegram_user_id is required.',
+                'telegram_user_id.integer' => 'Webhook telegram_user_id must be an integer.',
+                'linked_at.required' => 'Webhook linked_at is required.',
+                'linked_at.date' => 'Webhook linked_at must be a valid RFC 3339 date.',
+            ],
+        );
+
+        if ($payloadValidation->fails()) {
+            $eventId = $payloadValidation->valid()['event_id'] ?? null;
+
+            return $this->invalidRequest(
+                message: $payloadValidation->errors()->first(),
+                event: $event,
+                eventId: is_string($eventId) ? $eventId : null,
+            );
+        }
+
+        $validated = $payloadValidation->validated();
+        $eventId = (string) $validated['event_id'];
+        $externalId = (string) $validated['external_id'];
+        $botName = str()->lower((string) $validated['bot_username']);
+        $linkedAt = Carbon::parse((string) $validated['linked_at']);
+
+        try {
+            $result = $this->webhooks->markConnected(
+                eventId: $eventId,
+                event: $event,
+                externalId: $externalId,
+                botName: $botName,
+                linkedAt: $linkedAt,
+            );
+        } catch (WebhookException $exception) {
+            Log::error('Telegga webhook could not be processed.', [
+                'event' => $event,
+                'event_id' => $eventId,
+                'external_id' => $externalId,
+                'bot_username' => $botName,
+                'error_code' => 'internal',
+                'exception' => ExceptionLogContext::from(exception: $exception),
+            ]);
+
+            report($exception);
+
+            return WebhookResponse::error(
+                code: WebhookResponseCode::Internal,
+                event: $event,
+                eventId: $eventId,
+            );
+        }
+
+        if (! $result->status->successful()) {
+            return $this->processingError(
+                result: $result,
+                event: $event,
+                eventId: $eventId,
+                externalId: $externalId,
+                botName: $botName,
+            );
+        }
+
+        return $this->successResponse(
+            result: $result,
+            event: $event,
+            eventId: $eventId,
+            externalId: $externalId,
+            botName: $botName,
+        );
+    }
+
+    /**
+     * Create a response for an unsupported event.
+     */
+    private function unsupportedEvent(string $event): WebhookResponse
+    {
+        Log::warning('Telegga webhook event is not supported.', [
+            'event' => $event,
+            'error_code' => 'unsupported_event',
+        ]);
+
+        return WebhookResponse::error(
+            code: WebhookResponseCode::UnsupportedEvent,
+            event: $event,
+        );
+    }
+
+    /**
+     * Create a successful webhook processing response.
+     */
+    private function successResponse(
+        WebhookProcessingResult $result,
+        string $event,
+        string $eventId,
+        string $externalId,
+        string $botName,
+    ): WebhookResponse {
+        return WebhookResponse::success(
+            code: WebhookResponseCode::fromProcessingStatus(status: $result->status),
+            event: $event,
+            eventId: $eventId,
+            data: [
+                'external_id' => $externalId,
+                'bot_username' => $botName,
+                'is_connected' => true,
+            ],
+        );
+    }
+
+    /**
+     * Create an invalid webhook response.
      */
     private function invalidRequest(
         string $message,
         ?string $event = null,
         ?string $eventId = null,
-    ): JsonResponse {
-        return $this->errorResponse(
-            code: 'invalid_request',
+    ): WebhookResponse {
+        Log::warning('Telegga webhook request validation failed.', [
+            'event' => $event,
+            'event_id' => $eventId,
+            'error_code' => 'invalid_request',
+            'error_message' => $message,
+        ]);
+
+        return WebhookResponse::error(
+            code: WebhookResponseCode::InvalidRequest,
             message: $message,
-            status: 400,
             event: $event,
             eventId: $eventId,
         );
     }
 
     /**
-     * Создать ответ об ошибке webhook.
+     * Create a webhook processing error response.
      */
-    private function errorResponse(
-        string $code,
-        string $message,
-        int $status,
-        ?string $event = null,
-        ?string $eventId = null,
-    ): JsonResponse {
-        $data = [
-            'success' => false,
+    private function processingError(
+        WebhookProcessingResult $result,
+        string $event,
+        string $eventId,
+        string $externalId,
+        string $botName,
+    ): WebhookResponse {
+        $details = [
+            'external_id' => $externalId,
+            'received_bot_username' => $botName,
         ];
 
-        if ($event !== null) {
-            $data['event'] = $event;
+        if ($result->expectedBotName !== null) {
+            $details['expected_bot_username'] = $result->expectedBotName;
         }
 
-        if ($eventId !== null) {
-            $data['event_id'] = $eventId;
+        if ($result->expectedEvent !== null) {
+            $details['expected_event'] = $result->expectedEvent;
         }
 
-        $data['error'] = [
-            'code' => $code,
-            'message' => $message,
+        if ($result->failureStatus !== null) {
+            $details['failure_code'] = $result->failureStatus->value;
+        }
+
+        $logContext = [
+            'event' => $event,
+            'event_id' => $eventId,
+            'external_id' => $externalId,
+            'received_bot_username' => $botName,
+            'expected_bot_username' => $result->expectedBotName,
+            'expected_event' => $result->expectedEvent,
+            'error_code' => $result->status->value,
+            'failure_code' => $result->failureStatus?->value,
         ];
 
-        return response()->json(
-            data: $data,
-            status: $status,
+        if ($result->status === WebhookProcessingStatus::RetryWindowExpired) {
+            Log::error('Telegga webhook retry window expired.', $logContext);
+        } else {
+            Log::warning('Telegga webhook request was rejected.', $logContext);
+        }
+
+        return WebhookResponse::error(
+            code: WebhookResponseCode::fromProcessingStatus(status: $result->status),
+            event: $event,
+            eventId: $eventId,
+            details: $details,
         );
     }
 }

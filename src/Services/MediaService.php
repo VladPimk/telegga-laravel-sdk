@@ -4,52 +4,71 @@ declare(strict_types=1);
 
 namespace Telegga\Laravel\Services;
 
-use InvalidArgumentException;
+use Telegga\Laravel\Dto\MediaData;
 use Telegga\Laravel\Exceptions\MediaException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Http\TeleggaClient;
+use Telegga\Laravel\Mappers\MediaResponseMapper;
 
 final class MediaService
 {
+    private const int MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
+
     /**
-     * Создать сервис медиафайлов.
+     * Create the media service.
      */
     public function __construct(
         private readonly TeleggaClient $client,
+        private readonly MediaResponseMapper $mapper,
     ) {}
 
     /**
-     * Загрузить медиафайл.
+     * Upload a media file.
      */
-    public function upload(string $path): object
+    public function upload(string $contents, string $filename): MediaData
     {
-        if (trim($path) === '') {
+        if ($contents === '') {
             throw new MediaException(
-                message: 'Media file path cannot be empty.',
-                filePath: $path,
+                message: 'Media file contents cannot be empty.',
+                filename: $filename,
+            );
+        }
+
+        if (trim($filename) === '') {
+            throw new MediaException(
+                message: 'Media filename cannot be empty.',
+                filename: $filename,
+            );
+        }
+
+        if (strlen($contents) > self::MAX_FILE_SIZE_BYTES) {
+            throw new MediaException(
+                message: 'Media file exceeds the maximum size of 50 MB.',
+                filename: $filename,
             );
         }
 
         try {
-            return $this->ensureObject(
+            return $this->mapper->fromUpload(
                 response: $this->client->upload(
                     uri: 'media',
-                    path: $path,
+                    contents: $contents,
+                    filename: $filename,
                 )->object(),
             );
-        } catch (InvalidArgumentException|TeleggaApiException $exception) {
+        } catch (TeleggaApiException $exception) {
             throw new MediaException(
                 message: $exception->getMessage(),
-                filePath: $path,
+                filename: $filename,
                 previous: $exception,
             );
         }
     }
 
     /**
-     * Получить метаданные медиафайла.
+     * Get media file metadata.
      */
-    public function get(string $mediaId): object
+    public function get(string $mediaId): MediaData
     {
         if (trim($mediaId) === '') {
             throw new MediaException(
@@ -59,7 +78,7 @@ final class MediaService
         }
 
         try {
-            return $this->ensureObject(
+            return $this->mapper->fromGet(
                 response: $this->client->get(
                     uri: 'media/'.rawurlencode($mediaId),
                 )->object(),
@@ -71,21 +90,5 @@ final class MediaService
                 previous: $exception,
             );
         }
-    }
-
-    /**
-     * Проверить объект ответа медиафайла.
-     */
-    private function ensureObject(mixed $response): object
-    {
-        if (! is_object($response)) {
-            throw new TeleggaApiException(
-                message: 'Telegga returned an invalid media response.',
-                status: 0,
-                apiCode: 'invalid_response',
-            );
-        }
-
-        return $response;
     }
 }

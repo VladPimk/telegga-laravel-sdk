@@ -8,57 +8,46 @@ use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Exceptions\MediaException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 
-it('загружает медиафайл multipart запросом без потери полей ответа', function (): void {
-    $path = tempnam(directory: sys_get_temp_dir(), prefix: 'telegga-media-');
+it('uploads a media file with a multipart request without losing response fields', function (): void {
+    $contents = 'file-content';
+    $filename = 'photo.jpg';
 
-    if ($path === false) {
-        test()->fail('Не удалось создать временный файл.');
-    }
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/media' => Http::response([
+            'media_id' => 'media-1',
+            'mime_type' => 'image/jpeg',
+            'size' => 12,
+            'filename' => $filename,
+            'new_api_field' => 'new-value',
+        ], 201),
+    ]);
 
-    file_put_contents(filename: $path, data: 'file-content');
+    $media = app(TeleggaInterface::class)->uploadMedia(
+        contents: $contents,
+        filename: $filename,
+    );
 
-    try {
-        Http::preventStrayRequests();
-        Http::fake([
-            'api.telegga.net/api/v1/media' => Http::response([
-                'media_id' => 'media-1',
-                'mime_type' => 'image/jpeg',
-                'size' => 12,
-                'filename' => basename(path: $path),
-                'new_api_field' => 'new-value',
-            ], 201),
-        ]);
+    expect($media->media_id)
+        ->toBe('media-1')
+        ->and($media->mime_type)
+        ->toBe('image/jpeg');
 
-        $media = app(TeleggaInterface::class)->uploadMedia(
-            path: $path,
-        );
+    $this->assertSame('new-value', $media->raw()->new_api_field);
 
-        expect($media)
-            ->toBeInstanceOf(stdClass::class)
-            ->and($media->media_id)
-            ->toBe('media-1')
-            ->and($media->mime_type)
-            ->toBe('image/jpeg')
-            ->and($media->new_api_field)
-            ->toBe('new-value');
-
-        Http::assertSent(function (Request $request) use ($path): bool {
-            return $request->method() === 'POST'
-                && $request->url() === 'https://api.telegga.net/api/v1/media'
-                && $request->isMultipart()
-                && $request->hasFile(
-                    name: 'file',
-                    filename: basename(path: $path),
-                );
-        });
-    } finally {
-        if (is_file(filename: $path)) {
-            unlink(filename: $path);
-        }
-    }
+    Http::assertSent(function (Request $request) use ($contents, $filename): bool {
+        return $request->method() === 'POST'
+            && $request->url() === 'https://api.telegga.net/api/v1/media'
+            && $request->isMultipart()
+            && $request->hasFile(
+                name: 'file',
+                value: $contents,
+                filename: $filename,
+            );
+    });
 });
 
-it('получает метаданные медиафайла без потери новых полей ответа', function (): void {
+it('gets media metadata without losing new response fields', function (): void {
     $mediaId = 'e97d00ad-0000-4000-8000-000000000000';
 
     Http::preventStrayRequests();
@@ -76,14 +65,12 @@ it('получает метаданные медиафайла без потер
         mediaId: $mediaId,
     );
 
-    expect($media)
-        ->toBeInstanceOf(stdClass::class)
-        ->and($media->media_id)
+    expect($media->media_id)
         ->toBe($mediaId)
         ->and($media->filename)
-        ->toBe('photo.jpg')
-        ->and($media->new_api_field)
-        ->toBe('new-value');
+        ->toBe('photo.jpg');
+
+    $this->assertSame('new-value', $media->raw()->new_api_field);
 
     Http::assertSent(function (Request $request) use ($mediaId): bool {
         return $request->method() === 'GET'
@@ -91,15 +78,44 @@ it('получает метаданные медиафайла без потер
     });
 });
 
-it('не отправляет запрос с пустым путём к медиафайлу', function (): void {
+it('does not send a request with empty media contents', function (): void {
     Http::preventStrayRequests();
 
     try {
-        app(TeleggaInterface::class)->uploadMedia(path: '   ');
+        app(TeleggaInterface::class)->uploadMedia(
+            contents: '',
+            filename: 'photo.jpg',
+        );
     } catch (MediaException $exception) {
         expect($exception->getMessage())
-            ->toBe('Media file path cannot be empty.')
-            ->and($exception->filePath)
+            ->toBe('Media file contents cannot be empty.')
+            ->and($exception->filename)
+            ->toBe('photo.jpg')
+            ->and($exception->mediaId)
+            ->toBeNull()
+            ->and($exception->getPrevious())
+            ->toBeNull();
+
+        Http::assertNothingSent();
+
+        return;
+    }
+
+    $this->fail('Expected a MediaException.');
+});
+
+it('does not send a request without a media filename', function (): void {
+    Http::preventStrayRequests();
+
+    try {
+        app(TeleggaInterface::class)->uploadMedia(
+            contents: 'file-content',
+            filename: '   ',
+        );
+    } catch (MediaException $exception) {
+        expect($exception->getMessage())
+            ->toBe('Media filename cannot be empty.')
+            ->and($exception->filename)
             ->toBe('   ')
             ->and($exception->mediaId)
             ->toBeNull()
@@ -111,80 +127,70 @@ it('не отправляет запрос с пустым путём к мед�
         return;
     }
 
-    test()->fail('Ожидалось исключение MediaException.');
+    $this->fail('Expected a MediaException.');
 });
 
-it('скрывает ошибку недоступного локального файла', function (): void {
-    $path = sys_get_temp_dir().DIRECTORY_SEPARATOR.'missing-telegga-media-file';
-
+it('does not send a media file larger than fifty megabytes', function (): void {
     Http::preventStrayRequests();
 
     try {
-        app(TeleggaInterface::class)->uploadMedia(path: $path);
+        app(TeleggaInterface::class)->uploadMedia(
+            contents: str_repeat('a', 50 * 1024 * 1024 + 1),
+            filename: 'large.bin',
+        );
     } catch (MediaException $exception) {
-        expect($exception->filePath)
-            ->toBe($path)
+        expect($exception->getMessage())
+            ->toBe('Media file exceeds the maximum size of 50 MB.')
+            ->and($exception->filename)
+            ->toBe('large.bin')
             ->and($exception->mediaId)
             ->toBeNull()
             ->and($exception->getPrevious())
-            ->toBeInstanceOf(InvalidArgumentException::class);
+            ->toBeNull();
 
         Http::assertNothingSent();
 
         return;
     }
 
-    test()->fail('Ожидалось исключение MediaException.');
+    $this->fail('Expected a MediaException.');
 });
 
-it('скрывает ошибку api при загрузке медиафайла', function (): void {
-    $path = tempnam(directory: sys_get_temp_dir(), prefix: 'telegga-media-');
-
-    if ($path === false) {
-        test()->fail('Не удалось создать временный файл.');
-    }
-
-    file_put_contents(filename: $path, data: 'file-content');
+it('wraps an API error when uploading a media file', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/media' => Http::response([
+            'error' => [
+                'code' => 'invalid_request',
+                'message' => 'Media file is invalid.',
+            ],
+        ], 400),
+    ]);
 
     try {
-        Http::preventStrayRequests();
-        Http::fake([
-            'api.telegga.net/api/v1/media' => Http::response([
-                'error' => [
-                    'code' => 'invalid_request',
-                    'message' => 'Media file is invalid.',
-                ],
-            ], 400),
-        ]);
+        app(TeleggaInterface::class)->uploadMedia(
+            contents: 'file-content',
+            filename: 'photo.jpg',
+        );
+    } catch (MediaException $exception) {
+        expect($exception->filename)
+            ->toBe('photo.jpg')
+            ->and($exception->mediaId)
+            ->toBeNull()
+            ->and($exception->getPrevious())
+            ->toBeInstanceOf(TeleggaApiException::class)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
+            ->toBe('invalid_request')
+            ->and($this->previousApiException(exception: $exception)->status)
+            ->toBe(400);
 
-        try {
-            app(TeleggaInterface::class)->uploadMedia(
-                path: $path,
-            );
-        } catch (MediaException $exception) {
-            expect($exception->filePath)
-                ->toBe($path)
-                ->and($exception->mediaId)
-                ->toBeNull()
-                ->and($exception->getPrevious())
-                ->toBeInstanceOf(TeleggaApiException::class)
-                ->and($exception->getPrevious()?->apiCode)
-                ->toBe('invalid_request')
-                ->and($exception->getPrevious()?->status)
-                ->toBe(400);
-
-            return;
-        }
-
-        test()->fail('Ожидалось исключение MediaException.');
-    } finally {
-        if (is_file(filename: $path)) {
-            unlink(filename: $path);
-        }
+        return;
     }
+
+    $this->fail('Expected a MediaException.');
 });
 
-it('не отправляет запрос с пустым идентификатором медиафайла', function (): void {
+it('does not send a request with an empty media identifier', function (): void {
     Http::preventStrayRequests();
 
     try {
@@ -194,7 +200,7 @@ it('не отправляет запрос с пустым идентифика�
             ->toBe('Media identifier cannot be empty.')
             ->and($exception->mediaId)
             ->toBe('   ')
-            ->and($exception->filePath)
+            ->and($exception->filename)
             ->toBeNull()
             ->and($exception->getPrevious())
             ->toBeNull();
@@ -204,10 +210,10 @@ it('не отправляет запрос с пустым идентифика�
         return;
     }
 
-    test()->fail('Ожидалось исключение MediaException.');
+    $this->fail('Expected a MediaException.');
 });
 
-it('скрывает ошибку api при получении метаданных медиафайла', function (): void {
+it('wraps an API error when getting media metadata', function (): void {
     $mediaId = 'e97d00ad-0000-4000-8000-000000000000';
 
     Http::preventStrayRequests();
@@ -227,22 +233,22 @@ it('скрывает ошибку api при получении метаданн
     } catch (MediaException $exception) {
         expect($exception->mediaId)
             ->toBe($mediaId)
-            ->and($exception->filePath)
+            ->and($exception->filename)
             ->toBeNull()
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('not_found')
-            ->and($exception->getPrevious()?->status)
+            ->and($this->previousApiException(exception: $exception)->status)
             ->toBe(404);
 
         return;
     }
 
-    test()->fail('Ожидалось исключение MediaException.');
+    $this->fail('Expected a MediaException.');
 });
 
-it('отклоняет успешный ответ медиа с некорректным json', function (): void {
+it('rejects a successful media response with invalid JSON', function (): void {
     $mediaId = 'e97d00ad-0000-4000-8000-000000000000';
 
     Http::preventStrayRequests();
@@ -262,11 +268,11 @@ it('отклоняет успешный ответ медиа с некорре�
             ->toBe($mediaId)
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('invalid_response');
 
         return;
     }
 
-    test()->fail('Ожидалось исключение MediaException.');
+    $this->fail('Expected a MediaException.');
 });

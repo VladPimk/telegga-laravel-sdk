@@ -4,54 +4,60 @@ declare(strict_types=1);
 
 namespace Telegga\Laravel\Services;
 
+use Telegga\Laravel\BroadcastAudience;
+use Telegga\Laravel\Dto\BroadcastCancellationData;
+use Telegga\Laravel\Dto\BroadcastCreatedData;
+use Telegga\Laravel\Dto\BroadcastData;
 use Telegga\Laravel\Exceptions\BroadcastException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Http\TeleggaClient;
+use Telegga\Laravel\Mappers\BroadcastResponseMapper;
 use Telegga\Laravel\Resolvers\ConnectionContextResolver;
 
 final class BroadcastService
 {
     /**
-     * Создать сервис рассылок.
+     * Create the broadcast service.
      */
     public function __construct(
         private readonly TeleggaClient $client,
         private readonly ConnectionContextResolver $contexts,
+        private readonly BroadcastResponseMapper $mapper,
     ) {}
 
     /**
-     * Запустить рассылку.
+     * Start a broadcast for an explicit audience using the connection only to resolve the bot.
      *
      * @param  array<string, mixed>  $data
      */
     public function start(
-        string $uuid,
+        string $viaConnectionUuid,
         string $type,
+        ?BroadcastAudience $audience = null,
         array $data = [],
-        ?string $groupId = null,
-    ): object {
-        if (trim($uuid) === '') {
+    ): BroadcastCreatedData {
+        if (trim($viaConnectionUuid) === '') {
             throw new BroadcastException(
                 message: 'Connection UUID cannot be empty.',
-                connectionUuid: $uuid,
+                connectionUuid: $viaConnectionUuid,
             );
         }
 
         if (trim($type) === '') {
             throw new BroadcastException(
                 message: 'Broadcast type cannot be empty.',
-                connectionUuid: $uuid,
+                connectionUuid: $viaConnectionUuid,
             );
         }
 
-        if ($groupId !== null && trim($groupId) === '') {
+        if ($audience === null) {
             throw new BroadcastException(
-                message: 'Group identifier cannot be empty.',
-                connectionUuid: $uuid,
+                message: 'Broadcast audience must be specified.',
+                connectionUuid: $viaConnectionUuid,
             );
         }
 
-        $context = $this->contexts->resolveBot(uuid: $uuid);
+        $context = $this->contexts->resolveBot(uuid: $viaConnectionUuid);
         unset(
             $data['external_id'],
             $data['user_id'],
@@ -61,14 +67,14 @@ final class BroadcastService
         );
         $data['bot_id'] = $context->link->bot_id;
 
-        if ($groupId !== null) {
-            $data['group_id'] = trim($groupId);
+        if ($audience->groupId !== null) {
+            $data['group_id'] = $audience->groupId;
         }
 
         $data['type'] = trim($type);
 
         try {
-            return $this->ensureObject(
+            return $this->mapper->fromStart(
                 response: $this->client->post(
                     uri: 'broadcasts',
                     data: $data,
@@ -77,21 +83,21 @@ final class BroadcastService
         } catch (TeleggaApiException $exception) {
             throw new BroadcastException(
                 message: $exception->getMessage(),
-                connectionUuid: $uuid,
+                connectionUuid: $viaConnectionUuid,
                 previous: $exception,
             );
         }
     }
 
     /**
-     * Получить прогресс рассылки.
+     * Get broadcast progress.
      */
-    public function get(string $broadcastId): object
+    public function get(string $broadcastId): BroadcastData
     {
         $this->validateBroadcastId(broadcastId: $broadcastId);
 
         try {
-            return $this->ensureObject(
+            return $this->mapper->fromGet(
                 response: $this->client->get(
                     uri: 'broadcasts/'.rawurlencode($broadcastId),
                 )->object(),
@@ -106,14 +112,14 @@ final class BroadcastService
     }
 
     /**
-     * Отменить рассылку.
+     * Cancel a broadcast.
      */
-    public function cancel(string $broadcastId): object
+    public function cancel(string $broadcastId): BroadcastCancellationData
     {
         $this->validateBroadcastId(broadcastId: $broadcastId);
 
         try {
-            return $this->ensureObject(
+            return $this->mapper->fromCancel(
                 response: $this->client->post(
                     uri: 'broadcasts/'.rawurlencode($broadcastId).'/cancel',
                 )->object(),
@@ -128,7 +134,7 @@ final class BroadcastService
     }
 
     /**
-     * Проверить идентификатор рассылки.
+     * Validate a broadcast identifier.
      */
     private function validateBroadcastId(string $broadcastId): void
     {
@@ -138,21 +144,5 @@ final class BroadcastService
                 broadcastId: $broadcastId,
             );
         }
-    }
-
-    /**
-     * Проверить объект ответа рассылки.
-     */
-    private function ensureObject(mixed $response): object
-    {
-        if (! is_object($response)) {
-            throw new TeleggaApiException(
-                message: 'Telegga returned an invalid broadcast response.',
-                status: 0,
-                apiCode: 'invalid_response',
-            );
-        }
-
-        return $response;
     }
 }

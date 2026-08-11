@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
@@ -16,30 +16,16 @@ use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Models\TelegramConnectedUser;
 
 beforeEach(function (): void {
-    Schema::enableForeignKeyConstraints();
-
-    Schema::create('users', function (Blueprint $table): void {
-        $table->id();
-        $table->string('name');
-        $table->timestamps();
-    });
-
-    $botMigration = require __DIR__.'/../../database/migrations/2026_07_31_000001_create_available_telegram_bots_table.php';
-    $botMigration->up();
-
-    $connectionMigration = require __DIR__.'/../../database/migrations/2026_07_31_000002_create_telegram_connected_users_table.php';
-    $connectionMigration->up();
+    Model::preventLazyLoading();
 
     $this->telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
 });
 
 afterEach(function (): void {
-    Schema::dropIfExists('telegram_connected_users');
-    Schema::dropIfExists('available_telegram_bots');
-    Schema::dropIfExists('users');
+    Model::preventLazyLoading(false);
 });
 
-it('создаёт независимое подключение через выбранного активного бота', function (): void {
+it('creates an independent connection through the selected active bot', function (): void {
     $selectedBot = AvailableTelegramBot::query()->create(['bot_name' => 'second_bot']);
 
     Http::preventStrayRequests();
@@ -86,9 +72,7 @@ it('создаёт независимое подключение через вы
     );
     $connection = TelegramConnectedUser::query()->sole();
 
-    expect($result)
-        ->toBeInstanceOf(stdClass::class)
-        ->and($result->external_id)
+    expect($result->external_id)
         ->toBe($connection->uuid)
         ->and($result->link_url)
         ->toBe('https://t.me/second_bot?start=6U828WSH')
@@ -119,7 +103,7 @@ it('создаёт независимое подключение через вы
     });
 });
 
-it('сохраняет необязательный идентификатор пользователя проекта', function (): void {
+it('stores an optional application user identifier', function (): void {
     $userId = Schema::getConnection()
         ->table('users')
         ->insertGetId([
@@ -158,7 +142,64 @@ it('сохраняет необязательный идентификатор �
     });
 });
 
-it('оставляет локальную запись несозданной при ошибке api', function (): void {
+it('retries user creation after a temporary API error', function (): void {
+    $userRequestAttempt = 0;
+
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/bots' => Http::response([
+            'data' => [['bot_id' => 'bot-1', 'username' => 'mybot', 'status' => 'active']],
+        ]),
+        'api.telegga.net/api/v1/users' => function (Request $request) use (&$userRequestAttempt) {
+            $userRequestAttempt++;
+
+            if ($userRequestAttempt === 1) {
+                return Http::response([
+                    'error' => [
+                        'code' => 'internal',
+                        'message' => 'Temporary error.',
+                    ],
+                ], 503);
+            }
+
+            return Http::response([
+                'user_id' => 'telegga-user-1',
+                'external_id' => $request->data()['external_id'],
+                'link_status' => 'pending',
+                'link_code' => '6U828WSH',
+                'link_url' => 'https://t.me/mybot?start=6U828WSH',
+            ], 201);
+        },
+    ]);
+
+    $result = app(TeleggaInterface::class)->createConnection(
+        name: 'Иван',
+        telegramBotUuid: $this->telegramBot->uuid,
+        email: 'ivan@example.com',
+    );
+    $connection = TelegramConnectedUser::query()->sole();
+    $userRequests = Http::recorded(
+        callback: fn (Request $request): bool => $request->method() === 'POST'
+            && $request->url() === 'https://api.telegga.net/api/v1/users',
+    )->values();
+
+    expect($result->user_id)
+        ->toBe('telegga-user-1')
+        ->and($connection->is_created)
+        ->toBeTrue()
+        ->and($connection->is_connected)
+        ->toBeFalse()
+        ->and(TelegramConnectedUser::query()->count())
+        ->toBe(1);
+
+    $this->assertCount(2, $userRequests);
+    expect($userRequests[0][0]->data())
+        ->toBe($userRequests[1][0]->data());
+
+    Http::assertSentCount(3);
+});
+
+it('leaves the local record uncreated after an API error', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
@@ -190,15 +231,15 @@ it('оставляет локальную запись несозданной п
             ->and($connection->is_connected)
             ->toBeFalse();
 
-        Http::assertSentCount(2);
+        Http::assertSentCount(4);
 
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
-it('повторно отправляет существующее подключение с тем же uuid', function (): void {
+it('resends an existing connection with the same UUID', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'email' => 'ivan@example.com',
@@ -244,7 +285,7 @@ it('повторно отправляет существующее подклю�
     });
 });
 
-it('отклоняет пустой идентификатор группы до создания локальной записи', function (): void {
+it('rejects an empty group identifier before creating a local record', function (): void {
     Http::preventStrayRequests();
 
     try {
@@ -264,10 +305,10 @@ it('отклоняет пустой идентификатор группы до
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
-it('не повторяет уже созданное подключение', function (): void {
+it('does not retry an already created connection', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'is_created' => true,
@@ -291,10 +332,10 @@ it('не повторяет уже созданное подключение', f
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
-it('сохраняет uuid в исключении при отсутствии выбранного активного бота', function (): void {
+it('preserves the UUID in an exception when the selected active bot is missing', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
@@ -333,10 +374,10 @@ it('сохраняет uuid в исключении при отсутствии 
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
-it('не создаёт подключение при неполном совпадении имени активного бота', function (): void {
+it('does not create a connection when the active bot name only partially matches', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
@@ -368,10 +409,10 @@ it('не создаёт подключение при неполном совп�
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
-it('не создаёт локальную запись с пустым именем', function (): void {
+it('does not create a local record with an empty name', function (): void {
     try {
         app(TeleggaInterface::class)->createConnection(
             name: '   ',
@@ -386,10 +427,10 @@ it('не создаёт локальную запись с пустым имен
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
-it('не создаёт подключение для неизвестного локального бота', function (): void {
+it('does not create a connection for an unknown local bot', function (): void {
     $botUuid = Str::uuid()->toString();
     Http::preventStrayRequests();
 
@@ -411,10 +452,10 @@ it('не создаёт подключение для неизвестного �
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
-it('скрывает ошибку базы данных при создании локальной записи', function (): void {
+it('wraps a database error when creating a local record', function (): void {
     Http::preventStrayRequests();
 
     try {
@@ -436,13 +477,13 @@ it('скрывает ошибку базы данных при создании 
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
-it('скрывает ошибку базы данных при поиске подключения', function (): void {
+it('wraps a database error when looking up a connection', function (): void {
     $uuid = (string) Str::uuid();
 
-    Schema::drop('telegram_connected_users');
+    $this->dropConnectionTable();
     Http::preventStrayRequests();
 
     try {
@@ -458,10 +499,10 @@ it('скрывает ошибку базы данных при поиске по
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
-it('отклоняет retry для неизвестного uuid', function (): void {
+it('rejects a retry for an unknown UUID', function (): void {
     $uuid = (string) Str::uuid();
 
     Http::preventStrayRequests();
@@ -479,10 +520,10 @@ it('отклоняет retry для неизвестного uuid', function ():
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
 
-it('отклоняет успешный ответ api с некорректным json', function (): void {
+it('rejects a successful API response with invalid JSON', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
@@ -506,7 +547,7 @@ it('отклоняет успешный ответ api с некорректны
             ->toBe($connection->uuid)
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($exception->getPrevious()?->apiCode)
+            ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('invalid_response')
             ->and($connection->is_created)
             ->toBeFalse();
@@ -516,5 +557,5 @@ it('отклоняет успешный ответ api с некорректны
         return;
     }
 
-    test()->fail('Ожидалось исключение ConnectionException.');
+    $this->fail('Expected a ConnectionException.');
 });
