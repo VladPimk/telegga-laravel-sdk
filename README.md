@@ -58,6 +58,29 @@ The API base URL defaults to `https://api.telegga.net/api/v1` and must use HTTPS
 
 Generate a strong webhook token with `str()->random(64)` and set the same `TELEGGA_WEBHOOK_TOKEN` value as the webhook bearer token in the Telegga admin panel. `TELEGGA_WEBHOOK_PREVIOUS_TOKEN` is optional and should remain empty outside a token rotation.
 
+## Upgrading from 1.x
+
+Version 2.0 requires PHP 8.3 or later and Laravel 12 or 13. Update the dependency and run the package migrations:
+
+```bash
+composer require telegga/laravel-sdk:^2.0
+php artisan migrate
+```
+
+The 1.x line was distributed for development before the first Packagist publication. Version 2.0 amends its original package migrations. An application that installed 1.x directly from GitHub must either recreate the package tables in a development environment or provide application-owned upgrade migrations that preserve its existing data before deploying 2.0.
+
+Review these public API changes before upgrading:
+
+- successful JSON responses are returned as typed DTOs whose properties match the Telegga `snake_case` fields;
+- `uploadMedia()` accepts `contents` and `filename` instead of a filesystem path;
+- `getMessages()` requires explicit `from` and `to` values;
+- `getGroups()` returns `GroupPageData` with `data` and `next_cursor`;
+- `startBroadcast()` requires an explicit `BroadcastAudience`;
+- `user.linked` webhooks require the documented `event_id` and are persisted for idempotent processing;
+- the webhook route accepts JSON payloads only.
+
+If the package configuration was published previously, compare it with the current [`config/telegga.php`](config/telegga.php), especially the retry, webhook route, token rotation, application user model, and application users table settings. Existing application overrides are preserved, so newly introduced settings otherwise use their package defaults.
+
 ## API response DTOs
 
 Public methods return typed response DTOs instead of unstructured objects. DTO property names intentionally match the Telegga JSON fields in `snake_case`, so the package contract remains transparent:
