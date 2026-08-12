@@ -130,6 +130,24 @@ Delete an unused bot by its local UUID:
 $telegga->deleteTelegramBot(uuid: $bot->uuid);
 ```
 
+Synchronize every currently active Telegga bot into the local table:
+
+```bash
+php artisan telegga:bots:sync
+```
+
+The command clears the cached remote bot list, performs one current `GET /bots` request, and creates missing local records for active bots. Existing records and their local UUIDs are preserved. Inactive, inaccessible, or missing remote bots are never removed locally, and a previously soft-deleted bot is represented by a new local record if it becomes active again. The command logs its result and exits with a failure code without changing local records when the API response cannot be loaded or the database transaction fails.
+
+The host application controls the synchronization schedule. For example, in `routes/console.php`:
+
+```php
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::command('telegga:bots:sync')
+    ->hourly()
+    ->withoutOverlapping();
+```
+
 Deletion is rejected when the bot is associated with at least one connection.
 
 ## Creating a connection
