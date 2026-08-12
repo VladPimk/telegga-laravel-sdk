@@ -6,6 +6,7 @@ namespace Telegga\Laravel\Services;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Telegga\Laravel\Dto\ConnectionData;
 use Telegga\Laravel\Dto\UserData;
@@ -249,6 +250,31 @@ final class ConnectionService
         } catch (TeleggaApiException $exception) {
             throw new ConnectionException(
                 message: $exception->getMessage(),
+                previous: $exception,
+            );
+        }
+    }
+
+    /**
+     * Get locally stored Telegga connections.
+     *
+     * @return Collection<int, TelegramConnectedUser>
+     */
+    public function getLocal(?int $userId = null): Collection
+    {
+        try {
+            $query = TelegramConnectedUser::query()
+                ->with('telegramBot')
+                ->orderByDesc('id');
+
+            if ($userId !== null) {
+                $query->where('user_id', $userId);
+            }
+
+            return $query->get();
+        } catch (QueryException $exception) {
+            throw new ConnectionException(
+                message: 'Local Telegga connections could not be loaded.',
                 previous: $exception,
             );
         }

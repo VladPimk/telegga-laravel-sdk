@@ -22,6 +22,7 @@ use Telegga\Laravel\Dto\UserData;
 use Telegga\Laravel\Dto\UserGroupMembershipData;
 use Telegga\Laravel\Dto\UserPageData;
 use Telegga\Laravel\Models\AvailableTelegramBot;
+use Telegga\Laravel\Models\TelegramConnectedUser;
 use Telegga\Laravel\Services\BotService;
 use Telegga\Laravel\Services\BroadcastService;
 use Telegga\Laravel\Services\ConnectionService;
@@ -94,6 +95,16 @@ final class Telegga implements TeleggaInterface
             status: $status,
             cursor: $cursor,
         );
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @return Collection<int, TelegramConnectedUser>
+     */
+    public function getLocalConnections(?int $userId = null): Collection
+    {
+        return $this->connections->getLocal(userId: $userId);
     }
 
     /** {@inheritDoc} */
