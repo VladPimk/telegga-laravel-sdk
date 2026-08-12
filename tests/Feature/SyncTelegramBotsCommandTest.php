@@ -199,6 +199,7 @@ it('returns a failure when local synchronization fails', function (): void {
             ],
         ]),
     ]);
+    $this->dropConnectionTable();
     Schema::drop('available_telegram_bots');
 
     $this->artisan('telegga:bots:sync')
