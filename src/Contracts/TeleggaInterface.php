@@ -23,6 +23,7 @@ use Telegga\Laravel\Dto\UserData;
 use Telegga\Laravel\Dto\UserGroupMembershipData;
 use Telegga\Laravel\Dto\UserPageData;
 use Telegga\Laravel\Models\AvailableTelegramBot;
+use Telegga\Laravel\Models\TelegramConnectedUser;
 
 interface TeleggaInterface
 {
@@ -65,6 +66,13 @@ interface TeleggaInterface
         ?string $status = null,
         ?string $cursor = null,
     ): UserPageData;
+
+    /**
+     * Get locally stored Telegga connections.
+     *
+     * @return Collection<int, TelegramConnectedUser>
+     */
+    public function getLocalConnections(?int $userId = null): Collection;
 
     /**
      * Update a connected user.

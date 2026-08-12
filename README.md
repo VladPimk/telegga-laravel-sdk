@@ -192,6 +192,22 @@ The local `TelegramConnectedUser` model stores two independent enum-cast fields.
 
 When Telegga issues a connection code, the package stores its `link_url` and RFC 3339 expiration time locally as `link_url` and `link_expires_at`. The expiration is cast to an immutable date-time object. Use `$connection->hasValidLink()` to verify that the local record is not deleted, the remote user exists, and the link is present, still pending, and has not expired. Exact user lookups preserve an existing pending link because Telegga only returns the URL in create and regenerate-code responses. The package clears the stored URL and expiration when the selected link becomes active, blocked, revoked, missing, or the remote user is not found.
 
+## Reading local connections
+
+Read every locally stored connection without sending a request to the Telegga API:
+
+```php
+$connections = $telegga->getLocalConnections();
+```
+
+Filter the local collection by the optional application `user_id`:
+
+```php
+$connections = $telegga->getLocalConnections(userId: 42);
+```
+
+The method returns a collection of `TelegramConnectedUser` models ordered from newest to oldest. Each model has its `telegramBot` relation preloaded. Soft-deleted connections are excluded by default. This local method does not synchronize remote statuses; use `getConnection()` when current data must be requested from Telegga.
+
 ## Automatic HTTP retries
 
 The package automatically retries transport failures and HTTP `408`, `429`, and `5xx` responses only for operations that are safe to repeat. By default, a request is attempted up to three times with delays of 200 ms and 400 ms. A numeric `Retry-After` header of up to five seconds on a `429` response takes precedence when it requires a longer delay.
