@@ -306,9 +306,15 @@ final class ConnectionContextResolver
                 botName: $botName,
                 activeOnly: false,
             );
-            $attributes['link_status'] = $link === null
+            $linkStatus = $link === null
                 ? null
                 : $this->linkStatus(link: $link, connection: $connection);
+            $attributes['link_status'] = $linkStatus;
+
+            if ($linkStatus !== TelegramLinkStatus::Pending) {
+                $attributes['link_url'] = null;
+                $attributes['link_expires_at'] = null;
+            }
         }
 
         try {
@@ -335,6 +341,8 @@ final class ConnectionContextResolver
             $connection->fill([
                 'status' => TelegramUserStatus::NotCreated,
                 'link_status' => null,
+                'link_url' => null,
+                'link_expires_at' => null,
             ]);
 
             if ($connection->isDirty()) {

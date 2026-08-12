@@ -335,6 +335,7 @@ it('generates a new code through the bot_id of a pending link', function (): voi
             'link_status' => 'pending',
             'link_code' => 'NEWCODE1',
             'link_url' => 'https://t.me/mybot?start=NEWCODE1',
+            'expires_at' => '2099-07-23T15:33:15+01:00',
         ]),
         "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
@@ -355,7 +356,13 @@ it('generates a new code through the bot_id of a pending link', function (): voi
     );
 
     expect($result->link_code)
-        ->toBe('NEWCODE1');
+        ->toBe('NEWCODE1')
+        ->and($connection->refresh()->link_url)
+        ->toBe('https://t.me/mybot?start=NEWCODE1')
+        ->and($connection->link_expires_at?->getTimestamp())
+        ->toBe(strtotime('2099-07-23T15:33:15+01:00'))
+        ->and($connection->hasValidLink())
+        ->toBeTrue();
 
     Http::assertSent(function (Request $request) use ($connection): bool {
         return $request->method() === 'POST'
@@ -407,6 +414,8 @@ it('unlinks a user and resets the local connection status', function (): void {
         'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
         'link_status' => 'active',
+        'link_url' => 'https://t.me/mybot?start=OLD',
+        'link_expires_at' => now()->addDay(),
     ]);
 
     Http::preventStrayRequests();
@@ -434,7 +443,13 @@ it('unlinks a user and resets the local connection status', function (): void {
     );
 
     expect($connection->refresh()->link_status)
-        ->toBe(TelegramLinkStatus::Revoked);
+        ->toBe(TelegramLinkStatus::Revoked)
+        ->and($connection->link_url)
+        ->toBeNull()
+        ->and($connection->link_expires_at)
+        ->toBeNull()
+        ->and($connection->hasValidLink())
+        ->toBeFalse();
 
     Http::assertSent(function (Request $request) use ($connection): bool {
         return $request->method() === 'DELETE'
@@ -682,6 +697,7 @@ it('keeps a disabled user disabled when regenerating a bot-link code', function 
             'link_status' => 'pending',
             'link_code' => 'NEWCODE1',
             'link_url' => 'https://t.me/mybot?start=NEWCODE1',
+            'expires_at' => '2099-07-23T15:33:15+01:00',
         ]),
     ]);
 
@@ -691,7 +707,11 @@ it('keeps a disabled user disabled when regenerating a bot-link code', function 
     expect($connection->status)
         ->toBe(TelegramUserStatus::Disabled)
         ->and($connection->link_status)
-        ->toBe(TelegramLinkStatus::Pending);
+        ->toBe(TelegramLinkStatus::Pending)
+        ->and($connection->link_url)
+        ->toBe('https://t.me/mybot?start=NEWCODE1')
+        ->and($connection->hasValidLink())
+        ->toBeTrue();
 });
 
 it('keeps a disabled user disabled when unlinking its bot', function (): void {

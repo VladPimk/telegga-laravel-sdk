@@ -309,6 +309,14 @@ final class WebhookService
                     $attributes['link_status'] = TelegramLinkStatus::Active;
                 }
 
+                if ($lockedConnection->link_url !== null) {
+                    $attributes['link_url'] = null;
+                }
+
+                if ($lockedConnection->link_expires_at !== null) {
+                    $attributes['link_expires_at'] = null;
+                }
+
                 if ($lockedConnection->status === TelegramUserStatus::NotCreated) {
                     $attributes['status'] = TelegramUserStatus::Active;
                 }

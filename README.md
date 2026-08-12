@@ -172,6 +172,8 @@ The `meta` and `groupId` parameters are optional. The package sends them as `met
 
 The local `TelegramConnectedUser` model stores two independent enum-cast fields. `status` describes the Telegga user and uses `not_created`, `active`, or `disabled`. `link_status` describes only the selected bot link and uses `pending`, `active`, `blocked`, `revoked`, or `null`. A `null` value means that remote creation has not been confirmed or the latest exact API response contains no link for the selected local bot. A disabled user may therefore retain an active bot link, and an active user may have a revoked or blocked link.
 
+When Telegga issues a connection code, the package stores its `link_url` and RFC 3339 expiration time locally as `link_url` and `link_expires_at`. The expiration is cast to an immutable date-time object. Use `$connection->hasValidLink()` to verify that the local record is not deleted, the remote user exists, and the link is present, still pending, and has not expired. Exact user lookups preserve an existing pending link because Telegga only returns the URL in create and regenerate-code responses. The package clears the stored URL and expiration when the selected link becomes active, blocked, revoked, missing, or the remote user is not found.
+
 ## Automatic HTTP retries
 
 The package automatically retries transport failures and HTTP `408`, `429`, and `5xx` responses only for operations that are safe to repeat. By default, a request is attempted up to three times with delays of 200 ms and 400 ms. A numeric `Retry-After` header of up to five seconds on a `429` response takes precedence when it requires a longer delay.

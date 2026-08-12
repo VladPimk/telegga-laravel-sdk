@@ -65,6 +65,9 @@ it('accepts a connection event and returns the result idempotently', function ()
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
         'status' => 'active',
+        'link_status' => 'pending',
+        'link_url' => 'https://t.me/mybot?start=CODE',
+        'link_expires_at' => now()->addDay(),
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
     $payload = [
@@ -123,6 +126,12 @@ it('accepts a connection event and returns the result idempotently', function ()
 
     expect($connection->refresh()->link_status)
         ->toBe(TelegramLinkStatus::Active)
+        ->and($connection->link_url)
+        ->toBeNull()
+        ->and($connection->link_expires_at)
+        ->toBeNull()
+        ->and($connection->hasValidLink())
+        ->toBeFalse()
         ->and(TelegramConnectedUser::query()->count())
         ->toBe(1)
         ->and($webhookEvent->telegram_connected_user_id)

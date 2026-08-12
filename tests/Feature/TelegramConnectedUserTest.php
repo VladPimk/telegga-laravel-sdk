@@ -35,6 +35,8 @@ it('creates the connections table with expected columns', function (): void {
         'available_telegram_bot_id',
         'status',
         'link_status',
+        'link_url',
+        'link_expires_at',
         'created_at',
         'updated_at',
         'deleted_at',
@@ -85,12 +87,49 @@ it('generates a UUID and sets initial statuses', function (): void {
         ->toBe(TelegramUserStatus::NotCreated)
         ->and($connection->link_status)
         ->toBeNull()
+        ->and($connection->link_url)
+        ->toBeNull()
+        ->and($connection->link_expires_at)
+        ->toBeNull()
         ->and($connection->user_id)
         ->toBeNull()
         ->and($connection->telegramBot->is($this->telegramBot))
         ->toBeTrue()
         ->and($connection->user)
         ->toBeNull();
+});
+
+it('determines whether a stored bot connection link is valid', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'available_telegram_bot_id' => $this->telegramBot->id,
+        'status' => 'active',
+        'link_status' => 'pending',
+        'link_url' => 'https://t.me/mybot?start=CODE',
+        'link_expires_at' => now()->addHour(),
+    ]);
+
+    expect($connection->hasValidLink())->toBeTrue();
+
+    $connection->update(attributes: [
+        'link_expires_at' => now()->subSecond(),
+    ]);
+
+    expect($connection->hasValidLink())->toBeFalse();
+
+    $connection->update(attributes: [
+        'link_expires_at' => now()->addHour(),
+        'link_status' => 'active',
+    ]);
+
+    expect($connection->hasValidLink())->toBeFalse();
+
+    $connection->update(attributes: [
+        'link_status' => 'pending',
+    ]);
+    $connection->delete();
+
+    expect($connection->hasValidLink())->toBeFalse();
 });
 
 it('relates a connection to an application user', function (): void {

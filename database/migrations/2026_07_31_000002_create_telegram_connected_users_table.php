@@ -36,6 +36,8 @@ return new class extends Migration
                 ->restrictOnDelete();
             $table->string('status')->default('not_created')->index();
             $table->string('link_status')->nullable()->index();
+            $table->string('link_url')->nullable();
+            $table->timestampTz('link_expires_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

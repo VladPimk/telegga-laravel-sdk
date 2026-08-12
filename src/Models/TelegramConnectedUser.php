@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Telegga\Laravel\Models;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -22,6 +23,8 @@ use Telegga\Laravel\TelegramUserStatus;
  * @property int $available_telegram_bot_id
  * @property TelegramUserStatus $status
  * @property TelegramLinkStatus|null $link_status
+ * @property string|null $link_url
+ * @property CarbonImmutable|null $link_expires_at
  * @property-read AvailableTelegramBot|null $telegramBot
  */
 final class TelegramConnectedUser extends Model
@@ -40,6 +43,8 @@ final class TelegramConnectedUser extends Model
         'available_telegram_bot_id',
         'status',
         'link_status',
+        'link_url',
+        'link_expires_at',
     ];
 
     /**
@@ -62,7 +67,21 @@ final class TelegramConnectedUser extends Model
         return [
             'status' => TelegramUserStatus::class,
             'link_status' => TelegramLinkStatus::class,
+            'link_expires_at' => 'immutable_datetime',
         ];
+    }
+
+    /**
+     * Determine whether the stored bot connection link can still be used.
+     */
+    public function hasValidLink(): bool
+    {
+        return ! $this->trashed()
+            && $this->status->existsInTelegga()
+            && $this->link_status === TelegramLinkStatus::Pending
+            && is_string($this->link_url)
+            && trim($this->link_url) !== ''
+            && $this->link_expires_at?->isFuture() === true;
     }
 
     /**

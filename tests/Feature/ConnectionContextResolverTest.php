@@ -226,6 +226,8 @@ it('synchronizes a disabled user without losing its active bot link', function (
         'name' => 'Иван',
         'status' => 'active',
         'link_status' => 'pending',
+        'link_url' => 'https://t.me/mybot?start=OLD',
+        'link_expires_at' => now()->addDay(),
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -253,7 +255,11 @@ it('synchronizes a disabled user without losing its active bot link', function (
             ->and($connection->refresh()->status)
             ->toBe(TelegramUserStatus::Disabled)
             ->and($connection->link_status)
-            ->toBe(TelegramLinkStatus::Active);
+            ->toBe(TelegramLinkStatus::Active)
+            ->and($connection->link_url)
+            ->toBeNull()
+            ->and($connection->link_expires_at)
+            ->toBeNull();
 
         return;
     }
@@ -266,6 +272,8 @@ it('wraps an API error when looking up a Telegga user', function (): void {
         'name' => 'Иван',
         'status' => 'active',
         'link_status' => 'active',
+        'link_url' => 'https://t.me/mybot?start=OLD',
+        'link_expires_at' => now()->addDay(),
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -293,12 +301,53 @@ it('wraps an API error when looking up a Telegga user', function (): void {
             ->and($connection->refresh()->status)
             ->toBe(TelegramUserStatus::NotCreated)
             ->and($connection->link_status)
+            ->toBeNull()
+            ->and($connection->link_url)
+            ->toBeNull()
+            ->and($connection->link_expires_at)
             ->toBeNull();
 
         return;
     }
 
     $this->fail('Expected a ConnectionException.');
+});
+
+it('preserves an issued link while exact synchronization remains pending', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'status' => 'active',
+        'link_status' => 'pending',
+        'link_url' => 'https://t.me/mybot?start=CODE',
+        'link_expires_at' => now()->addDay(),
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+            'status' => 'active',
+            'links' => [
+                [
+                    'bot_id' => 'bot-pending',
+                    'bot_username' => 'mybot',
+                    'status' => 'pending',
+                ],
+            ],
+        ]),
+    ]);
+
+    app(ConnectionContextResolver::class)->resolveBot(uuid: $connection->uuid);
+    $connection->refresh();
+
+    expect($connection->link_status)
+        ->toBe(TelegramLinkStatus::Pending)
+        ->and($connection->link_url)
+        ->toBe('https://t.me/mybot?start=CODE')
+        ->and($connection->hasValidLink())
+        ->toBeTrue();
 });
 
 it('rejects a Telegga user without an active bot link', function (): void {

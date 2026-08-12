@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Telegga\Laravel\Services;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Log;
 use Telegga\Laravel\Dto\ConnectionData;
@@ -144,6 +145,11 @@ final class ConnectionService
             telegramBot: $telegramBot,
             meta: $meta,
             groupId: $groupId,
+        );
+
+        $this->synchronizeLinkInvitation(
+            connection: $connection,
+            response: $response,
         );
 
         try {
@@ -337,7 +343,7 @@ final class ConnectionService
 
         $this->synchronizeLinkStatus(
             connection: $context->connection,
-            linkStatus: $response->link_status,
+            response: $response,
         );
 
         return $response;
@@ -368,6 +374,8 @@ final class ConnectionService
         try {
             $context->connection->update([
                 'link_status' => TelegramLinkStatus::Revoked,
+                'link_url' => null,
+                'link_expires_at' => null,
             ]);
         } catch (Throwable $exception) {
             throw new ConnectionException(
@@ -453,6 +461,8 @@ final class ConnectionService
                 ->update([
                     'status' => TelegramUserStatus::NotCreated,
                     'link_status' => null,
+                    'link_url' => null,
+                    'link_expires_at' => null,
                 ]);
 
             $storedConnection = TelegramConnectedUser::query()
@@ -462,6 +472,8 @@ final class ConnectionService
                 || (
                     $storedConnection->status === TelegramUserStatus::NotCreated
                     && $storedConnection->link_status === null
+                    && $storedConnection->link_url === null
+                    && $storedConnection->link_expires_at === null
                 );
         } catch (Throwable $exception) {
             $stateException = $exception;
@@ -556,11 +568,16 @@ final class ConnectionService
         ConnectionData $response,
     ): void {
         try {
-            $connection->update([
+            $linkStatus = $this->parseLinkStatus(
+                status: $response->link_status,
+                connectionUuid: $connection->uuid,
+            );
+            $connection->update(attributes: [
                 'status' => TelegramUserStatus::Active,
-                'link_status' => $this->parseLinkStatus(
-                    status: $response->link_status,
-                    connectionUuid: $connection->uuid,
+                'link_status' => $linkStatus,
+                ...$this->linkInvitationAttributes(
+                    linkStatus: $linkStatus,
+                    response: $response,
                 ),
             ]);
         } catch (ConnectionException $exception) {
@@ -579,13 +596,18 @@ final class ConnectionService
      */
     private function synchronizeLinkStatus(
         TelegramConnectedUser $connection,
-        string $linkStatus,
+        ConnectionData $response,
     ): void {
         try {
-            $connection->update([
-                'link_status' => $this->parseLinkStatus(
-                    status: $linkStatus,
-                    connectionUuid: $connection->uuid,
+            $linkStatus = $this->parseLinkStatus(
+                status: $response->link_status,
+                connectionUuid: $connection->uuid,
+            );
+            $connection->update(attributes: [
+                'link_status' => $linkStatus,
+                ...$this->linkInvitationAttributes(
+                    linkStatus: $linkStatus,
+                    response: $response,
                 ),
             ]);
         } catch (ConnectionException $exception) {
@@ -597,6 +619,71 @@ final class ConnectionService
                 previous: $exception,
             );
         }
+    }
+
+    /**
+     * Store a newly issued bot connection link before remote state confirmation.
+     */
+    private function synchronizeLinkInvitation(
+        TelegramConnectedUser $connection,
+        ConnectionData $response,
+    ): void {
+        try {
+            $linkStatus = $this->parseLinkStatus(
+                status: $response->link_status,
+                connectionUuid: $connection->uuid,
+            );
+            $connection->update(attributes: $this->linkInvitationAttributes(
+                linkStatus: $linkStatus,
+                response: $response,
+            ));
+        } catch (Throwable $exception) {
+            throw new ConnectionException(
+                message: 'Local Telegga connection link could not be updated.',
+                connectionUuid: $connection->uuid,
+                previous: $exception,
+            );
+        }
+    }
+
+    /**
+     * Build local attributes for a bot connection link.
+     *
+     * @return array{link_url: string|null, link_expires_at: CarbonImmutable|null}
+     */
+    private function linkInvitationAttributes(
+        ?TelegramLinkStatus $linkStatus,
+        ConnectionData $response,
+    ): array {
+        if ($linkStatus !== TelegramLinkStatus::Pending) {
+            return [
+                'link_url' => null,
+                'link_expires_at' => null,
+            ];
+        }
+
+        return [
+            'link_url' => $response->link_url,
+            'link_expires_at' => $this->parseLinkExpiration(expiresAt: $response->expires_at),
+        ];
+    }
+
+    /**
+     * Convert an API expiration time to the application timezone for storage.
+     */
+    private function parseLinkExpiration(?string $expiresAt): ?CarbonImmutable
+    {
+        if ($expiresAt === null) {
+            return null;
+        }
+
+        $timezone = config(key: 'app.timezone', default: 'UTC');
+
+        if (! is_string($timezone) || trim($timezone) === '') {
+            $timezone = 'UTC';
+        }
+
+        return CarbonImmutable::parse($expiresAt)->setTimezone($timezone);
     }
 
     /**
