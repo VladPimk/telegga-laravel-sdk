@@ -12,7 +12,7 @@ beforeEach(function (): void {
     $telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
     $this->connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $telegramBot->id,
     ]);
 });

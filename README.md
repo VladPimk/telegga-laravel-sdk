@@ -170,6 +170,8 @@ if (($result->link_status ?? null) === 'pending') {
 
 The `meta` and `groupId` parameters are optional. The package sends them as `meta` and `group_id` in the `POST /users` request. These values are not stored locally.
 
+The local `TelegramConnectedUser` model stores two independent enum-cast fields. `status` describes the Telegga user and uses `not_created`, `active`, or `disabled`. `link_status` describes only the selected bot link and uses `pending`, `active`, `blocked`, `revoked`, or `null`. A `null` value means that remote creation has not been confirmed or the latest exact API response contains no link for the selected local bot. A disabled user may therefore retain an active bot link, and an active user may have a revoked or blocked link.
+
 ## Automatic HTTP retries
 
 The package automatically retries transport failures and HTTP `408`, `429`, and `5xx` responses only for operations that are safe to repeat. By default, a request is attempted up to three times with delays of 200 ms and 400 ms. A numeric `Retry-After` header of up to five seconds on a `429` response takes precedence when it requires a longer delay.
@@ -187,7 +189,7 @@ All `GET` requests are retried. The following modifying operations are explicitl
 
 Message sending, broadcasts, broadcast cancellation, media uploads, group creation, connection-code regeneration, and membership removal are never retried automatically because the API does not provide an idempotency key or an equally strong replay guarantee for those operations.
 
-If a retried user or group deletion ends with `404 not_found`, the package treats the remote object as already deleted and completes the local operation. If a retried unlink ends with `409 user_not_linked`, the local connection is marked as disconnected. The same `404` or `409` received on the first attempt remains an exception, so invalid identifiers are not silently accepted.
+If a retried user or group deletion ends with `404 not_found`, the package treats the remote object as already deleted and completes the local operation. If a retried unlink ends with `409 user_not_linked`, the local `link_status` is set to `revoked`. The same `404` or `409` received on the first attempt remains an exception, so invalid identifiers are not silently accepted.
 
 For group deletion, this means that a direct `404 not_found` is reported as an error, while `503` followed by `404 not_found` is accepted as a completed deletion. The API does not provide an idempotency key that would allow the package to distinguish a lost successful response from an object that was already absent.
 
@@ -205,7 +207,7 @@ $result = $telegga->retryConnection(
 );
 ```
 
-This method is separate from HTTP retries. It repeats the business operation for a local connection that was created locally but was not created in Telegga. If `meta` or `groupId` were used during the first business attempt, pass them again.
+This method is separate from HTTP retries. It repeats the business operation for a local connection whose `status` is still `not_created`. After `POST /users`, the package performs an exact user lookup and stores the confirmed user `status` and selected bot `link_status` independently. If confirmation fails, the local state remains retryable. If `meta` or `groupId` were used during the first business attempt, pass them again.
 
 When a local record was created before the request failed, its UUID is available from the exception:
 
@@ -224,6 +226,8 @@ try {
 ## Managing connections
 
 All connection operations accept the UUID of the local record. For user routes that accept either identifier, the package sends this UUID directly as Telegga's `external_id` without first resolving the internal `user_id`. The package compares the `bot_username` returned by Telegga with the local `bot_name` after converting both values to lowercase. Both values use the username without the `@` prefix. Internal Telegga user and bot identifiers are not stored locally.
+
+When an exact Telegga user lookup returns `404 not_found`, the package synchronizes the local record to `status: not_created` and `link_status: null` before returning `ConnectionException`. Other API errors leave the local statuses unchanged. The local UUID can then be passed to `retryConnection()` to recreate the missing remote user.
 
 Retrieve a user together with links and groups:
 
@@ -263,7 +267,7 @@ $connection = $telegga->updateConnection(
 );
 ```
 
-After a successful API response, `display_name` and `email` are synchronized with the local `name` and `email` fields. An empty `email` string clears the local value. The user status is not stored locally.
+After a successful API response, `display_name`, `email`, and the Telegga user `status` are synchronized locally. An empty `email` string clears the local value. Updating the user status does not overwrite the independent bot `link_status`.
 
 Explicitly generate a new code for an existing link:
 
@@ -271,7 +275,7 @@ Explicitly generate a new code for an existing link:
 $result = $telegga->regenerateConnectionCode(uuid: $uuid);
 ```
 
-Unlinking a user from the bot preserves the local record and sets `is_connected` to `false`:
+Unlinking a user from the bot preserves the local record and user `status`, and sets `link_status` to `revoked`:
 
 ```php
 $telegga->unlinkConnection(uuid: $uuid);
@@ -544,11 +548,11 @@ The `user.linked` event requires every field documented by Telegga, including `e
 
 After the connection and event identity checks succeed, the package stores the event in `telegga_webhook_events` and relates it to the local connection before validating the assigned bot. This preserves retryable bot validation failures and processing failures as unprocessed events. `attempts` counts deliveries of the same accepted `event_id`, while `first_seen_at` records its first delivery. The locally generated event `uuid` is separate from Telegga's globally unique `event_id`.
 
-When bot validation succeeds, the authenticated `user.linked` event is treated as authoritative confirmation that the Telegga user exists and is linked. A database transaction atomically sets both `is_created` and `is_connected` to `true` when necessary and records `processed_at`. A later delivery can finish an event that was stored but not processed. This repairs local state when the API operation succeeded but its response or local synchronization failed.
+When bot validation succeeds, the authenticated `user.linked` event is treated as authoritative confirmation that the Telegga user exists and the selected bot link is active. A database transaction sets `link_status` to `active`, changes `status` from `not_created` to `active` when necessary, and records `processed_at`. An existing `disabled` user status is preserved because user activation and bot linking are independent API states. A later delivery can finish an event that was stored but not processed.
 
 Repeated delivery of a processed `event_id` for the same connection increments `attempts`, returns `200`, and does not load the bot or update the connection again. An unprocessed stored event can complete on a later delivery. Reusing an `event_id` for another connection or event type returns `409 event_id_conflict`. The database unique constraint on `event_id` and row locking prevent concurrent delivery from applying the same event twice.
 
-Successful `user.linked` and `test` events return `200` with JSON containing `success`, the event type, and a result message. A `user.linked` response also contains its required `event_id`, `external_id`, `bot_username`, and the resulting connection status. The `test` event has no `event_id` and is not stored.
+Successful `user.linked` and `test` events return `200` with JSON containing `success`, the event type, and a result message. A `user.linked` response also contains its required `event_id`, `external_id`, `bot_username`, and the resulting independent `status` and `link_status`. The `test` event has no `event_id` and is not stored.
 
 Webhook processing uses the following error codes:
 

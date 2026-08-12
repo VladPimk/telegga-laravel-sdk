@@ -21,7 +21,7 @@ it('passes message type and data to the unified API endpoint', function (
 ): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -30,6 +30,7 @@ it('passes message type and data to the unified API endpoint', function (
         "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
+            'status' => 'active',
             'links' => [
                 [
                     'bot_id' => 'bot-active',
@@ -144,7 +145,7 @@ it('passes message type and data to the unified API endpoint', function (
 it('does not allow reserved message fields to be overridden', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -153,6 +154,7 @@ it('does not allow reserved message fields to be overridden', function (): void 
         "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
+            'status' => 'active',
             'links' => [
                 [
                     'bot_id' => 'bot-active',
@@ -240,7 +242,7 @@ it('does not send a message with an empty type', function (): void {
 it('does not send a message without an active link', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -249,6 +251,7 @@ it('does not send a message without an active link', function (): void {
         "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
+            'status' => 'active',
             'links' => [
                 [
                     'bot_id' => 'bot-revoked',
@@ -280,7 +283,7 @@ it('does not send a message without an active link', function (): void {
 it('wraps an API error when sending a message', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -289,6 +292,7 @@ it('wraps an API error when sending a message', function (): void {
         "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
+            'status' => 'active',
             'links' => [
                 [
                     'bot_id' => 'bot-active',
@@ -330,7 +334,7 @@ it('wraps an API error when sending a message', function (): void {
 it('rejects a successful message response with invalid JSON', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -339,6 +343,7 @@ it('rejects a successful message response with invalid JSON', function (): void 
         "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
+            'status' => 'active',
             'links' => [
                 [
                     'bot_id' => 'bot-active',

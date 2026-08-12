@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Models\TelegramConnectedUser;
+use Telegga\Laravel\TelegramUserStatus;
 
 beforeEach(function (): void {
     $this->telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
@@ -32,8 +33,8 @@ it('creates the connections table with expected columns', function (): void {
         'email',
         'user_id',
         'available_telegram_bot_id',
-        'is_connected',
-        'is_created',
+        'status',
+        'link_status',
         'created_at',
         'updated_at',
         'deleted_at',
@@ -54,6 +55,14 @@ it('creates the expected connection table indexes', function (): void {
         ->and($indexes->contains(
             fn (array $index): bool => $index['columns'] === ['available_telegram_bot_id']
                 && $index['unique'] === false,
+        ))->toBeTrue()
+        ->and($indexes->contains(
+            fn (array $index): bool => $index['columns'] === ['status']
+                && $index['unique'] === false,
+        ))->toBeTrue()
+        ->and($indexes->contains(
+            fn (array $index): bool => $index['columns'] === ['link_status']
+                && $index['unique'] === false,
         ))->toBeTrue();
 });
 
@@ -72,10 +81,10 @@ it('generates a UUID and sets initial statuses', function (): void {
         ->not->toBe($providedUuid)
         ->and(Str::isUuid($connection->uuid, 7))
         ->toBeTrue()
-        ->and($connection->is_created)
-        ->toBeFalse()
-        ->and($connection->is_connected)
-        ->toBeFalse()
+        ->and($connection->status)
+        ->toBe(TelegramUserStatus::NotCreated)
+        ->and($connection->link_status)
+        ->toBeNull()
         ->and($connection->user_id)
         ->toBeNull()
         ->and($connection->telegramBot->is($this->telegramBot))

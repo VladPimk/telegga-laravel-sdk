@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\DB;
 use Telegga\Laravel\Exceptions\WebhookException;
 use Telegga\Laravel\Models\TeleggaWebhookEvent;
 use Telegga\Laravel\Models\TelegramConnectedUser;
+use Telegga\Laravel\TelegramLinkStatus;
+use Telegga\Laravel\TelegramUserStatus;
 use Telegga\Laravel\Webhooks\WebhookProcessingResult;
 use Telegga\Laravel\Webhooks\WebhookProcessingStatus;
 
@@ -181,6 +183,8 @@ final class WebhookService
         if ($webhookEvent->processed_at !== null) {
             return new WebhookProcessingResult(
                 status: WebhookProcessingStatus::Duplicate,
+                userStatus: $connection->status,
+                linkStatus: $connection->link_status,
             );
         }
 
@@ -281,29 +285,32 @@ final class WebhookService
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                if ($lockedEvent->processed_at !== null) {
-                    return new WebhookProcessingResult(
-                        status: WebhookProcessingStatus::Duplicate,
-                        expectedBotName: $expectedBotName,
-                    );
-                }
-
                 $lockedConnection = TelegramConnectedUser::withTrashed()
                     ->whereKey($connection->getKey())
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                $status = $lockedConnection->is_connected
-                    ? WebhookProcessingStatus::AlreadyConnected
-                    : WebhookProcessingStatus::Connected;
-                $attributes = [];
-
-                if (! $lockedConnection->is_created) {
-                    $attributes['is_created'] = true;
+                if ($lockedEvent->processed_at !== null) {
+                    return new WebhookProcessingResult(
+                        status: WebhookProcessingStatus::Duplicate,
+                        expectedBotName: $expectedBotName,
+                        userStatus: $lockedConnection->status,
+                        linkStatus: $lockedConnection->link_status,
+                    );
                 }
 
-                if (! $lockedConnection->is_connected) {
-                    $attributes['is_connected'] = true;
+                $status = $lockedConnection->link_status === TelegramLinkStatus::Active
+                    ? WebhookProcessingStatus::AlreadyConnected
+                    : WebhookProcessingStatus::Connected;
+
+                $attributes = [];
+
+                if ($lockedConnection->link_status !== TelegramLinkStatus::Active) {
+                    $attributes['link_status'] = TelegramLinkStatus::Active;
+                }
+
+                if ($lockedConnection->status === TelegramUserStatus::NotCreated) {
+                    $attributes['status'] = TelegramUserStatus::Active;
                 }
 
                 if ($attributes !== []) {
@@ -317,6 +324,8 @@ final class WebhookService
                 return new WebhookProcessingResult(
                     status: $status,
                     expectedBotName: $expectedBotName,
+                    userStatus: $lockedConnection->status,
+                    linkStatus: $lockedConnection->link_status,
                 );
             });
         } catch (QueryException $exception) {

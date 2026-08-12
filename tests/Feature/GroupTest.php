@@ -19,7 +19,7 @@ beforeEach(function (): void {
 it('creates a group for the local connection bot', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -35,6 +35,7 @@ it('creates a group for the local connection bot', function (): void {
         "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
+            'status' => 'active',
             'links' => [
                 [
                     'bot_id' => 'bot-pending',
@@ -70,7 +71,7 @@ it('creates a group for the local connection bot', function (): void {
 it('returns a group page for the local connection bot', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -90,6 +91,7 @@ it('returns a group page for the local connection bot', function (): void {
         "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
+            'status' => 'active',
             'links' => [
                 [
                     'bot_id' => 'bot-active',
@@ -181,7 +183,7 @@ it('gets updates and deletes a group', function (): void {
 it('manages membership through user endpoints', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -237,17 +239,17 @@ it('manages membership through user endpoints', function (): void {
 it('sends local UUIDs as external_ids in one bulk member request', function (): void {
     $first = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
     $second = TelegramConnectedUser::query()->create([
         'name' => 'Пётр',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
     $unselected = TelegramConnectedUser::query()->create([
         'name' => 'Анна',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -292,7 +294,7 @@ it('sends local UUIDs as external_ids in one bulk member request', function (): 
 it('accepts a bulk member response without not_found', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -376,7 +378,7 @@ it('does not add members when a local connection is not created in Telegga', fun
 it('removes a member through the group endpoint', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -489,7 +491,7 @@ it('wraps an API error in a group exception', function (): void {
 it('rejects an invalid group list response', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -501,6 +503,7 @@ it('rejects an invalid group list response', function (): void {
         "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
+            'status' => 'active',
             'links' => [
                 [
                     'bot_id' => 'bot-active',

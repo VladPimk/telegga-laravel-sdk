@@ -11,6 +11,8 @@ use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Models\TelegramConnectedUser;
 use Telegga\Laravel\Resolvers\ConnectionContextResolver;
+use Telegga\Laravel\TelegramLinkStatus;
+use Telegga\Laravel\TelegramUserStatus;
 
 beforeEach(function (): void {
     $this->telegramBot = AvailableTelegramBot::query()->create(['bot_name' => 'mybot']);
@@ -19,7 +21,7 @@ beforeEach(function (): void {
 it('resolves a connection context through an active Telegga link', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -71,7 +73,7 @@ it('resolves a connection context through an active Telegga link', function (): 
 it('matches a bot name case-insensitively', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -80,6 +82,7 @@ it('matches a bot name case-insensitively', function (): void {
         "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
+            'status' => 'active',
             'links' => [
                 [
                     'bot_id' => 'bot-active',
@@ -103,7 +106,7 @@ it('matches a bot name case-insensitively', function (): void {
 it('resolves a Telegga user without an active bot link', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -112,6 +115,7 @@ it('resolves a Telegga user without an active bot link', function (): void {
         "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
+            'status' => 'active',
             'links' => [
                 [
                     'bot_id' => 'bot-revoked',
@@ -137,7 +141,7 @@ it('resolves a Telegga user without an active bot link', function (): void {
 it('prioritizes an active link when resolving any bot link', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -146,6 +150,7 @@ it('prioritizes an active link when resolving any bot link', function (): void {
         "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
+            'status' => 'active',
             'links' => [
                 [
                     'bot_id' => 'bot-revoked',
@@ -216,10 +221,51 @@ it('does not call the API for a connection that is not yet created', function ()
     $this->fail('Expected a ConnectionException.');
 });
 
+it('synchronizes a disabled user without losing its active bot link', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'status' => 'active',
+        'link_status' => 'pending',
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+            'status' => 'disabled',
+            'links' => [
+                [
+                    'bot_id' => 'bot-active',
+                    'bot_username' => 'mybot',
+                    'status' => 'active',
+                ],
+            ],
+        ]),
+    ]);
+
+    try {
+        app(ConnectionContextResolver::class)->resolve(uuid: $connection->uuid);
+    } catch (ConnectionException $exception) {
+        expect($exception->getMessage())
+            ->toBe('Telegga user is disabled.')
+            ->and($connection->refresh()->status)
+            ->toBe(TelegramUserStatus::Disabled)
+            ->and($connection->link_status)
+            ->toBe(TelegramLinkStatus::Active);
+
+        return;
+    }
+
+    $this->fail('Expected a ConnectionException.');
+});
+
 it('wraps an API error when looking up a Telegga user', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
+        'link_status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -243,7 +289,11 @@ it('wraps an API error when looking up a Telegga user', function (): void {
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
             ->and($this->previousApiException(exception: $exception)->apiCode)
-            ->toBe('not_found');
+            ->toBe('not_found')
+            ->and($connection->refresh()->status)
+            ->toBe(TelegramUserStatus::NotCreated)
+            ->and($connection->link_status)
+            ->toBeNull();
 
         return;
     }
@@ -254,7 +304,7 @@ it('wraps an API error when looking up a Telegga user', function (): void {
 it('rejects a Telegga user without an active bot link', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -263,6 +313,7 @@ it('rejects a Telegga user without an active bot link', function (): void {
         "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
+            'status' => 'active',
             'links' => [
                 [
                     'bot_id' => 'bot-revoked',
@@ -281,7 +332,11 @@ it('rejects a Telegga user without an active bot link', function (): void {
         expect($exception->connectionUuid)
             ->toBe($connection->uuid)
             ->and($exception->getPrevious())
-            ->toBeNull();
+            ->toBeNull()
+            ->and($connection->refresh()->status)
+            ->toBe(TelegramUserStatus::Active)
+            ->and($connection->link_status)
+            ->toBe(TelegramLinkStatus::Revoked);
 
         return;
     }
@@ -292,7 +347,7 @@ it('rejects a Telegga user without an active bot link', function (): void {
 it('does not accept a link when the bot name only partially matches', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -301,6 +356,7 @@ it('does not accept a link when the bot name only partially matches', function (
         "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
+            'status' => 'active',
             'links' => [
                 [
                     'bot_id' => 'bot-active',

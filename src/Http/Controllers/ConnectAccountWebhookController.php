@@ -220,7 +220,8 @@ final class ConnectAccountWebhookController
             data: [
                 'external_id' => $externalId,
                 'bot_username' => $botName,
-                'is_connected' => true,
+                'status' => $result->userStatus?->value,
+                'link_status' => $result->linkStatus?->value,
             ],
         );
     }

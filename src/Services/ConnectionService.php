@@ -16,6 +16,8 @@ use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Models\TelegramConnectedUser;
 use Telegga\Laravel\Resolvers\ConnectionContextResolver;
 use Telegga\Laravel\Support\ExceptionLogContext;
+use Telegga\Laravel\TelegramLinkStatus;
+use Telegga\Laravel\TelegramUserStatus;
 use Throwable;
 
 final class ConnectionService
@@ -71,12 +73,19 @@ final class ConnectionService
             );
         }
 
-        return $this->send(
+        $response = $this->createRemoteConnection(
             connection: $connection,
             telegramBot: $telegramBot,
             meta: $meta,
             groupId: $groupId,
         );
+
+        $this->synchronizeCreation(
+            connection: $connection,
+            response: $response,
+        );
+
+        return $response;
     }
 
     /**
@@ -109,7 +118,7 @@ final class ConnectionService
             );
         }
 
-        if ($connection->is_created) {
+        if ($connection->status->existsInTelegga()) {
             throw new ConnectionException(
                 message: 'Telegga connection is already created.',
                 connectionUuid: $connection->uuid,
@@ -130,12 +139,30 @@ final class ConnectionService
             connectionUuid: $connection->uuid,
         );
 
-        return $this->send(
+        $response = $this->createRemoteConnection(
             connection: $connection,
             telegramBot: $telegramBot,
             meta: $meta,
             groupId: $groupId,
         );
+
+        try {
+            $user = $this->users->findByExternalId(externalId: $connection->uuid);
+        } catch (TeleggaApiException $exception) {
+            throw new ConnectionException(
+                message: $exception->getMessage(),
+                connectionUuid: $connection->uuid,
+                previous: $exception,
+            );
+        }
+
+        $this->contexts->synchronizeStatuses(
+            connection: $connection,
+            user: $user,
+            withBot: true,
+        );
+
+        return $response;
     }
 
     /**
@@ -143,17 +170,29 @@ final class ConnectionService
      */
     public function get(string $uuid): UserData
     {
-        $connection = $this->contexts->resolveConnection(uuid: $uuid);
+        $connection = $this->contexts->resolveConnection(uuid: $uuid, withBot: true);
 
         try {
-            return $this->users->get(userId: $connection->uuid);
+            $response = $this->users->get(userId: $connection->uuid);
         } catch (TeleggaApiException $exception) {
+            if ($exception->apiCode === 'not_found') {
+                $this->contexts->synchronizeMissingUser(connection: $connection);
+            }
+
             throw new ConnectionException(
                 message: $exception->getMessage(),
                 connectionUuid: $uuid,
                 previous: $exception,
             );
         }
+
+        $this->contexts->synchronizeStatuses(
+            connection: $connection,
+            user: $response,
+            withBot: true,
+        );
+
+        return $response;
     }
 
     /**
@@ -238,7 +277,7 @@ final class ConnectionService
             );
         }
 
-        $this->synchronize(
+        $this->synchronizeUpdate(
             connection: $connection,
             response: $response,
             data: $data,
@@ -284,7 +323,7 @@ final class ConnectionService
         $context = $this->contexts->resolveBot(uuid: $uuid);
 
         try {
-            return $this->users->regenerateCode(
+            $response = $this->users->regenerateCode(
                 userId: $context->connection->uuid,
                 botId: $context->link->bot_id,
             );
@@ -295,6 +334,13 @@ final class ConnectionService
                 previous: $exception,
             );
         }
+
+        $this->synchronizeLinkStatus(
+            connection: $context->connection,
+            linkStatus: $response->link_status,
+        );
+
+        return $response;
     }
 
     /**
@@ -321,7 +367,7 @@ final class ConnectionService
 
         try {
             $context->connection->update([
-                'is_connected' => false,
+                'link_status' => TelegramLinkStatus::Revoked,
             ]);
         } catch (Throwable $exception) {
             throw new ConnectionException(
@@ -337,7 +383,7 @@ final class ConnectionService
      *
      * @param  array<string, mixed>  $meta
      */
-    private function send(
+    private function createRemoteConnection(
         TelegramConnectedUser $connection,
         AvailableTelegramBot $telegramBot,
         array $meta = [],
@@ -360,24 +406,6 @@ final class ConnectionService
         } catch (BotException|TeleggaApiException $exception) {
             throw new ConnectionException(
                 message: $exception->getMessage(),
-                connectionUuid: $connection->uuid,
-                previous: $exception,
-            );
-        }
-
-        $attributes = [
-            'is_created' => true,
-        ];
-
-        if ($response->link_status === 'active') {
-            $attributes['is_connected'] = true;
-        }
-
-        try {
-            $connection->update(attributes: $attributes);
-        } catch (Throwable $exception) {
-            throw new ConnectionException(
-                message: 'Telegga connection state could not be updated.',
                 connectionUuid: $connection->uuid,
                 previous: $exception,
             );
@@ -423,15 +451,18 @@ final class ConnectionService
             TelegramConnectedUser::query()
                 ->whereKey($connection->getKey())
                 ->update([
-                    'is_created' => false,
-                    'is_connected' => false,
+                    'status' => TelegramUserStatus::NotCreated,
+                    'link_status' => null,
                 ]);
 
             $storedConnection = TelegramConnectedUser::query()
                 ->whereKey($connection->getKey())
                 ->first();
             $stateSynchronized = $storedConnection === null
-                || (! $storedConnection->is_created && ! $storedConnection->is_connected);
+                || (
+                    $storedConnection->status === TelegramUserStatus::NotCreated
+                    && $storedConnection->link_status === null
+                );
         } catch (Throwable $exception) {
             $stateException = $exception;
         }
@@ -466,7 +497,7 @@ final class ConnectionService
      *
      * @param  array<string, mixed>  $data
      */
-    private function synchronize(
+    private function synchronizeUpdate(
         TelegramConnectedUser $connection,
         UserData $response,
         array $data,
@@ -492,9 +523,19 @@ final class ConnectionService
             $attributes['email'] = ($email === null || $email === '') ? null : $email;
         }
 
-        if ($attributes === []) {
-            return;
+        $status = $response->status ?? $data['status'] ?? null;
+        $userStatus = is_string($status)
+            ? TelegramUserStatus::tryFrom($status)
+            : null;
+
+        if ($userStatus === null || $userStatus === TelegramUserStatus::NotCreated) {
+            throw new ConnectionException(
+                message: 'Telegga returned an invalid user status.',
+                connectionUuid: $connection->uuid,
+            );
         }
+
+        $attributes['status'] = $userStatus;
 
         try {
             $connection->update(attributes: $attributes);
@@ -505,5 +546,75 @@ final class ConnectionService
                 previous: $exception,
             );
         }
+    }
+
+    /**
+     * Synchronize a newly created Telegga user and its bot link.
+     */
+    private function synchronizeCreation(
+        TelegramConnectedUser $connection,
+        ConnectionData $response,
+    ): void {
+        try {
+            $connection->update([
+                'status' => TelegramUserStatus::Active,
+                'link_status' => $this->parseLinkStatus(
+                    status: $response->link_status,
+                    connectionUuid: $connection->uuid,
+                ),
+            ]);
+        } catch (ConnectionException $exception) {
+            throw $exception;
+        } catch (Throwable $exception) {
+            throw new ConnectionException(
+                message: 'Telegga connection state could not be updated.',
+                connectionUuid: $connection->uuid,
+                previous: $exception,
+            );
+        }
+    }
+
+    /**
+     * Synchronize a Telegga bot-link status.
+     */
+    private function synchronizeLinkStatus(
+        TelegramConnectedUser $connection,
+        string $linkStatus,
+    ): void {
+        try {
+            $connection->update([
+                'link_status' => $this->parseLinkStatus(
+                    status: $linkStatus,
+                    connectionUuid: $connection->uuid,
+                ),
+            ]);
+        } catch (ConnectionException $exception) {
+            throw $exception;
+        } catch (Throwable $exception) {
+            throw new ConnectionException(
+                message: 'Local Telegga connection state could not be updated.',
+                connectionUuid: $connection->uuid,
+                previous: $exception,
+            );
+        }
+    }
+
+    /**
+     * Convert a Telegga bot-link status to the local enum.
+     */
+    private function parseLinkStatus(
+        string $status,
+        string $connectionUuid,
+    ): TelegramLinkStatus {
+        $linkStatus = TelegramLinkStatus::tryFrom($status);
+
+        if ($linkStatus === null) {
+            throw new ConnectionException(
+                message: 'Telegga returned an invalid bot link status.',
+                connectionUuid: $connectionUuid,
+            );
+        }
+
+        return $linkStatus;
     }
 }
