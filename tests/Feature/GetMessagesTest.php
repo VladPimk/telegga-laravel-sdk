@@ -19,7 +19,7 @@ beforeEach(function (): void {
 it('gets message history only for the specified connection', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -87,7 +87,7 @@ it('gets message history only for the specified connection', function (): void {
 it('returns null for a missing next page cursor', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -214,7 +214,7 @@ it('does not request history for a local connection not created in Telegga', fun
 it('wraps an API error when getting message history', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -253,7 +253,7 @@ it('wraps an API error when getting message history', function (): void {
 it('rejects an invalid message history page', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 

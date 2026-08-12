@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Telegga\Laravel\Models;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use LogicException;
+use Telegga\Laravel\TelegramLinkStatus;
+use Telegga\Laravel\TelegramUserStatus;
 
 /**
  * @property int $id
@@ -18,8 +21,10 @@ use LogicException;
  * @property string|null $email
  * @property int|null $user_id
  * @property int $available_telegram_bot_id
- * @property bool $is_connected
- * @property bool $is_created
+ * @property TelegramUserStatus $status
+ * @property TelegramLinkStatus|null $link_status
+ * @property string|null $link_url
+ * @property CarbonImmutable|null $link_expires_at
  * @property-read AvailableTelegramBot|null $telegramBot
  */
 final class TelegramConnectedUser extends Model
@@ -28,8 +33,7 @@ final class TelegramConnectedUser extends Model
     use SoftDeletes;
 
     protected $attributes = [
-        'is_connected' => false,
-        'is_created' => false,
+        'status' => 'not_created',
     ];
 
     protected $fillable = [
@@ -37,8 +41,10 @@ final class TelegramConnectedUser extends Model
         'email',
         'user_id',
         'available_telegram_bot_id',
-        'is_connected',
-        'is_created',
+        'status',
+        'link_status',
+        'link_url',
+        'link_expires_at',
     ];
 
     /**
@@ -59,9 +65,23 @@ final class TelegramConnectedUser extends Model
     protected function casts(): array
     {
         return [
-            'is_connected' => 'boolean',
-            'is_created' => 'boolean',
+            'status' => TelegramUserStatus::class,
+            'link_status' => TelegramLinkStatus::class,
+            'link_expires_at' => 'immutable_datetime',
         ];
+    }
+
+    /**
+     * Determine whether the stored bot connection link can still be used.
+     */
+    public function hasValidLink(): bool
+    {
+        return ! $this->trashed()
+            && $this->status->existsInTelegga()
+            && $this->link_status === TelegramLinkStatus::Pending
+            && is_string($this->link_url)
+            && trim($this->link_url) !== ''
+            && $this->link_expires_at?->isFuture() === true;
     }
 
     /**

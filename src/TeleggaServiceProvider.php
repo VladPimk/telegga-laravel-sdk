@@ -9,6 +9,7 @@ use Illuminate\Contracts\Foundation\CachesConfiguration;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Support\ServiceProvider;
 use Telegga\Laravel\Console\Commands\ClearWebhookEventsCommand;
+use Telegga\Laravel\Console\Commands\SyncTelegramBotsCommand;
 use Telegga\Laravel\Contracts\TeleggaInterface;
 use Telegga\Laravel\Http\TeleggaClient;
 use Telegga\Laravel\Resolvers\ConnectionContextResolver;
@@ -115,6 +116,7 @@ final class TeleggaServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 ClearWebhookEventsCommand::class,
+                SyncTelegramBotsCommand::class,
             ]);
         }
 

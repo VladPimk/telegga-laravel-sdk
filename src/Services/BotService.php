@@ -7,7 +7,9 @@ namespace Telegga\Laravel\Services;
 use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Telegga\Laravel\Dto\BotData;
+use Telegga\Laravel\Dto\BotSyncData;
 use Telegga\Laravel\Exceptions\BotException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Http\TeleggaClient;
@@ -126,6 +128,63 @@ final class BotService
         } catch (QueryException $exception) {
             throw new BotException(
                 message: 'Available Telegram bots could not be loaded.',
+                previous: $exception,
+            );
+        }
+    }
+
+    /**
+     * Synchronize active API bots with locally available bots.
+     */
+    public function sync(): BotSyncData
+    {
+        try {
+            $this->cache->forget($this->cacheKey);
+            $bots = $this->getAll();
+        } catch (Throwable $exception) {
+            throw new BotException(
+                message: 'Available Telegram bots could not be loaded from Telegga.',
+                previous: $exception,
+            );
+        }
+
+        $botNames = $bots
+            ->filter(fn (BotData $bot): bool => $bot->status === 'active')
+            ->map(fn (BotData $bot): string => $this->validateName(botName: $bot->username))
+            ->unique()
+            ->values();
+
+        try {
+            return DB::transaction(function () use ($bots, $botNames): BotSyncData {
+                $existingNames = AvailableTelegramBot::query()
+                    ->whereIn('bot_name', $botNames)
+                    ->pluck('bot_name');
+                $missingNames = $botNames->diff($existingNames)->values();
+                $timestamp = now();
+
+                if ($missingNames->isNotEmpty()) {
+                    AvailableTelegramBot::query()->insert(
+                        $missingNames
+                            ->map(fn (string $botName): array => [
+                                'uuid' => str()->uuid7()->toString(),
+                                'bot_name' => $botName,
+                                'created_at' => $timestamp,
+                                'updated_at' => $timestamp,
+                            ])
+                            ->all(),
+                    );
+                }
+
+                return new BotSyncData(
+                    received: $bots->count(),
+                    active: $botNames->count(),
+                    created: $missingNames->count(),
+                    existing: $existingNames->count(),
+                );
+            });
+        } catch (Throwable $exception) {
+            throw new BotException(
+                message: 'Available Telegram bots could not be synchronized locally.',
                 previous: $exception,
             );
         }

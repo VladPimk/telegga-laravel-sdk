@@ -18,7 +18,7 @@ beforeEach(function (): void {
 it('starts a broadcast to all users of the connection bot', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -32,6 +32,7 @@ it('starts a broadcast to all users of the connection bot', function (): void {
         "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
+            'status' => 'active',
             'links' => [
                 [
                     'bot_id' => 'bot-pending',
@@ -84,7 +85,7 @@ it('starts a broadcast to all users of the connection bot', function (): void {
 it('starts a media broadcast to members of the specified group', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -97,6 +98,7 @@ it('starts a media broadcast to members of the specified group', function (): vo
         "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
             'user_id' => 'telegga-user-1',
             'external_id' => $connection->uuid,
+            'status' => 'active',
             'links' => [
                 [
                     'bot_id' => 'bot-active',

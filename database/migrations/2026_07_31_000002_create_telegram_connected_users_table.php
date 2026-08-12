@@ -34,8 +34,10 @@ return new class extends Migration
                 ->references('id')
                 ->on('available_telegram_bots')
                 ->restrictOnDelete();
-            $table->boolean('is_connected')->default(false);
-            $table->boolean('is_created')->default(false);
+            $table->string('status')->default('not_created')->index();
+            $table->string('link_status')->nullable()->index();
+            $table->string('link_url')->nullable();
+            $table->dateTimeTz('link_expires_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

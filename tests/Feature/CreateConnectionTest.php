@@ -14,6 +14,8 @@ use Telegga\Laravel\Exceptions\ConnectionException;
 use Telegga\Laravel\Exceptions\TeleggaApiException;
 use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Models\TelegramConnectedUser;
+use Telegga\Laravel\TelegramLinkStatus;
+use Telegga\Laravel\TelegramUserStatus;
 
 beforeEach(function (): void {
     Model::preventLazyLoading();
@@ -57,6 +59,7 @@ it('creates an independent connection through the selected active bot', function
                     'link_status' => 'pending',
                     'link_code' => '6U828WSH',
                     'link_url' => 'https://t.me/second_bot?start=6U828WSH',
+                    'expires_at' => '2099-07-23T15:33:15+01:00',
                 ],
                 status: 201,
             );
@@ -84,10 +87,16 @@ it('creates an independent connection through the selected active bot', function
         ->toBeNull()
         ->and($connection->telegramBot->is($selectedBot))
         ->toBeTrue()
-        ->and($connection->is_created)
-        ->toBeTrue()
-        ->and($connection->is_connected)
-        ->toBeFalse();
+        ->and($connection->status)
+        ->toBe(TelegramUserStatus::Active)
+        ->and($connection->link_status)
+        ->toBe(TelegramLinkStatus::Pending)
+        ->and($connection->link_url)
+        ->toBe('https://t.me/second_bot?start=6U828WSH')
+        ->and($connection->link_expires_at?->getTimestamp())
+        ->toBe(strtotime('2099-07-23T15:33:15+01:00'))
+        ->and($connection->hasValidLink())
+        ->toBeTrue();
 
     Http::assertSent(function (Request $request) use ($connection): bool {
         return $request->method() === 'POST'
@@ -168,6 +177,7 @@ it('retries user creation after a temporary API error', function (): void {
                 'link_status' => 'pending',
                 'link_code' => '6U828WSH',
                 'link_url' => 'https://t.me/mybot?start=6U828WSH',
+                'expires_at' => '2099-07-23T15:33:15+01:00',
             ], 201);
         },
     ]);
@@ -185,10 +195,14 @@ it('retries user creation after a temporary API error', function (): void {
 
     expect($result->user_id)
         ->toBe('telegga-user-1')
-        ->and($connection->is_created)
+        ->and($connection->status)
+        ->toBe(TelegramUserStatus::Active)
+        ->and($connection->link_status)
+        ->toBe(TelegramLinkStatus::Pending)
+        ->and($connection->link_url)
+        ->toBe('https://t.me/mybot?start=6U828WSH')
+        ->and($connection->hasValidLink())
         ->toBeTrue()
-        ->and($connection->is_connected)
-        ->toBeFalse()
         ->and(TelegramConnectedUser::query()->count())
         ->toBe(1);
 
@@ -197,6 +211,54 @@ it('retries user creation after a temporary API error', function (): void {
         ->toBe($userRequests[1][0]->data());
 
     Http::assertSentCount(3);
+});
+
+it('stores an issued link after retrying and confirming a pending connection', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/bots' => Http::response([
+            'data' => [['bot_id' => 'bot-1', 'username' => 'mybot', 'status' => 'active']],
+        ]),
+        'api.telegga.net/api/v1/users' => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+            'link_status' => 'pending',
+            'link_code' => 'RETRY001',
+            'link_url' => 'https://t.me/mybot?start=RETRY001',
+            'expires_at' => '2099-07-23T15:33:15+01:00',
+        ], 201),
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+            'status' => 'active',
+            'links' => [
+                [
+                    'bot_id' => 'bot-1',
+                    'bot_username' => 'mybot',
+                    'status' => 'pending',
+                ],
+            ],
+        ]),
+    ]);
+
+    app(TeleggaInterface::class)->retryConnection(uuid: $connection->uuid);
+    $connection->refresh();
+
+    expect($connection->status)
+        ->toBe(TelegramUserStatus::Active)
+        ->and($connection->link_status)
+        ->toBe(TelegramLinkStatus::Pending)
+        ->and($connection->link_url)
+        ->toBe('https://t.me/mybot?start=RETRY001')
+        ->and($connection->link_expires_at?->getTimestamp())
+        ->toBe(strtotime('2099-07-23T15:33:15+01:00'))
+        ->and($connection->hasValidLink())
+        ->toBeTrue();
 });
 
 it('leaves the local record uncreated after an API error', function (): void {
@@ -226,10 +288,10 @@ it('leaves the local record uncreated after an API error', function (): void {
             ->toBe($connection->uuid)
             ->and($exception->getPrevious())
             ->toBeInstanceOf(TeleggaApiException::class)
-            ->and($connection->is_created)
-            ->toBeFalse()
-            ->and($connection->is_connected)
-            ->toBeFalse();
+            ->and($connection->status)
+            ->toBe(TelegramUserStatus::NotCreated)
+            ->and($connection->link_status)
+            ->toBeNull();
 
         Http::assertSentCount(4);
 
@@ -258,6 +320,18 @@ it('resends an existing connection with the same UUID', function (): void {
                 'link_status' => 'active',
             ], 200);
         },
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+            'status' => 'active',
+            'links' => [
+                [
+                    'bot_id' => 'bot-1',
+                    'bot_username' => 'mybot',
+                    'status' => 'active',
+                ],
+            ],
+        ]),
     ]);
 
     $result = app(TeleggaInterface::class)->retryConnection(
@@ -271,10 +345,10 @@ it('resends an existing connection with the same UUID', function (): void {
         ->toBe($connection->uuid)
         ->and(TelegramConnectedUser::query()->count())
         ->toBe(1)
-        ->and($connection->is_created)
-        ->toBeTrue()
-        ->and($connection->is_connected)
-        ->toBeTrue();
+        ->and($connection->status)
+        ->toBe(TelegramUserStatus::Active)
+        ->and($connection->link_status)
+        ->toBe(TelegramLinkStatus::Active);
 
     Http::assertSent(function (Request $request) use ($connection): bool {
         return $request->method() === 'POST'
@@ -311,7 +385,7 @@ it('rejects an empty group identifier before creating a local record', function 
 it('does not retry an already created connection', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -366,8 +440,8 @@ it('preserves the UUID in an exception when the selected active bot is missing',
             ->toBe($connection->uuid)
             ->and($exception->getMessage())
             ->toBe('Active Telegram bot is not available in Telegga.')
-            ->and($connection->is_created)
-            ->toBeFalse();
+            ->and($connection->status)
+            ->toBe(TelegramUserStatus::NotCreated);
 
         Http::assertSentCount(1);
 
@@ -401,8 +475,8 @@ it('does not create a connection when the active bot name only partially matches
 
         expect($exception->connectionUuid)
             ->toBe($connection->uuid)
-            ->and($connection->is_created)
-            ->toBeFalse();
+            ->and($connection->status)
+            ->toBe(TelegramUserStatus::NotCreated);
 
         Http::assertSentCount(1);
 
@@ -549,7 +623,142 @@ it('rejects a successful API response with invalid JSON', function (): void {
             ->toBeInstanceOf(TeleggaApiException::class)
             ->and($this->previousApiException(exception: $exception)->apiCode)
             ->toBe('invalid_response')
-            ->and($connection->is_created)
+            ->and($connection->status)
+            ->toBe(TelegramUserStatus::NotCreated);
+
+        Http::assertSentCount(2);
+
+        return;
+    }
+
+    $this->fail('Expected a ConnectionException.');
+});
+
+it('preserves independent user and link statuses when retrying a disabled Telegga user', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/bots' => Http::response([
+            'data' => [['bot_id' => 'bot-1', 'username' => 'mybot', 'status' => 'active']],
+        ]),
+        'api.telegga.net/api/v1/users' => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+            'link_status' => 'active',
+        ]),
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+            'status' => 'disabled',
+            'links' => [
+                [
+                    'bot_id' => 'bot-1',
+                    'bot_username' => 'mybot',
+                    'status' => 'active',
+                ],
+            ],
+        ]),
+    ]);
+
+    app(TeleggaInterface::class)->retryConnection(uuid: $connection->uuid);
+    $connection->refresh();
+
+    expect($connection->status)
+        ->toBe(TelegramUserStatus::Disabled)
+        ->and($connection->link_status)
+        ->toBe(TelegramLinkStatus::Active);
+
+    Http::assertSentCount(3);
+});
+
+it('keeps a connection retryable when remote status confirmation fails', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/bots' => Http::response([
+            'data' => [['bot_id' => 'bot-1', 'username' => 'mybot', 'status' => 'active']],
+        ]),
+        'api.telegga.net/api/v1/users' => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+            'link_status' => 'pending',
+            'link_code' => 'RETRY002',
+            'link_url' => 'https://t.me/mybot?start=RETRY002',
+            'expires_at' => '2099-07-23T15:33:15+01:00',
+        ]),
+        "api.telegga.net/api/v1/users?external_id={$connection->uuid}" => Http::response([
+            'error' => [
+                'code' => 'internal',
+                'message' => 'Internal error.',
+            ],
+        ], 500),
+    ]);
+
+    try {
+        app(TeleggaInterface::class)->retryConnection(uuid: $connection->uuid);
+    } catch (ConnectionException $exception) {
+        $connection->refresh();
+
+        expect($exception->connectionUuid)
+            ->toBe($connection->uuid)
+            ->and($connection->status)
+            ->toBe(TelegramUserStatus::NotCreated)
+            ->and($connection->link_status)
+            ->toBeNull()
+            ->and($connection->link_url)
+            ->toBe('https://t.me/mybot?start=RETRY002')
+            ->and($connection->hasValidLink())
+            ->toBeFalse();
+
+        return;
+    }
+
+    $this->fail('Expected a ConnectionException.');
+});
+
+it('keeps a retryable state when an issued link expiration is invalid', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/bots' => Http::response([
+            'data' => [['bot_id' => 'bot-1', 'username' => 'mybot', 'status' => 'active']],
+        ]),
+        'api.telegga.net/api/v1/users' => Http::response([
+            'user_id' => 'telegga-user-1',
+            'external_id' => $connection->uuid,
+            'link_status' => 'pending',
+            'link_code' => 'RETRY003',
+            'link_url' => 'https://t.me/mybot?start=RETRY003',
+            'expires_at' => 'invalid-expiration',
+        ]),
+    ]);
+
+    try {
+        app(TeleggaInterface::class)->retryConnection(uuid: $connection->uuid);
+    } catch (ConnectionException $exception) {
+        $connection->refresh();
+
+        expect($exception->connectionUuid)
+            ->toBe($connection->uuid)
+            ->and($connection->status)
+            ->toBe(TelegramUserStatus::NotCreated)
+            ->and($connection->link_status)
+            ->toBeNull()
+            ->and($connection->link_url)
+            ->toBeNull()
+            ->and($connection->hasValidLink())
             ->toBeFalse();
 
         Http::assertSentCount(2);

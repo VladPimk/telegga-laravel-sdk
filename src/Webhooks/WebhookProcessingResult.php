@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Telegga\Laravel\Webhooks;
 
+use Telegga\Laravel\TelegramLinkStatus;
+use Telegga\Laravel\TelegramUserStatus;
+
 final readonly class WebhookProcessingResult
 {
     /**
@@ -14,5 +17,7 @@ final readonly class WebhookProcessingResult
         public ?string $expectedBotName = null,
         public ?string $expectedEvent = null,
         public ?WebhookProcessingStatus $failureStatus = null,
+        public ?TelegramUserStatus $userStatus = null,
+        public ?TelegramLinkStatus $linkStatus = null,
     ) {}
 }

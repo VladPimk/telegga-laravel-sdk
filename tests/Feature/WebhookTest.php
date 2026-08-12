@@ -13,6 +13,8 @@ use Telegga\Laravel\Http\Middleware\VerifyWebhookToken;
 use Telegga\Laravel\Models\AvailableTelegramBot;
 use Telegga\Laravel\Models\TeleggaWebhookEvent;
 use Telegga\Laravel\Models\TelegramConnectedUser;
+use Telegga\Laravel\TelegramLinkStatus;
+use Telegga\Laravel\TelegramUserStatus;
 
 /**
  * Create a complete user connection event payload.
@@ -62,7 +64,10 @@ it('registers the webhook route at the expected URI', function (): void {
 it('accepts a connection event and returns the result idempotently', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
+        'link_status' => 'pending',
+        'link_url' => 'https://t.me/mybot?start=CODE',
+        'link_expires_at' => now()->addDay(),
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
     $payload = [
@@ -84,7 +89,8 @@ it('accepts a connection event and returns the result idempotently', function ()
         'data' => [
             'external_id' => $connection->uuid,
             'bot_username' => 'mybot',
-            'is_connected' => true,
+            'status' => 'active',
+            'link_status' => 'active',
         ],
     ];
 
@@ -109,7 +115,8 @@ it('accepts a connection event and returns the result idempotently', function ()
             'data' => [
                 'external_id' => $connection->uuid,
                 'bot_username' => 'mybot',
-                'is_connected' => true,
+                'status' => 'active',
+                'link_status' => 'active',
             ],
         ]);
 
@@ -117,8 +124,14 @@ it('accepts a connection event and returns the result idempotently', function ()
     DB::disableQueryLog();
     $webhookEvent = TeleggaWebhookEvent::query()->sole();
 
-    expect($connection->refresh()->is_connected)
-        ->toBeTrue()
+    expect($connection->refresh()->link_status)
+        ->toBe(TelegramLinkStatus::Active)
+        ->and($connection->link_url)
+        ->toBeNull()
+        ->and($connection->link_expires_at)
+        ->toBeNull()
+        ->and($connection->hasValidLink())
+        ->toBeFalse()
         ->and(TelegramConnectedUser::query()->count())
         ->toBe(1)
         ->and($webhookEvent->telegram_connected_user_id)
@@ -145,7 +158,7 @@ it('accepts a connection event and returns the result idempotently', function ()
 it('records a new event_id for an already connected user', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -176,16 +189,54 @@ it('records a new event_id for an already connected user', function (): void {
         ->toBeTrue();
 });
 
+it('returns current connection statuses when an event is completed before transactional processing', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+
+    TeleggaWebhookEvent::created(function (TeleggaWebhookEvent $webhookEvent) use ($connection): void {
+        TelegramConnectedUser::query()
+            ->whereKey($connection->getKey())
+            ->update([
+                'status' => 'active',
+                'link_status' => 'active',
+            ]);
+        TeleggaWebhookEvent::query()
+            ->whereKey($webhookEvent->getKey())
+            ->update([
+                'processed_at' => now(),
+            ]);
+    });
+
+    try {
+        $response = $this
+            ->withToken('webhook-secret')
+            ->postJson('/webhooks/v1/telegram/connect-account', userLinkedWebhookPayload(overrides: [
+                'external_id' => $connection->uuid,
+            ]));
+    } finally {
+        TeleggaWebhookEvent::flushEventListeners();
+        TeleggaWebhookEvent::clearBootedModels();
+    }
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('message', 'Webhook event has already been processed.')
+        ->assertJsonPath('data.status', 'active')
+        ->assertJsonPath('data.link_status', 'active');
+});
+
 it('rejects an event_id already assigned to another connection', function (): void {
     $log = Log::spy();
     $firstConnection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
     $secondConnection = TelegramConnectedUser::query()->create([
         'name' => 'Пётр',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -223,8 +274,8 @@ it('rejects an event_id already assigned to another connection', function (): vo
         ->toBe($firstConnection->id)
         ->and($webhookEvent->attempts)
         ->toBe(1)
-        ->and($secondConnection->refresh()->is_connected)
-        ->toBeFalse();
+        ->and($secondConnection->refresh()->link_status)
+        ->toBeNull();
 
     $this->receivedCall(spy: $log, method: 'warning')
         ->once()
@@ -238,7 +289,7 @@ it('rejects an event_id already assigned to another connection', function (): vo
 it('completes a previously recorded unprocessed event', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
     $webhookEvent = TeleggaWebhookEvent::query()->create([
@@ -256,8 +307,8 @@ it('completes a previously recorded unprocessed event', function (): void {
         ->assertOk()
         ->assertJsonPath('message', 'Telegram connection marked as connected.');
 
-    expect($connection->refresh()->is_connected)
-        ->toBeTrue()
+    expect($connection->refresh()->link_status)
+        ->toBe(TelegramLinkStatus::Active)
         ->and($webhookEvent->refresh()->attempts)
         ->toBe(2)
         ->and($webhookEvent->processed_at)
@@ -267,7 +318,7 @@ it('completes a previously recorded unprocessed event', function (): void {
 it('accepts a test event without changing connections', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -285,8 +336,8 @@ it('accepts a test event without changing connections', function (): void {
             'message' => 'Webhook accepted.',
         ]);
 
-    expect($connection->refresh()->is_connected)
-        ->toBeFalse()
+    expect($connection->refresh()->link_status)
+        ->toBeNull()
         ->and(TeleggaWebhookEvent::query()->doesntExist())
         ->toBeTrue();
 });
@@ -340,7 +391,7 @@ it('returns an error for an unknown external_id', function (): void {
 it('returns a distinct error for a deleted connection', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
     $connection->delete();
@@ -365,8 +416,8 @@ it('returns a distinct error for a deleted connection', function (): void {
             ],
         ]);
 
-    expect(TelegramConnectedUser::withTrashed()->find($connection->id)?->is_connected)
-        ->toBeFalse()
+    expect(TelegramConnectedUser::withTrashed()->find($connection->id)?->link_status)
+        ->toBeNull()
         ->and(TeleggaWebhookEvent::query()->doesntExist())
         ->toBeTrue();
 });
@@ -391,17 +442,18 @@ it('restores local state from an authorized user linked event', function (): voi
             'data' => [
                 'external_id' => $connection->uuid,
                 'bot_username' => 'mybot',
-                'is_connected' => true,
+                'status' => 'active',
+                'link_status' => 'active',
             ],
         ]);
 
     $connection->refresh();
     $webhookEvent = TeleggaWebhookEvent::query()->sole();
 
-    expect($connection->is_created)
-        ->toBeTrue()
-        ->and($connection->is_connected)
-        ->toBeTrue()
+    expect($connection->status)
+        ->toBe(TelegramUserStatus::Active)
+        ->and($connection->link_status)
+        ->toBe(TelegramLinkStatus::Active)
         ->and($webhookEvent->telegram_connected_user_id)
         ->toBe($connection->id)
         ->and($webhookEvent->processed_at)
@@ -411,7 +463,7 @@ it('restores local state from an authorized user linked event', function (): voi
 it('requests another delivery when the related bot was deleted', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
     $this->telegramBot->delete();
@@ -440,8 +492,8 @@ it('requests another delivery when the related bot was deleted', function (): vo
 
     $webhookEvent = TeleggaWebhookEvent::query()->sole();
 
-    expect($connection->refresh()->is_connected)
-        ->toBeFalse()
+    expect($connection->refresh()->link_status)
+        ->toBeNull()
         ->and($webhookEvent->attempts)
         ->toBe(1)
         ->and($webhookEvent->processed_at)
@@ -451,7 +503,7 @@ it('requests another delivery when the related bot was deleted', function (): vo
 it('requests another delivery when the related bot is missing', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -482,8 +534,8 @@ it('requests another delivery when the related bot is missing', function (): voi
 
     $webhookEvent = TeleggaWebhookEvent::query()->sole();
 
-    expect($connection->refresh()->is_connected)
-        ->toBeFalse()
+    expect($connection->refresh()->link_status)
+        ->toBeNull()
         ->and($webhookEvent->attempts)
         ->toBe(1)
         ->and($webhookEvent->processed_at)
@@ -493,7 +545,7 @@ it('requests another delivery when the related bot is missing', function (): voi
 it('compares a bot name case-insensitively', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -506,14 +558,14 @@ it('compares a bot name case-insensitively', function (): void {
         ->assertOk()
         ->assertJsonPath('data.bot_username', 'mybot');
 
-    expect($connection->refresh()->is_connected)
-        ->toBeTrue();
+    expect($connection->refresh()->link_status)
+        ->toBe(TelegramLinkStatus::Active);
 });
 
 it('requests another delivery when the bot name does not match', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -542,8 +594,8 @@ it('requests another delivery when the bot name does not match', function (): vo
 
     $webhookEvent = TeleggaWebhookEvent::query()->sole();
 
-    expect($connection->refresh()->is_connected)
-        ->toBeFalse()
+    expect($connection->refresh()->link_status)
+        ->toBeNull()
         ->and($webhookEvent->attempts)
         ->toBe(1)
         ->and($webhookEvent->processed_at)
@@ -554,7 +606,7 @@ it('acknowledges an unresolved bot failure after the retry window expires', func
     $log = Log::spy();
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
     $payload = userLinkedWebhookPayload(overrides: [
@@ -592,8 +644,8 @@ it('acknowledges an unresolved bot failure after the retry window expires', func
 
     $webhookEvent = TeleggaWebhookEvent::query()->sole();
 
-    expect($connection->refresh()->is_connected)
-        ->toBeFalse()
+    expect($connection->refresh()->link_status)
+        ->toBeNull()
         ->and($webhookEvent->attempts)
         ->toBe(2)
         ->and($webhookEvent->processed_at)
@@ -830,7 +882,7 @@ it('does not accept connection event fields from the query string', function ():
 it('rejects a connection event without an event_id', function (): void {
     $connection = TelegramConnectedUser::query()->create([
         'name' => 'Иван',
-        'is_created' => true,
+        'status' => 'active',
         'available_telegram_bot_id' => $this->telegramBot->id,
     ]);
 
@@ -852,10 +904,35 @@ it('rejects a connection event without an event_id', function (): void {
             ],
         ]);
 
-    expect($connection->refresh()->is_connected)
-        ->toBeFalse()
+    expect($connection->refresh()->link_status)
+        ->toBeNull()
         ->and(TeleggaWebhookEvent::query()->doesntExist())
         ->toBeTrue();
+});
+
+it('activates the bot link without enabling a disabled Telegga user', function (): void {
+    $connection = TelegramConnectedUser::query()->create([
+        'name' => 'Иван',
+        'status' => 'disabled',
+        'link_status' => 'pending',
+        'available_telegram_bot_id' => $this->telegramBot->id,
+    ]);
+
+    $this
+        ->withToken('webhook-secret')
+        ->postJson('/webhooks/v1/telegram/connect-account', userLinkedWebhookPayload(overrides: [
+            'external_id' => $connection->uuid,
+        ]))
+        ->assertOk()
+        ->assertJsonPath('data.status', 'disabled')
+        ->assertJsonPath('data.link_status', 'active');
+
+    $connection->refresh();
+
+    expect($connection->status)
+        ->toBe(TelegramUserStatus::Disabled)
+        ->and($connection->link_status)
+        ->toBe(TelegramLinkStatus::Active);
 });
 
 it('requires documented connection event fields', function (
