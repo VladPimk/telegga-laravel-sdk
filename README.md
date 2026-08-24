@@ -112,9 +112,14 @@ Before creating connections, register a bot that is available to the Telegga ser
 $bot = $telegga->addTelegramBot(
     botName: 'auctiongate_notification_bot',
 );
+
+$username = $bot->bot_name;
+$displayName = $bot->display_name;
 ```
 
-The package accepts and stores the username without the `@` prefix, matching the format returned by the API. Local and API usernames are converted to lowercase before comparison, and the local value is stored in lowercase. The package does not store `bot_id` or any other bot data returned by the API. The model `uuid` is generated locally.
+The package accepts and stores the username without the `@` prefix, matching the format returned by the API. Local and API usernames are converted to lowercase before comparison, and the local value is stored in lowercase. The API `display_name` is stored separately without changing its case and may be `null` when the API omits it. The package does not store the API `bot_id`; the model `uuid` is generated locally.
+
+`addTelegramBot()` always validates the requested username against a current `GET /bots` response. A newly registered local bot stores both the username and display name. Calling the method again for an existing local bot refreshes its display name when the API value has changed while preserving the local ID, UUID, and connections.
 
 The remote `GET /bots` response is cached through the application's Laravel cache store for 10 minutes. The cache contains only the validated raw response array; package DTOs and collections are created by `BotResponseMapper` after every cache read and are never serialized into the cache. This keeps cached data independent of PHP class changes during rolling deployments. The versioned cache key is scoped by a SHA-256 hash of the API base URL and API key, so bot lists from different Telegga services are not mixed and the API key is not exposed in the key. API errors and invalid responses are not cached. Changes to bot access or status can therefore take up to 10 minutes to become visible to ordinary reads. `addTelegramBot()` clears the cache before validating the requested bot, and a successful `deleteTelegramBot()` invalidates it for the next read.
 
@@ -136,7 +141,7 @@ Synchronize every currently active Telegga bot into the local table:
 php artisan telegga:bots:sync
 ```
 
-The command clears the cached remote bot list, performs one current `GET /bots` request, and creates missing local records for active bots. Existing records and their local UUIDs are preserved. Inactive, inaccessible, or missing remote bots are never removed locally, and a previously soft-deleted bot is represented by a new local record if it becomes active again. The command logs its result and exits with a failure code without changing local records when the API response cannot be loaded or the database transaction fails.
+The command clears the cached remote bot list, performs one current `GET /bots` request, and creates missing local records for active bots with their display names. Existing active records receive the current display name when it is missing or has changed, while their local IDs, UUIDs, and connections are preserved. Inactive, inaccessible, or missing remote bots are never updated or removed locally, and a previously soft-deleted bot is represented by a new local record if it becomes active again. The command logs its result and exits with a failure code without changing local records when the API response cannot be loaded or the database transaction fails.
 
 The host application controls the synchronization schedule. For example, in `routes/console.php`:
 

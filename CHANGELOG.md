@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Local storage for Telegram bot display names.
+
+### Changed
+
+- Bot registration and synchronization now keep local display names aligned with active bots returned by Telegga.
+
 ## [3.0.1] - 2026-08-12
 
 ### Added
