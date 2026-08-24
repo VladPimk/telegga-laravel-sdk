@@ -17,19 +17,25 @@ it('synchronizes active bots without removing existing local records', function 
     $log = Log::spy();
     $existingBot = AvailableTelegramBot::query()->create([
         'bot_name' => 'existing_bot',
+        'display_name' => null,
     ]);
     $existingUuid = $existingBot->uuid;
     AvailableTelegramBot::query()->create([
         'bot_name' => 'local_only_bot',
+        'display_name' => 'Local Only Bot',
+    ]);
+    AvailableTelegramBot::query()->create([
+        'bot_name' => 'inactive_bot',
+        'display_name' => 'Local Inactive Bot',
     ]);
 
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
             'data' => [
-                ['bot_id' => 'bot-1', 'username' => 'Existing_Bot', 'status' => 'active'],
-                ['bot_id' => 'bot-2', 'username' => 'new_bot', 'status' => 'active'],
-                ['bot_id' => 'bot-3', 'username' => 'inactive_bot', 'status' => 'inactive'],
+                ['bot_id' => 'bot-1', 'username' => 'Existing_Bot', 'display_name' => 'Existing Bot', 'status' => 'active'],
+                ['bot_id' => 'bot-2', 'username' => 'new_bot', 'display_name' => 'New Bot', 'status' => 'active'],
+                ['bot_id' => 'bot-3', 'username' => 'inactive_bot', 'display_name' => 'Remote Inactive Bot', 'status' => 'inactive'],
             ],
         ]),
     ]);
@@ -44,18 +50,29 @@ it('synchronizes active bots without removing existing local records', function 
     $queries = collect(DB::getQueryLog());
     DB::disableQueryLog();
 
-    expect(AvailableTelegramBot::query()->orderBy('bot_name')->pluck('bot_name')->all())
-        ->toBe(['existing_bot', 'local_only_bot', 'new_bot'])
+    $storedBots = AvailableTelegramBot::query()->get()->keyBy('bot_name');
+
+    expect($storedBots->keys()->sort()->values()->all())
+        ->toBe(['existing_bot', 'inactive_bot', 'local_only_bot', 'new_bot'])
         ->and($existingBot->refresh()->uuid)
         ->toBe($existingUuid)
-        ->and(Str::isUuid(
-            AvailableTelegramBot::query()->where('bot_name', 'new_bot')->sole()->uuid,
-            7,
-        ))
+        ->and($existingBot->display_name)
+        ->toBe('Existing Bot')
+        ->and($storedBots->get('new_bot')?->display_name)
+        ->toBe('New Bot')
+        ->and($storedBots->get('local_only_bot')?->display_name)
+        ->toBe('Local Only Bot')
+        ->and($storedBots->get('inactive_bot')?->display_name)
+        ->toBe('Local Inactive Bot')
+        ->and(Str::isUuid($storedBots->get('new_bot')?->uuid, 7))
         ->toBeTrue();
 
     $this->assertCount(1, $queries->filter(
         fn (array $query): bool => str_starts_with(strtolower($query['query']), 'insert into')
+            && str_contains(strtolower($query['query']), 'available_telegram_bots'),
+    ));
+    $this->assertCount(1, $queries->filter(
+        fn (array $query): bool => str_starts_with(strtolower($query['query']), 'update')
             && str_contains(strtolower($query['query']), 'available_telegram_bots'),
     ));
 
@@ -95,10 +112,55 @@ it('refreshes the cached bot list before synchronization', function (): void {
         ->expectsOutput('Telegram bots synchronized: received 1, active 1, created 1, existing 0.')
         ->assertExitCode(Command::SUCCESS);
 
-    expect(AvailableTelegramBot::query()->pluck('bot_name')->all())
-        ->toBe(['current_bot']);
+    $currentBot = AvailableTelegramBot::query()->sole();
+
+    expect($currentBot->bot_name)
+        ->toBe('current_bot')
+        ->and($currentBot->display_name)
+        ->toBeNull();
 
     Http::assertSentCount(2);
+});
+
+it('does not update an existing bot when the display name is unchanged', function (): void {
+    $existingBot = AvailableTelegramBot::query()->create([
+        'bot_name' => 'existing_bot',
+        'display_name' => 'Existing Bot',
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/bots' => Http::response([
+            'data' => [
+                [
+                    'bot_id' => 'bot-1',
+                    'username' => 'existing_bot',
+                    'display_name' => 'Existing Bot',
+                    'status' => 'active',
+                ],
+            ],
+        ]),
+    ]);
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    $this->artisan('telegga:bots:sync')
+        ->expectsOutput('Telegram bots synchronized: received 1, active 1, created 0, existing 1.')
+        ->assertExitCode(Command::SUCCESS);
+
+    $queries = collect(DB::getQueryLog());
+    DB::disableQueryLog();
+
+    expect($existingBot->refresh()->display_name)
+        ->toBe('Existing Bot');
+
+    $this->assertCount(0, $queries->filter(
+        fn (array $query): bool => str_starts_with(strtolower($query['query']), 'update')
+            && str_contains(strtolower($query['query']), 'available_telegram_bots'),
+    ));
+
+    Http::assertSentCount(1);
 });
 
 it('can run repeatedly without creating duplicate bots', function (): void {
@@ -134,7 +196,7 @@ it('creates a new local record for an active soft-deleted bot', function (): voi
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
             'data' => [
-                ['bot_id' => 'bot-1', 'username' => 'restored_bot', 'status' => 'active'],
+                ['bot_id' => 'bot-1', 'username' => 'restored_bot', 'display_name' => 'Restored Bot', 'status' => 'active'],
             ],
         ]),
     ]);
@@ -147,6 +209,8 @@ it('creates a new local record for an active soft-deleted bot', function (): voi
 
     expect($newBot->uuid)
         ->not->toBe($deletedBot->uuid)
+        ->and($newBot->display_name)
+        ->toBe('Restored Bot')
         ->and(AvailableTelegramBot::withTrashed()->count())
         ->toBe(2);
 });

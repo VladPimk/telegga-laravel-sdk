@@ -157,26 +157,31 @@ final class BotService
             );
         }
 
-        $botNames = $bots
+        /** @var Collection<string, BotData> $activeBots */
+        $activeBots = $bots
             ->filter(fn (BotData $bot): bool => $bot->status === 'active')
-            ->map(fn (BotData $bot): string => $this->validateName(botName: $bot->username))
-            ->unique()
-            ->values();
+            ->keyBy(fn (BotData $bot): string => $this->validateName(botName: $bot->username));
+        $botNames = $activeBots->keys();
 
         try {
-            return DB::transaction(function () use ($bots, $botNames): BotSyncData {
-                $existingNames = AvailableTelegramBot::query()
+            return DB::transaction(function () use ($bots, $activeBots, $botNames): BotSyncData {
+                /** @var Collection<string, AvailableTelegramBot> $existingBots */
+                $existingBots = AvailableTelegramBot::query()
                     ->whereIn('bot_name', $botNames)
-                    ->pluck('bot_name');
-                $missingNames = $botNames->diff($existingNames)->values();
+                    ->get()
+                    ->keyBy('bot_name');
+                $missingBots = $activeBots->reject(
+                    fn (BotData $bot, string $botName): bool => $existingBots->has($botName),
+                );
                 $timestamp = now();
 
-                if ($missingNames->isNotEmpty()) {
+                if ($missingBots->isNotEmpty()) {
                     AvailableTelegramBot::query()->insert(
-                        $missingNames
-                            ->map(fn (string $botName): array => [
+                        $missingBots
+                            ->map(fn (BotData $bot, string $botName): array => [
                                 'uuid' => str()->uuid7()->toString(),
                                 'bot_name' => $botName,
+                                'display_name' => $bot->display_name,
                                 'created_at' => $timestamp,
                                 'updated_at' => $timestamp,
                             ])
@@ -184,11 +189,21 @@ final class BotService
                     );
                 }
 
+                foreach ($existingBots as $botName => $localBot) {
+                    $displayName = $activeBots->get($botName)?->display_name;
+
+                    if ($localBot->display_name !== $displayName) {
+                        $localBot->update([
+                            'display_name' => $displayName,
+                        ]);
+                    }
+                }
+
                 return new BotSyncData(
                     received: $bots->count(),
-                    active: $botNames->count(),
-                    created: $missingNames->count(),
-                    existing: $existingNames->count(),
+                    active: $activeBots->count(),
+                    created: $missingBots->count(),
+                    existing: $existingBots->count(),
                 );
             });
         } catch (Throwable $exception) {
