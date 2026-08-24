@@ -15,6 +15,7 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property string $uuid
  * @property string $bot_name
+ * @property string|null $display_name
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -25,6 +26,7 @@ final class AvailableTelegramBot extends Model
 
     protected $fillable = [
         'bot_name',
+        'display_name',
     ];
 
     /**

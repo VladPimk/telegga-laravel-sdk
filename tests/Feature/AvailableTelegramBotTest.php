@@ -16,12 +16,14 @@ it('creates the available bots table and generates a local UUID', function (): v
     $bot = AvailableTelegramBot::query()->create([
         'uuid' => $providedUuid,
         'bot_name' => 'mybot',
+        'display_name' => 'My Bot',
     ]);
 
     expect(Schema::hasColumns('available_telegram_bots', [
         'id',
         'uuid',
         'bot_name',
+        'display_name',
         'created_at',
         'updated_at',
         'deleted_at',
@@ -32,6 +34,8 @@ it('creates the available bots table and generates a local UUID', function (): v
         ->toBeTrue()
         ->and($bot->bot_name)
         ->toBe('mybot')
+        ->and($bot->display_name)
+        ->toBe('My Bot')
         ->and($bot->created_at)
         ->not->toBeNull()
         ->and($bot->updated_at)
@@ -47,6 +51,17 @@ it('creates the available bots table and generates a local UUID', function (): v
             fn (array $index): bool => $index['columns'] === ['bot_name', 'deleted_at']
                 && $index['unique'] === true,
         ))->toBeTrue();
+});
+
+it('allows a local bot without a display name', function (): void {
+    $bot = AvailableTelegramBot::query()->create([
+        'bot_name' => 'mybot',
+    ]);
+
+    expect($bot->display_name)
+        ->toBeNull()
+        ->and($bot->refresh()->display_name)
+        ->toBeNull();
 });
 
 it('adds a local bot after validating the API list', function (): void {
