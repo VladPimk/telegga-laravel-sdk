@@ -83,7 +83,7 @@ final class BotService
         try {
             $this->cache->forget($this->cacheKey);
 
-            $exists = $this->getAll()->contains(
+            $remoteBot = $this->getAll()->first(
                 fn (BotData $bot): bool => str()->lower($bot->username) === $botName,
             );
         } catch (TeleggaApiException $exception) {
@@ -94,7 +94,7 @@ final class BotService
             );
         }
 
-        if (! $exists) {
+        if (! $remoteBot instanceof BotData) {
             throw new BotException(
                 message: 'Telegram bot is not available in Telegga.',
                 botName: $botName,
@@ -102,12 +102,21 @@ final class BotService
         }
 
         try {
-            return AvailableTelegramBot::query()->firstOrCreate([
-                'bot_name' => $botName,
-            ]);
+            $localBot = AvailableTelegramBot::query()->firstOrCreate(
+                ['bot_name' => $botName],
+                ['display_name' => $remoteBot->display_name],
+            );
+
+            if (! $localBot->wasRecentlyCreated && $localBot->display_name !== $remoteBot->display_name) {
+                $localBot->update([
+                    'display_name' => $remoteBot->display_name,
+                ]);
+            }
+
+            return $localBot;
         } catch (QueryException $exception) {
             throw new BotException(
-                message: 'Available Telegram bot could not be created.',
+                message: 'Available Telegram bot could not be saved.',
                 botName: $botName,
                 previous: $exception,
             );
