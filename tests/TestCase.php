@@ -22,13 +22,9 @@ abstract class TestCase extends Orchestra
      */
     protected function receivedCall(LegacyMockInterface $spy, string $method): VerificationDirector
     {
-        $verification = $spy->shouldHaveReceived($method);
-
-        if (! $verification instanceof VerificationDirector) {
-            throw new RuntimeException('Mockery did not return a verification director.');
-        }
-
-        return $verification;
+        return $this->verificationDirector(
+            verification: $spy->shouldHaveReceived($method),
+        );
     }
 
     /**
@@ -121,5 +117,17 @@ abstract class TestCase extends Orchestra
     protected function defineDatabaseMigrationsAfterDatabaseRefreshed()
     {
         Schema::enableForeignKeyConstraints();
+    }
+
+    /**
+     * Normalize version-dependent Mockery return type declarations.
+     */
+    private function verificationDirector(mixed $verification): VerificationDirector
+    {
+        if (! $verification instanceof VerificationDirector) {
+            throw new RuntimeException('Mockery did not return a verification director.');
+        }
+
+        return $verification;
     }
 }
