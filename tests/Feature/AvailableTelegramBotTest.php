@@ -16,12 +16,14 @@ it('creates the available bots table and generates a local UUID', function (): v
     $bot = AvailableTelegramBot::query()->create([
         'uuid' => $providedUuid,
         'bot_name' => 'mybot',
+        'display_name' => 'My Bot',
     ]);
 
     expect(Schema::hasColumns('available_telegram_bots', [
         'id',
         'uuid',
         'bot_name',
+        'display_name',
         'created_at',
         'updated_at',
         'deleted_at',
@@ -32,6 +34,8 @@ it('creates the available bots table and generates a local UUID', function (): v
         ->toBeTrue()
         ->and($bot->bot_name)
         ->toBe('mybot')
+        ->and($bot->display_name)
+        ->toBe('My Bot')
         ->and($bot->created_at)
         ->not->toBeNull()
         ->and($bot->updated_at)
@@ -49,7 +53,47 @@ it('creates the available bots table and generates a local UUID', function (): v
         ))->toBeTrue();
 });
 
+it('allows a local bot without a display name', function (): void {
+    $bot = AvailableTelegramBot::query()->create([
+        'bot_name' => 'mybot',
+    ]);
+
+    expect($bot->display_name)
+        ->toBeNull()
+        ->and($bot->refresh()->display_name)
+        ->toBeNull();
+});
+
 it('adds a local bot after validating the API list', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/bots' => Http::response([
+            'data' => [
+                [
+                    'bot_id' => 'remote-bot-id',
+                    'username' => 'mybot',
+                    'display_name' => 'My Bot',
+                    'status' => 'active',
+                ],
+            ],
+        ]),
+    ]);
+
+    $bot = app(TeleggaInterface::class)->addTelegramBot(botName: 'mybot');
+
+    expect($bot->bot_name)
+        ->toBe('mybot')
+        ->and($bot->display_name)
+        ->toBe('My Bot')
+        ->and(Str::isUuid($bot->uuid))
+        ->toBeTrue()
+        ->and($bot->uuid)
+        ->not->toBe('remote-bot-id');
+
+    Http::assertSentCount(1);
+});
+
+it('stores a null display name when the API omits it', function (): void {
     Http::preventStrayRequests();
     Http::fake([
         'api.telegga.net/api/v1/bots' => Http::response([
@@ -65,12 +109,10 @@ it('adds a local bot after validating the API list', function (): void {
 
     $bot = app(TeleggaInterface::class)->addTelegramBot(botName: 'mybot');
 
-    expect($bot->bot_name)
-        ->toBe('mybot')
-        ->and(Str::isUuid($bot->uuid))
-        ->toBeTrue()
-        ->and($bot->uuid)
-        ->not->toBe('remote-bot-id');
+    expect($bot->display_name)
+        ->toBeNull()
+        ->and($bot->refresh()->display_name)
+        ->toBeNull();
 
     Http::assertSentCount(1);
 });
@@ -132,6 +174,50 @@ it('returns an existing local bot on repeated addition', function (): void {
         ->toBeTrue()
         ->and(AvailableTelegramBot::query()->count())
         ->toBe(1);
+});
+
+it('updates the display name when adding an existing local bot', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.telegga.net/api/v1/bots' => Http::sequence()
+            ->push([
+                'data' => [
+                    [
+                        'bot_id' => 'remote-bot-id',
+                        'username' => 'mybot',
+                        'display_name' => 'Old Bot Name',
+                        'status' => 'active',
+                    ],
+                ],
+            ])
+            ->push([
+                'data' => [
+                    [
+                        'bot_id' => 'remote-bot-id',
+                        'username' => 'mybot',
+                        'display_name' => 'New Bot Name',
+                        'status' => 'active',
+                    ],
+                ],
+            ]),
+    ]);
+
+    $first = app(TeleggaInterface::class)->addTelegramBot(botName: 'mybot');
+    $uuid = $first->uuid;
+    $second = app(TeleggaInterface::class)->addTelegramBot(botName: 'mybot');
+
+    expect($second->is($first))
+        ->toBeTrue()
+        ->and($second->uuid)
+        ->toBe($uuid)
+        ->and($second->display_name)
+        ->toBe('New Bot Name')
+        ->and($second->refresh()->display_name)
+        ->toBe('New Bot Name')
+        ->and(AvailableTelegramBot::query()->count())
+        ->toBe(1);
+
+    Http::assertSentCount(2);
 });
 
 it('rejects an API username with an extra character', function (string $apiUsername): void {

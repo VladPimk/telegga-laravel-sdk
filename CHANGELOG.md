@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [3.0.2] - 2026-08-25
+
+### Added
+
+- Local storage for Telegram bot display names.
+
+### Changed
+
+- Bot registration and synchronization now keep local display names aligned with active bots returned by Telegga.
+
 ## [3.0.1] - 2026-08-12
 
 ### Added
@@ -90,7 +100,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Initial public release of the Telegga Laravel SDK.
 
-[Unreleased]: https://github.com/VladPimk/telegga-laravel-sdk/compare/v3.0.1...HEAD
+[Unreleased]: https://github.com/VladPimk/telegga-laravel-sdk/compare/v3.0.2...HEAD
+[3.0.2]: https://github.com/VladPimk/telegga-laravel-sdk/compare/v3.0.1...v3.0.2
 [3.0.1]: https://github.com/VladPimk/telegga-laravel-sdk/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/VladPimk/telegga-laravel-sdk/compare/v2.0.0...v3.0.0
 [2.0.0]: https://github.com/VladPimk/telegga-laravel-sdk/compare/v1.0.1...v2.0.0
